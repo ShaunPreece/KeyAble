@@ -12,6 +12,9 @@ It runs in your web browser and needs nothing installed.
 
 ## How to run it
 
+Use KeyAble online, with nothing to download:
+https://keyable.slightperception.com
+
 The user guide and the download are on KeyAble's home page:
 https://www.slightperception.com/apps/keyable/
 
