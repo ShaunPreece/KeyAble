@@ -1,0 +1,143 @@
+ACCESSIBILITY: THE DECISIONS THAT MATTER, AND THE ONES NOT TO BREAK
+===================================================================
+
+KeyAble exists because Keychron's own Launcher web app is very difficult to use
+with a screen reader. Accessibility is therefore not a feature of this project, it is the whole point.
+
+If you fork KeyAble, this is the part most worth preserving, and the part
+least obvious from reading the code. Break the data and a keyboard is missing;
+break the accessibility and the app has no reason to exist.
+
+
+1. THE GUIDING RULE
+-------------------
+Everything must be fully operable by screen reader and keyboard alone, and must
+work across NVDA, JAWS, Narrator (Windows), and VoiceOver (macOS), not just
+one of them. Build to the web standards (native HTML first, then WAI-ARIA), not
+to one screen reader's quirks. If something only works after a
+screen-reader-specific trick, prefer a more standard pattern every assistive
+technology understands.
+
+Target: WCAG 2.2 Level AA as a minimum, AAA where practical, and the WAI-ARIA
+Authoring Practices Guide (APG) for any widget pattern.
+
+
+2. PREFER NATIVE CONTROLS
+-------------------------
+Native HTML controls (button, select, input, textarea, dialog) are the most
+reliable across every assistive technology. Reach for a custom ARIA widget only
+when no native control fits. KeyAble uses:
+
+  - Plain <button> elements for actions, not clickable divs.
+  - Real <label> (or aria-labelledby) on every input.
+  - Native <dialog> for anything that is conceptually a dialog.
+
+There are three deliberate exceptions, all built to the APG patterns:
+
+  - Lists are custom ARIA listboxes, never a native <select>. With a native
+    dropdown, some screen readers preview an option while arrowing without
+    committing it, so the next button acted on the wrong value.
+  - The Step 3 action types are APG tabs, so the arrow keys move between them
+    and the open one is always announced.
+  - The macro steps are one listbox with real focus on each step: Enter
+    edits, Delete removes, Alt (Option) plus Up or Down moves, and the
+    Applications key, Shift+F10, VoiceOver's VO+Shift+M or a click opens a
+    menu of the same actions. One "Add Step" menu adds steps. A button or row
+    of buttons per step would mean a Tab stop, or several, for every step.
+    Real focus on the option (a roving tabindex) is used rather than
+    aria-activedescendant because VoiceOver follows focus more reliably.
+
+This is why the app behaves consistently across readers: there is very little
+custom widgetry to behave inconsistently.
+
+
+3. DIALOGS ARE REAL MODALS, ALWAYS
+----------------------------------
+Any alert, confirmation, or decision-required prompt is a true native modal:
+
+  - A native <dialog> named by aria-labelledby, and described by
+    aria-describedby where it has body text. Confirmations of a destructive
+    action (factory reset, restore) use role="alertdialog".
+  - Opened with showModal().
+  - Tab and Shift+Tab kept inside it by one shared trap for every dialog.
+    showModal() alone still lets Tab reach the browser's own toolbar.
+  - Escape closes it via the dialog's cancel event.
+  - Focus returns to a sensible trigger element when it closes.
+  - A short, low tone plays as it opens, distinct from the two-note
+    success and failure chirps. A dialog that appears because something is
+    missing (the Mac or Windows layout, before a first change) plays the
+    error buzz instead.
+
+NEVER use an inline focused region (a div with tabindex that holds some
+buttons) as a stand-in for a dialog. Tab leaks out of it and strands the user
+with no idea where they are or what they were deciding. This was a real trap
+that was deliberately removed; do not reintroduce it.
+
+
+4. FOCUS MANAGEMENT ON SECTION CHANGE
+-------------------------------------
+The app shows and hides sections rather than loading pages. When a new section
+appears, focus is moved to that section's heading (an <h2 tabindex="-1">; the page's one <h1> is the app name), so a
+screen-reader user lands on the new content, not stranded on the old button.
+Focus movement is always explicit and logical, never accidental, and focus is
+never trapped except intentionally inside a modal.
+
+
+5. LIVE ANNOUNCEMENTS, USED SPARINGLY
+-------------------------------------
+Dynamic changes (a remap written, lighting toggled, a reset completed) are
+announced through ARIA live regions so the user hears the result without
+hunting for it.
+
+But restraint matters. In text-entry panels the app does NOT fire a spoken
+warning on every keystroke: non-blocking warnings per keystroke make a screen
+reader unusable. The rule that emerged is: blocking errors when the user tries
+to proceed, plus a single debounced summary (for example a character count),
+never a running commentary while typing.
+
+
+6. NO VISUAL-ONLY INFORMATION
+-----------------------------
+Nothing is conveyed by colour, position, or a picture alone.
+
+  - Every key is presented and chosen as text (its name), never as a spot on a
+    diagram.
+  - Colour contrast meets WCAG AA in both the dark and the light theme
+    (the theme follows the system setting until the user picks one), but
+    contrast is treated as necessary-not-sufficient: the screen-reader
+    experience is the real test, and colour never carries meaning by itself.
+  - The lighting hue slider speaks a colour name with its value ("orange,
+    30 degrees"), since a number of degrees means nothing on its own.
+  - Icons and non-text elements carry a text label or aria-label.
+
+
+7. NAMING KEYS CORRECTLY
+------------------------
+A subtle accessibility point specific to this app: a user who cannot see the
+legend on the cap relies entirely on the spoken name. Four bottom-row
+modifiers mean different things on each side: the key Windows calls Left Win
+is Left Option on a Mac. Keychron's own legends get this wrong, so KeyAble
+names each of these keys by both meanings, for example "Left Win (or Left
+Option on Mac)", which is right whichever side is active. Names route through
+a single description choke point so every place a key is spoken (the list,
+the confirmation, the reset button) stays consistent.
+
+
+8. TESTING EXPECTATION
+----------------------
+Accessibility testing is baseline, not a follow-up task. A feature is not done
+until it has been confirmed working with a screen reader. The primary manual
+target on Windows is NVDA (free), then JAWS, then Narrator; on macOS,
+VoiceOver; in the browser, Chrome and Edge (KeyAble needs WebHID, which
+Firefox and Safari do not have). KeyAble does not run on phones or tablets:
+no mobile browser has WebHID. Never assume a custom widget
+behaves the same across all of them; confirm on real assistive technology.
+
+
+9. THE SHORT VERSION
+--------------------
+Native controls over custom widgets. Real modals, never fake ones. Explicit
+focus, never trapped by accident. Announce results, but do not narrate every
+keystroke. Nothing meaningful in colour or pictures alone. Name every key so
+it is right on both the Mac and Windows sides. Test with a real screen reader
+before calling anything done.

@@ -1,0 +1,540 @@
+QMK / VIA KEYCODE REFERENCE
+===========================
+The keycodes and protocol commands KeyAble is built on. They are the standard
+QMK and VIA ones, so this also applies to Keychron Launcher and the VIA
+configurator.
+
+This file covers:
+  1. What the "Any" keycode field is and where to find it
+  2. Modifier wrapper syntax
+  3. Complete KC_ key name list
+  4. Numeric keycode values (for VIA protocol CMD_SET_KEY)
+  5. Special and media keys
+  6. Limitations - what this syntax cannot do
+  7. VIA protocol quick reference
+  8. Authoritative sources
+
+
+===========================================================================
+SECTION 1 - THE "ANY" KEYCODE FIELD
+===========================================================================
+
+Both the Keychron Launcher and the VIA configurator (usevia.app) include a
+field called "Any" (usually under Custom → Any in the keymap screen). It
+lets you type a raw QMK keycode string instead of picking from the standard
+key list.
+
+The Keychron Launcher does NOT extend or modify QMK syntax - it uses the
+same strings as VIA. Any valid QMK modifier-wrapped keycode string that works
+in VIA will also work in the Keychron Launcher.
+
+The VIA "Any" field accepts:
+  - Plain key names:         KC_A, KC_F5, KC_DEL
+  - Modifier-wrapped keys:   LSFT(KC_P), LCTL(LALT(KC_DEL))
+  - Preset combinations:     HYPR(KC_T), MEH(KC_NO)
+
+It does NOT accept:
+  - Macro sequences (use the macro recorder instead)
+  - Tap-dance or mod-tap keycodes
+  - Layer-switching keycodes
+
+
+===========================================================================
+SECTION 2 - MODIFIER WRAPPER SYNTAX
+===========================================================================
+
+Wrap any KC_ key name in one or more modifier functions.
+
+SINGLE MODIFIERS
+----------------
+  LSFT(kc)   or   S(kc)    Left Shift + key
+  LCTL(kc)   or   C(kc)    Left Ctrl + key
+  LALT(kc)   or   A(kc)    Left Alt + key
+  LGUI(kc)   or   G(kc)    Left Win / Cmd + key
+
+  RSFT(kc)                 Right Shift + key
+  RCTL(kc)                 Right Ctrl + key
+  RALT(kc)                 Right Alt + key  (also used for AltGr)
+  RGUI(kc)                 Right Win / Cmd + key
+
+The short aliases S(), C(), A(), G() are fully equivalent to LSFT(), LCTL(),
+LALT(), LGUI() - use whichever is clearer.
+
+COMBINING MULTIPLE MODIFIERS
+-----------------------------
+Nest the wrapper functions:
+
+  LCTL(LALT(KC_DEL))          Ctrl + Alt + Delete
+  LSFT(LGUI(KC_S))            Shift + Win + S  (Windows snip & sketch)
+  LCTL(LSFT(KC_ESC))          Ctrl + Shift + Esc  (Task Manager)
+  LCTL(LALT(LSFT(KC_P)))      Ctrl + Alt + Shift + P
+
+Short alias versions of the same:
+  C(A(KC_DEL))
+  S(G(KC_S))
+  C(S(KC_ESC))
+  C(A(S(KC_P)))
+
+PRESET MULTI-MODIFIER COMBINATIONS
+------------------------------------
+These are QMK shortcuts for common modifier bundles:
+
+  LCA(kc)      Left Ctrl + Alt + key
+  LCS(kc)      Left Ctrl + Shift + key
+  LSA(kc)      Left Shift + Alt + key
+  LCAG(kc)     Left Ctrl + Alt + GUI + key
+  MEH(kc)      Left Ctrl + Shift + Alt + key     (all three, no GUI)
+  HYPR(kc)     Left Ctrl + Shift + Alt + GUI     (all four modifiers)
+
+MEH and HYPR are useful for creating shortcuts that no application uses by
+default, so they will not conflict with anything. Assign MEH(KC_T) to a key
+and set that shortcut in any app.
+
+Using KC_NO as the base (modifier only, no letter):
+  HYPR(KC_NO)   - sends all four modifiers held, no additional key
+  MEH(KC_NO)    - sends Ctrl + Shift + Alt held, no additional key
+These are used to make a physical key act as a pure modifier chord.
+
+EXAMPLES
+--------
+  LSFT(KC_P)            Shift + P
+  LCTL(KC_C)            Ctrl + C  (Copy)
+  LCTL(KC_V)            Ctrl + V  (Paste)
+  LCTL(KC_Z)            Ctrl + Z  (Undo)
+  LGUI(KC_L)            Win + L   (Lock screen)
+  LGUI(KC_D)            Win + D   (Show desktop)
+  LGUI(KC_R)            Win + R   (Run dialog)
+  LGUI(LSFT(KC_S))      Win + Shift + S  (Snip & Sketch)
+  LALT(KC_F4)           Alt + F4  (Close window)
+  LCTL(LALT(KC_DEL))    Ctrl + Alt + Delete
+  LCTL(LSFT(KC_ESC))    Ctrl + Shift + Esc  (Task Manager)
+  HYPR(KC_A)            Ctrl + Shift + Alt + GUI + A  (custom hotkey)
+  MEH(KC_B)             Ctrl + Shift + Alt + B        (custom hotkey)
+
+
+===========================================================================
+SECTION 3 - COMPLETE KC_ KEY NAME LIST
+===========================================================================
+
+Letters (always lowercase in the name, produces lowercase unless Shift held)
+---
+  KC_A   KC_B   KC_C   KC_D   KC_E   KC_F   KC_G
+  KC_H   KC_I   KC_J   KC_K   KC_L   KC_M   KC_N
+  KC_O   KC_P   KC_Q   KC_R   KC_S   KC_T   KC_U
+  KC_V   KC_W   KC_X   KC_Y   KC_Z
+
+Numbers (top row)
+---
+  KC_1   KC_2   KC_3   KC_4   KC_5
+  KC_6   KC_7   KC_8   KC_9   KC_0
+
+Function keys
+---
+  KC_F1   KC_F2   KC_F3   KC_F4   KC_F5   KC_F6
+  KC_F7   KC_F8   KC_F9   KC_F10  KC_F11  KC_F12
+  KC_F13  KC_F14  KC_F15  KC_F16  KC_F17  KC_F18
+  KC_F19  KC_F20  KC_F21  KC_F22  KC_F23  KC_F24
+
+Common editing and navigation keys
+---
+  KC_ENT     Enter
+  KC_ESC     Escape
+  KC_BSPC    Backspace
+  KC_TAB     Tab
+  KC_SPC     Space
+  KC_INS     Insert
+  KC_DEL     Delete
+  KC_HOME    Home
+  KC_END     End
+  KC_PGUP    Page Up
+  KC_PGDN    Page Down
+  KC_UP      Up arrow
+  KC_DOWN    Down arrow
+  KC_LEFT    Left arrow
+  KC_RGHT    Right arrow
+  KC_CAPS    Caps Lock
+  KC_NUM     Num Lock
+  KC_SCRL    Scroll Lock
+  KC_PAUS    Pause / Break
+  KC_PSCR    Print Screen
+  KC_APP     Application / Menu key
+
+Punctuation and symbol keys (unshifted names)
+---
+  KC_MINS    -   (minus / hyphen)
+  KC_EQL     =   (equals)
+  KC_LBRC    [   (left bracket)
+  KC_RBRC    ]   (right bracket)
+  KC_BSLS    \   (backslash)
+  KC_SCLN    ;   (semicolon)
+  KC_QUOT    '   (apostrophe / single quote)
+  KC_GRV     `   (grave / backtick)
+  KC_COMM    ,   (comma)
+  KC_DOT     .   (period / full stop)
+  KC_SLSH    /   (forward slash)
+  KC_NUBS    non-US backslash (ISO keyboards only)
+  KC_NUHS    non-US hash / # (ISO keyboards only)
+
+Modifier keys as standalone keycodes (when you want the physical modifier key)
+---
+  KC_LCTL    Left Ctrl
+  KC_LSFT    Left Shift
+  KC_LALT    Left Alt
+  KC_LGUI    Left Win / Cmd
+  KC_RCTL    Right Ctrl
+  KC_RSFT    Right Shift
+  KC_RALT    Right Alt / AltGr
+  KC_RGUI    Right Win / Cmd
+
+Numpad keys
+---
+  KC_P0    Numpad 0      KC_P1    Numpad 1      KC_P2    Numpad 2
+  KC_P3    Numpad 3      KC_P4    Numpad 4      KC_P5    Numpad 5
+  KC_P6    Numpad 6      KC_P7    Numpad 7      KC_P8    Numpad 8
+  KC_P9    Numpad 9      KC_PDOT  Numpad .      KC_PENT  Numpad Enter
+  KC_PPLS  Numpad +      KC_PMNS  Numpad -      KC_PAST  Numpad *
+  KC_PSLS  Numpad /
+
+Special values
+---
+  KC_NO      No key / empty (use as base for modifier-only assignments)
+  KC_TRNS    Transparent - falls through to the layer below
+
+
+===========================================================================
+SECTION 4 - NUMERIC KEYCODE VALUES (FOR CMD_SET_KEY)
+===========================================================================
+
+The VIA HID protocol's CMD_SET_KEY command (0x05) takes a 16-bit keycode
+value. When you type a string like LSFT(KC_P) in VIA's Any field, VIA
+converts it to a 16-bit number before sending it to the keyboard.
+
+A remapper that talks to the keyboard directly, as KeyAble does, needs these
+numeric values.
+
+BASIC KEYCODES (single byte, USB HID usage IDs)
+------------------------------------------------
+These are standard USB HID usage page 0x07 (keyboard) values:
+
+  KC_NO        0x0000
+  KC_A         0x0004
+  KC_B         0x0005
+  KC_C         0x0006
+  KC_D         0x0007
+  KC_E         0x0008
+  KC_F         0x0009
+  KC_G         0x000A
+  KC_H         0x000B
+  KC_I         0x000C
+  KC_J         0x000D
+  KC_K         0x000E
+  KC_L         0x000F
+  KC_M         0x0010
+  KC_N         0x0011
+  KC_O         0x0012
+  KC_P         0x0013
+  KC_Q         0x0014
+  KC_R         0x0015
+  KC_S         0x0016
+  KC_T         0x0017
+  KC_U         0x0018
+  KC_V         0x0019
+  KC_W         0x001A
+  KC_X         0x001B
+  KC_Y         0x001C
+  KC_Z         0x001D
+  KC_1         0x001E
+  KC_2         0x001F
+  KC_3         0x0020
+  KC_4         0x0021
+  KC_5         0x0022
+  KC_6         0x0023
+  KC_7         0x0024
+  KC_8         0x0025
+  KC_9         0x0026
+  KC_0         0x0027
+  KC_ENT       0x0028
+  KC_ESC       0x0029
+  KC_BSPC      0x002A
+  KC_TAB       0x002B
+  KC_SPC       0x002C
+  KC_MINS      0x002D
+  KC_EQL       0x002E
+  KC_LBRC      0x002F
+  KC_RBRC      0x0030
+  KC_BSLS      0x0031
+  KC_NUHS      0x0032
+  KC_SCLN      0x0033
+  KC_QUOT      0x0034
+  KC_GRV       0x0035
+  KC_COMM      0x0036
+  KC_DOT       0x0037
+  KC_SLSH      0x0038
+  KC_CAPS      0x0039
+  KC_F1        0x003A
+  KC_F2        0x003B
+  KC_F3        0x003C
+  KC_F4        0x003D
+  KC_F5        0x003E
+  KC_F6        0x003F
+  KC_F7        0x0040
+  KC_F8        0x0041
+  KC_F9        0x0042
+  KC_F10       0x0043
+  KC_F11       0x0044
+  KC_F12       0x0045
+  KC_PSCR      0x0046
+  KC_SCRL      0x0047
+  KC_PAUS      0x0048
+  KC_INS       0x0049
+  KC_HOME      0x004A
+  KC_PGUP      0x004B
+  KC_DEL       0x004C
+  KC_END       0x004D
+  KC_PGDN      0x004E
+  KC_RGHT      0x004F
+  KC_LEFT      0x0050
+  KC_DOWN      0x0051
+  KC_UP        0x0052
+  KC_NUM       0x0053
+  KC_PSLS      0x0054
+  KC_PAST      0x0055
+  KC_PMNS      0x0056
+  KC_PPLS      0x0057
+  KC_PENT      0x0058
+  KC_P1        0x0059
+  KC_P2        0x005A
+  KC_P3        0x005B
+  KC_P4        0x005C
+  KC_P5        0x005D
+  KC_P6        0x005E
+  KC_P7        0x005F
+  KC_P8        0x0060
+  KC_P9        0x0061
+  KC_P0        0x0062
+  KC_PDOT      0x0063
+  KC_NUBS      0x0064
+  KC_APP       0x0065
+  KC_F13       0x0068
+  KC_F14       0x0069
+  KC_F15       0x006A
+  KC_F16       0x006B
+  KC_F17       0x006C
+  KC_F18       0x006D
+  KC_F19       0x006E
+  KC_F20       0x006F
+  KC_F21       0x0070
+  KC_F22       0x0071
+  KC_F23       0x0072
+  KC_F24       0x0073
+  KC_LCTL      0x00E0
+  KC_LSFT      0x00E1
+  KC_LALT      0x00E2
+  KC_LGUI      0x00E3
+  KC_RCTL      0x00E4
+  KC_RSFT      0x00E5
+  KC_RALT      0x00E6
+  KC_RGUI      0x00E7
+
+MODIFIER-WRAPPED KEYCODE ENCODING
+----------------------------------
+When you wrap a key in a modifier function, QMK encodes it as a 16-bit value
+with the modifier bits in the upper byte and the basic keycode in the lower byte.
+
+The upper-byte modifier bit positions:
+  Bit 8  (0x0100)  =  Left Ctrl
+  Bit 9  (0x0200)  =  Left Shift
+  Bit 10 (0x0400)  =  Left Alt
+  Bit 11 (0x0800)  =  Left GUI
+  Bit 12 (0x1000)  =  Right-side modifier flag (OR'd with bits 8-11 for right variants)
+
+Right-side modifiers:
+  Right Ctrl  = 0x1100  (right flag 0x1000 | left-ctrl bit 0x0100)
+  Right Shift = 0x1200  (right flag 0x1000 | left-shift bit 0x0200)
+  Right Alt   = 0x1400  (right flag 0x1000 | left-alt bit 0x0400)
+  Right GUI   = 0x1800  (right flag 0x1000 | left-gui bit 0x0800)
+
+To calculate the 16-bit value for a modifier-wrapped keycode:
+  combined_mods | basic_keycode
+
+EXAMPLES:
+  LSFT(KC_P)              = 0x0200 | 0x0013  = 0x0213
+  LCTL(KC_C)              = 0x0100 | 0x0006  = 0x0106
+  LCTL(LALT(KC_DEL))      = 0x0100 | 0x0400 | 0x004C  = 0x054C
+  LCTL(LSFT(KC_ESC))      = 0x0100 | 0x0200 | 0x0029  = 0x0329
+  LGUI(LSFT(KC_S))        = 0x0800 | 0x0200 | 0x0016  = 0x0A16
+  HYPR(KC_A)              = 0x0100|0x0200|0x0400|0x0800 | 0x0004  = 0x0F04
+  MEH(KC_A)               = 0x0100|0x0200|0x0400 | 0x0004  = 0x0704
+
+Authoritative source for exact values: QMK firmware source file
+  quantum/keycodes.h  (github.com/qmk/qmk_firmware)
+
+For VIA-specific keycode parsing, see the VIA source:
+  github.com/the-via/reader  (the library VIA uses to parse keycode strings)
+
+
+===========================================================================
+SECTION 5 - SPECIAL AND MEDIA KEYS
+===========================================================================
+
+QMK defines consumer/media keycodes that send HID consumer page codes.
+These work as standalone assignments (not inside modifier wrappers).
+
+AUDIO / VOLUME
+--------------
+  KC_MUTE    Mute
+  KC_VOLU    Volume Up
+  KC_VOLD    Volume Down
+
+MEDIA PLAYBACK
+--------------
+  KC_MPLY    Play / Pause
+  KC_MSTP    Stop
+  KC_MPRV    Previous track
+  KC_MNXT    Next track
+  KC_MFFD    Fast forward
+  KC_MRWD    Rewind
+
+BRIGHTNESS (on supported hardware)
+------------------------------------
+  KC_BRIU    Brightness Up
+  KC_BRID    Brightness Down
+
+KEYBOARD BACKLIGHT (QMK RGB/backlight control)
+-----------------------------------------------
+  RGB_TOG    Toggle RGB lighting on/off
+  RGB_MOD    Cycle through RGB modes
+  RGB_RMOD   Cycle RGB modes in reverse
+  RGB_HUI    Hue increase
+  RGB_HUD    Hue decrease
+  RGB_SAI    Saturation increase
+  RGB_SAD    Saturation decrease
+  RGB_VAI    Value (brightness) increase
+  RGB_VAD    Value decrease
+  BL_TOGG    Toggle backlight
+  BL_INC     Backlight brightness increase
+  BL_DEC     Backlight brightness decrease
+
+LAYER SWITCHING (VIA supports these in the standard picker, not "Any")
+----------------------------------------------------------------------
+  MO(n)      Momentary layer n (hold to activate)
+  TG(n)      Toggle layer n on/off
+  TO(n)      Switch to layer n (replaces current)
+  DF(n)      Set layer n as default
+  LT(n,kc)   Layer n when held, key kc when tapped  (mod-tap variant)
+
+Note: Layer-switching keycodes have a separate VIA keycode encoding range
+and are not typically entered via the "Any" field - use the layer picker.
+
+TRANSPARENT / NO-OP
+--------------------
+  KC_TRNS    Transparent - falls through to the key definition on the layer below.
+             Shown as a shaded key in VIA. Essential for multi-layer setups.
+  KC_NO      No operation - key does nothing.
+
+
+===========================================================================
+SECTION 6 - LIMITATIONS
+===========================================================================
+
+THE 8-MODIFIER CONSTRAINT
+--------------------------
+The modifier wrapper syntax only works with the 8 USB HID hardware modifier keys:
+  Left/Right - Shift, Ctrl, Alt, GUI (Win/Cmd)
+
+It does NOT work with:
+  CapsLock  - is a toggle key at the HID layer, not a held modifier
+  Num Lock  - same, toggle only
+  Fn        - firmware-only, not a USB HID keycode at all
+  Any other "regular" key
+
+You cannot create a shortcut like "CapsLock + S" using the Any field.
+CapsLock is KC_CAPS = 0x0039, a regular keycode, not a modifier bit.
+
+IMPLICATIONS FOR NVDA USERS
+----------------------------
+NVDA uses Insert (or optionally CapsLock) as its modifier key. NVDA intercepts
+these at the OS level. The keyboard sends a plain KC_INS or KC_CAPS keycode;
+NVDA detects it is held and watches for the next key.
+
+You cannot encode "NVDA modifier + S" in a single keycode assignment, because:
+  - There is no USB HID concept of "CapsLock held"
+  - NVDA's modifier interception happens above the HID layer
+
+WORKAROUND: Assign a shortcut that uses standard modifiers to a key (e.g.
+Ctrl+Shift+Alt+S via MEH(KC_S)), then bind that shortcut inside NVDA's Input
+Gestures dialog to the NVDA command you want. This is more reliable than
+trying to simulate CapsLock/Insert behaviour.
+
+SINGLE KEYCODE ONLY
+---------------------
+The VIA "Any" field and CMD_SET_KEY accept exactly one 16-bit keycode value
+per key slot. You cannot assign a sequence of keypresses (e.g. type "hello")
+to a key via this mechanism - that requires macros.
+
+MACROS
+------
+VIA supports up to 16 macros (QMK firmware dependent). Macros can contain:
+  - Key press/release sequences
+  - Text strings (each character sent as a keypress)
+  - Delays between steps
+These are stored separately from the keymap and use the macro commands in
+Section 7.
+
+MOD-TAP (not available via "Any")
+-----------------------------------
+QMK supports keycodes like LCTL_T(KC_A) (Left Ctrl when held, A when tapped).
+The VIA "Any" field does NOT support mod-tap syntax - these must be configured
+in the firmware source or via QMK Configurator.
+
+
+===========================================================================
+SECTION 7 - VIA PROTOCOL QUICK REFERENCE
+===========================================================================
+
+Keychron's QMK keyboards ship with VIA built in and always on (the factory
+firmware is the "via" keymap build). They expose a raw HID interface:
+  Usage page: 0xFF60
+  Usage:      0x0061
+
+Every message is a 32-byte report (report ID 0x00), zero-padded. The reply
+echoes the command byte first. In WebHID: hidDevice.sendReport(0x00, bytes),
+then match the 'inputreport' reply by its first byte, with a timeout in case
+the device does not answer (wrong device, or firmware without VIA).
+
+Commands KeyAble uses:
+  0x01  get protocol version   handshake; confirms the keyboard answers VIA
+  0x04  get keycode            [0x04, layer, row, col] -> bytes 4..5
+  0x05  set keycode            [0x05, layer, row, col, kc_high, kc_low]
+  0x06  dynamic keymap reset   rewrites every key with its firmware default,
+                               effective immediately
+  0x07  custom set value       lighting and other per-board values
+  0x08  custom get value
+  0x09  custom save            store custom values to EEPROM
+  0x0C  macro get count        reply byte 1 = number of macro slots
+  0x0D  macro get buffer size  reply bytes 1..2, big-endian
+  0x0E  macro get buffer       [0x0E, offset_hi, offset_lo, size]
+  0x0F  macro set buffer       [0x0F, offset_hi, offset_lo, size, data...]
+  0x11  get layer count
+  0x14  get encoder            [0x14, layer, encoder_id, clockwise]
+  0x15  set encoder            [0x15, layer, encoder_id, clockwise, kc_high, kc_low]
+
+Note 0x0A (EEPROM reset) only invalidates EEPROM until the next reboot; use
+0x06 to restore factory keys immediately.
+
+Example: remap row 0, col 0 on layer 0 to Ctrl+C (LCTL(KC_C) = 0x0106):
+  [0x05, 0x00, 0x00, 0x00, 0x01, 0x06, 0, 0, ... (26 more zeros)]
+
+Each key's (row, col) address comes from the board's VIA JSON layout, where a
+key is written as "row, col" (e.g. "0, 5").
+
+
+===========================================================================
+SECTION 8 - AUTHORITATIVE SOURCES
+===========================================================================
+
+  QMK keycodes:       docs.qmk.fm/keycodes
+  QMK source:         github.com/qmk/qmk_firmware - quantum/keycodes.h
+  VIA docs:           caniusevia.com/docs/configuring_qmk
+  Keychron firmware:  github.com/Keychron/qmk_firmware (wireless_playground)
+                      keyboards/keychron/<model>/via_json/ and keymaps/via/keymap.c

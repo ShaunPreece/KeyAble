@@ -1,0 +1,147 @@
+KEYBOARD DATA: WHERE IT COMES FROM AND HOW TO ADD A MODEL
+=========================================================
+
+The hardest-won part of KeyAble is not the code, it is the data: knowing
+exactly which keys each Keychron model has, what they are called, and what the
+factory-default assignment of every key is. This file explains where that data
+came from and how you would add a keyboard the app does not yet cover.
+
+
+1. THE TWO KINDS OF DATA
+------------------------
+KeyAble holds two separate datasets, for two separate jobs.
+
+  A. LAYOUT DATA (which keys exist, and their names)
+     Stored in the app as KEYCHRON_LAYOUTS. For each supported model it lists
+     every key position (row, column) and the human-readable name to show and
+     speak for it ("A", "Left Shift", "Enter", and so on). This is what lets
+     the app present a text list of keys instead of a picture.
+
+  B. FACTORY DATASET (the true factory keycode of every key, per layer)
+     Stored in the app as FACTORY_KEYMAPS, keyed by the keyboard's USB product
+     ID (PID). For each model it holds every layer (usually Mac base, Mac Fn,
+     Windows base, Windows Fn; five on a few boards) as a map of "row,column"
+     to numeric keycode, plus the encoder (knob) assignments. This is what lets
+     "reset to factory" write the correct original value back to each layer,
+     instead of guessing. Guessing from a key's label is wrong for the
+     bottom-row modifiers: on the Mac layer those positions hold Option and
+     Command, while the Windows layer holds the Windows key and Alt on the same
+     physical keys, so a label-based reset would corrupt the Mac layer.
+
+Layout data is keyed by SHAPE (a layoutId such as "q6_ansi_knob"), which is
+deliberately shared between products with the same physical geometry (for
+example wired Q6 and Q6 Max both use q6_ansi_knob). The factory dataset is
+keyed by PID/model, because two boards can share a shape but ship different
+factory assignments.
+
+
+2. WHERE IT CAME FROM
+---------------------
+Both datasets were derived from Keychron's own public, open sources:
+
+  - Keychron's QMK firmware fork on GitHub, for the wireless Max and Pro
+    boards:
+      repo:   https://github.com/Keychron/qmk_firmware
+      branch: wireless_playground
+      commit: 666862cb8123b64a6b96718d739c6203ad99031f
+    Factory keymaps are the via keymaps, for example:
+      keyboards/keychron/v6_max/ansi_encoder/keymaps/via/keymap.c
+
+  - Mainline QMK, for the wired Q and V boards, whose Keychron keymaps live
+    there:
+      repo:   https://github.com/qmk/qmk_firmware
+      branch: master
+      commit: a738fad372c1e72e10c47f560c8d167d233416ad
+    These boards have no via keymap, so the factory keymaps are the default
+    ones, for example:
+      keyboards/keychron/q6/ansi_encoder/keymaps/default/keymap.c
+
+    The layer blocks (MAC_BASE, WIN_BASE and the Fn layers) in each keymap.c
+    are the authoritative factory assignments. These were parsed into the
+    factory dataset. The firmware source itself is not included in this
+    repository; fetch the commits above to reproduce or check the data.
+
+  - The B6 Pro runs Keychron's ZMK firmware (github.com/Keychron/zmk), whose
+    keymap format the parser does not read. It has no factory dataset, and
+    uses the best-effort reset described in section 3, which has been checked
+    on real hardware.
+
+  - Keychron's VIA JSON files (the same files the Keychron Launcher and VIA
+    configurator load). These describe each board's physical layout and key
+    positions, and were used to build the layout data.
+
+  - The QMK / VIA keycode reference (docs/QMK_VIA_Keycode_Reference.txt).
+    This maps human key names to the numeric keycodes the VIA
+    protocol writes, and documents the "Any" raw-keycode field, modifier
+    wrapper syntax, and the limits of what the protocol can express.
+
+Nothing here was invented or guessed. Every model's data traces back to a
+Keychron source file, and the more recently added models were verified
+directly against both the VIA JSON and the keymap.c layer blocks.
+
+
+3. HOW A MODEL IS IDENTIFIED AT RUNTIME
+---------------------------------------
+When you connect, the browser reports the keyboard's USB product ID (PID). The
+app looks the PID up to decide which model you have and therefore which layout
+and factory data to use. If a PID has layout data but no factory dataset, the
+app still works: reset falls back to a best-effort default rather than a
+verified per-layer value. If a PID is unknown entirely, the app cannot help
+until the model is added.
+
+
+4. HOW TO ADD A KEYBOARD
+------------------------
+At a high level, adding a model is a data task, in this order:
+
+  1. Find the board's USB product ID (PID). Connecting an unrecognised board
+     shows its ID on the "Keyboard Not Supported" screen, or read it from the
+     model's info.json in the firmware source.
+
+  2. Get the layout. From the model's VIA JSON, work out every key position
+     and its name, and add a KEYCHRON_LAYOUTS entry (or reuse an existing
+     layoutId if the shape is identical to a model already supported).
+
+  3. Get the factory keymap. Find the model's keymap.c in the Keychron QMK
+     source, and read every layer block (usually Mac base, Mac Fn, Windows
+     base, Windows Fn; a few boards have a fifth, in a different order) plus
+     the encoder map. Convert each key to its numeric keycode using the
+     keycode reference.
+
+  4. Add a FACTORY_KEYMAPS entry keyed by the PID, with each layer at its
+     real index on the device as a "row,col" to keycode map, plus the encoder
+     assignments. A board whose layer order differs from the usual four also
+     needs a roles entry saying which layer is which.
+
+  5. Verify against hardware: connect the real board, confirm keys are named
+     correctly, remap one key and reset it, and confirm a full factory reset
+     restores the true original values on both the Mac and Windows sides.
+
+The project used small helper scripts under DevTools/ to parse keymap.c and
+bundle the parsed layers into the factory dataset, but the data itself is the
+point; the scripts are just plumbing you can reproduce however you like.
+
+
+5. WHAT THE PROTOCOL CANNOT DO
+------------------------------
+Some things are limits of QMK/VIA, not of KeyAble, and any remapper hits
+them:
+
+  - VIA writes single keycodes per position. Complex behaviours that live only
+    in firmware source (tap-hold tuning, combos, custom C code) cannot be set
+    over the protocol.
+  - The "Any" field accepts raw QMK keycode strings and modifier wrappers, but
+    only what the firmware's keycode table already understands.
+  - JIS (Japanese) physical layouts are not covered by the current data.
+
+The keycode reference file spells these out in detail. Read it before assuming
+a remap is possible.
+
+
+6. THE SHORT VERSION
+--------------------
+The data is real, sourced, and verified against Keychron's own open firmware.
+Adding a keyboard means sourcing its layout (VIA JSON) and its factory keymap
+(keymap.c), converting to keycodes, keying the factory data by PID, and
+testing on the actual board. No reverse engineering of closed software was
+involved; it is all built on the open QMK/VIA ecosystem.

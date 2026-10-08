@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KeyAble Factory Ground-Truth (read-only confirm)</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    max-width: 52rem; margin: 0 auto; padding: 1rem 1.25rem 4rem;
+    line-height: 1.5;
+  }
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.15rem; margin-top: 2rem; }
+  .safe {
+    border: 2px solid #2e7d32; background: rgba(46,125,50,.08);
+    padding: .75rem 1rem; border-radius: .5rem; margin: 1rem 0;
+  }
+  .warn {
+    border: 2px solid #b26a00; background: rgba(178,106,0,.08);
+    padding: .75rem 1rem; border-radius: .5rem; margin: 1rem 0;
+  }
+  .step { border-top: 1px solid #8888; padding-top: 1rem; margin-top: 1.5rem; }
+  button {
+    font-size: 1rem; padding: .55rem .9rem; margin: .25rem .4rem .25rem 0;
+    border-radius: .4rem; cursor: pointer; min-height: 2.6rem;
+  }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  label { display: block; font-weight: 600; margin: 1rem 0 .25rem; }
+  input[type=text] { width: 100%; font-size: .95rem; padding: .5rem; box-sizing: border-box; }
+  textarea {
+    width: 100%; min-height: 20rem; font-family: ui-monospace, Consolas, monospace;
+    font-size: .9rem; padding: .6rem; box-sizing: border-box;
+  }
+  #status { font-weight: 600; padding: .5rem .25rem; }
+  .hint { font-size: .9rem; opacity: .85; }
+  a.skip { position:absolute; left:-999px; }
+  a.skip:focus { left: .5rem; top: .5rem; position: fixed; background:#fff; color:#000; padding:.4rem; }
+</style>
+</head>
+<body>
+<a href="#main" class="skip">Skip to main content</a>
+
+<h1>KeyAble Factory Ground-Truth</h1>
+<p>Reads all four layers from a <strong>freshly factory-reset</strong> keyboard
+and compares every position against the source-derived dataset (the parsed
+firmware keymap plus the token to keycode table). A clean pass confirms the
+parser alignment and the keycode numbers are trustworthy for models you do not
+own.</p>
+
+<div class="safe" role="note">
+  <strong>This tool only reads the keyboard.</strong> It never writes to the
+  board. It does <em>not</em> factory-reset for you; do that in the main Access
+  Key app first (see below).
+</div>
+
+<div class="warn" role="note">
+  <strong>Do this first:</strong> in the main KeyAble app, run
+  <em>Reset Keyboard to Default</em> (factory reset), then come back here and run
+  Steps 1 to 3. (No backup needed on a test board.)
+</div>
+
+<p class="hint">Use Chrome, Edge, or Opera opened from a <code>http://localhost</code>
+address (WebHID needs a secure context; localhost counts). Plug the keyboard in
+by USB first.</p>
+
+<main id="main">
+
+<p id="status" role="status" aria-live="polite">Ready. Start with Step 1.</p>
+
+<section class="step" aria-labelledby="h1step">
+  <h2 id="h1step">Step 1. Load the firmware dataset</h2>
+  <label for="ds-path">Dataset path (relative to this page)</label>
+  <input id="ds-path" type="text"
+    value="../ProjectAssets/keychron-firmware-src/v5_max/iso_encoder/parsed.json">
+  <p class="hint">Default is the V5 Max ISO (PID 0x0951). Change it to test a
+  different model, then reload. The firmware folder is not in the repository:
+  fetch the commits listed in docs/KEYBOARD-DATA.txt and run the parser to
+  create it.</p>
+  <button id="btn-load" type="button">Load dataset (Step 1)</button>
+</section>
+
+<section class="step" aria-labelledby="h2step">
+  <h2 id="h2step">Step 2. Connect the keyboard</h2>
+  <p class="hint">Opens the same device chooser KeyAble uses (VIA raw-HID,
+  usage page FF60). Pick your keyboard and activate Connect.</p>
+  <button id="btn-connect" type="button" disabled>Connect keyboard (Step 2)</button>
+</section>
+
+<section class="step" aria-labelledby="h3step">
+  <h2 id="h3step">Step 3. Read all layers and compare</h2>
+  <p class="hint">Reads every key on all four layers plus the encoder and compares
+  each to the source-derived value. The result summary appears in the report box.</p>
+  <button id="btn-run" type="button" disabled>Read and compare (Step 3)</button>
+  <label>
+    <input id="opt-raw" type="checkbox"> Also write a full raw dump (every position)
+  </label>
+</section>
+
+<section class="step" aria-labelledby="h4step">
+  <h2 id="h4step">Step 4. Copy the report</h2>
+  <label for="report">Result report. Copy this and paste it back.</label>
+  <textarea id="report" readonly aria-live="off"></textarea>
+  <button id="btn-copy" type="button">Copy report to clipboard</button>
+  <button id="btn-clear" type="button">Clear report</button>
+</section>
+
+</main>
+
+<script src="token-keycodes.js"></script>
+<script>
+// Constants mirrored from KeyAble (KeyAble.html)
+const REPORT_LEN   = 32;
+const RAW_USAGE_PAGE = 0xff60;
+const RAW_USAGE      = 0x61;
+const CMD_GET_KEY      = 0x04;   // reply keycode at (reply[4]<<8)|reply[5]
+const CMD_GET_ENCODER  = 0x14;   // args [layer, encoder_id, clockwise]
+const CMD_KC_GET_DEFAULT_LAYER = 0xA3;
+
+const TK = window.TokenKeycodes;                 // source-derived token -> keycode table
+const LAYER_INDEX = TK.LAYER_INDEX;              // MAC_BASE 0, MAC_FN 1, WIN_BASE 2, WIN_FN 3
+
+let hidDevice = null;
+let dataset   = null;
+
+const $ = id => document.getElementById(id);
+const reportBox = $('report');
+function setStatus(m) { $('status').textContent = m; }
+function log(line) { reportBox.value += line + '\n'; reportBox.scrollTop = reportBox.scrollHeight; }
+function hex(n, w = 4) { return '0x' + Number(n).toString(16).toUpperCase().padStart(w, '0'); }
+
+if (!TK) { setStatus('token-keycodes.js failed to load. Serve this page over http://localhost.'); }
+
+// Step 1: load dataset (fetch works over http://localhost)
+$('btn-load').addEventListener('click', async () => {
+  const path = $('ds-path').value.trim();
+  setStatus('Loading dataset...');
+  try {
+    const res = await fetch(path, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    dataset = await res.json();
+    const layers = Object.keys(dataset.layers || {});
+    log('==== Dataset loaded ====');
+    log('Path: ' + path);
+    log('Dataset PID: ' + (dataset.pid || '(none)') + '   macro: ' + (dataset.macro || '(none)') +
+        '   matrixLen: ' + (dataset.matrixLen != null ? dataset.matrixLen : '(none)'));
+    log('Layers: ' + layers.join(', '));
+    log('');
+    $('btn-connect').disabled = false;
+    setStatus('Dataset loaded (' + layers.length + ' layers). Continue with Step 2.');
+    setTimeout(() => $('btn-connect').focus(), 60);
+  } catch (err) {
+    log('Dataset load failed: ' + (err && err.message || err));
+    log('Make sure this page is served over http://localhost, not opened as a file.');
+    log('');
+    setStatus('Could not load the dataset: ' + (err && err.message || err));
+  }
+});
+
+// Step 2: connect
+$('btn-connect').addEventListener('click', async () => {
+  if (!navigator.hid) { setStatus('WebHID is not available in this browser.'); return; }
+  setStatus('A device chooser is opening. Select your keyboard, then Connect.');
+  try {
+    const devices = await navigator.hid.requestDevice({
+      filters: [{ usagePage: RAW_USAGE_PAGE, usage: RAW_USAGE }]
+    });
+    if (!devices || !devices.length) { setStatus('No device selected. Try Step 2 again.'); return; }
+    hidDevice = devices[0];
+    if (!hidDevice.opened) await hidDevice.open();
+    log('Connected: ' + (hidDevice.productName || 'keyboard') +
+        '  VID ' + hex(hidDevice.vendorId) + '  PID ' + hex(hidDevice.productId));
+    log('');
+    $('btn-run').disabled = false;
+    setStatus('Connected. Moving you to the Step 3 button. Press it to read and compare.');
+    setTimeout(() => $('btn-run').focus(), 120);
+  } catch (err) {
+    log('Connect error: ' + (err && err.message || err));
+    log('');
+    setStatus('Step 2 could not complete: ' + (err && err.message || err));
+  }
+});
+
+function sendVIA(bytes, timeoutMs = 2000) {
+  return new Promise(resolve => {
+    const buf = new Uint8Array(REPORT_LEN);
+    bytes.forEach((b, i) => { buf[i] = b; });
+    const timer = setTimeout(() => { hidDevice.removeEventListener('inputreport', handler); resolve(null); }, timeoutMs);
+    function handler(ev) {
+      clearTimeout(timer);
+      hidDevice.removeEventListener('inputreport', handler);
+      resolve(new Uint8Array(ev.data.buffer));
+    }
+    hidDevice.addEventListener('inputreport', handler);
+    hidDevice.sendReport(0x00, buf).catch(() => {
+      clearTimeout(timer); hidDevice.removeEventListener('inputreport', handler); resolve(null);
+    });
+  });
+}
+
+async function readKey(layerIdx, row, col) {
+  const r = await sendVIA([CMD_GET_KEY, layerIdx, row, col]);
+  if (!r || r[0] !== CMD_GET_KEY) return null;
+  return (r[4] << 8) | r[5];
+}
+async function readEncoder(layerIdx, id, cw) {
+  const r = await sendVIA([CMD_GET_ENCODER, layerIdx, id, cw ? 1 : 0]);
+  if (!r || r[0] !== CMD_GET_ENCODER) return null;
+  return (r[4] << 8) | r[5];
+}
+
+// Step 3: read + compare (every position vs the source-derived value)
+$('btn-run').addEventListener('click', async () => {
+  if (!hidDevice || !dataset || !TK) { setStatus('Load the dataset and connect first.'); return; }
+  $('btn-run').disabled = true;
+  const writeRaw = $('opt-raw').checked;
+  setStatus('Reading the keyboard. This takes a few seconds...');
+
+  const mismatches = [];   // token, board != source-derived expected
+  const unresolved = [];   // token has no source value (should be none)
+  const rawLines   = [];
+
+  function compare(token, code, where) {
+    const exp = TK.resolveToken(token);
+    if (exp === null) { unresolved.push(where + ': ' + token + ' board=' + hex(code) + ' (no source value)'); return 'unresolved'; }
+    if (code === exp) return 'match';
+    mismatches.push(where + ': ' + token + ' expected ' + hex(exp) + ' but board=' + hex(code));
+    return 'mismatch';
+  }
+
+  try {
+    log('==== Ground-truth read: ' + new Date().toString() + ' ====');
+    const dl = await sendVIA([CMD_KC_GET_DEFAULT_LAYER]);
+    if (dl && dl[0] === CMD_KC_GET_DEFAULT_LAYER) {
+      log('Board default-layer byte: ' + dl[1] + '  (0 = Mac side, 2 = Windows side)');
+    }
+    log('Board PID ' + hex(hidDevice.productId) + '  vs dataset PID ' + (dataset.pid || '(none)') +
+        '   match: ' + (hex(hidDevice.productId).toLowerCase() === String(dataset.pid).toLowerCase()));
+    log('');
+
+    for (const lname of Object.keys(dataset.layers)) {
+      const idx = LAYER_INDEX[lname];
+      if (idx === undefined) { log('Skipping unknown layer name: ' + lname); continue; }
+      let read = 0, match = 0, mm = 0, unr = 0, fail = 0;
+      for (const e of dataset.layers[lname]) {
+        const code = await readKey(idx, e.row, e.col);
+        const where = lname + ' r' + e.row + 'c' + e.col;
+        if (code === null) { fail++; log('  READ FAIL at ' + where); continue; }
+        read++;
+        if (writeRaw) rawLines.push(where + '  ' + e.token + '  board=' + hex(code) + '  expect=' + hex(TK.resolveToken(e.token)));
+        const r = compare(e.token, code, where);
+        if (r === 'match') match++; else if (r === 'mismatch') mm++; else unr++;
+      }
+      log('Layer ' + lname + ' (idx ' + idx + '): read ' + read + ', match ' + match +
+          ', MISMATCH ' + mm + ', unresolved ' + unr + (fail ? ', READ-FAIL ' + fail : ''));
+    }
+    log('');
+
+    // Encoders
+    if (dataset.encoders) {
+      log('Encoders (id 0):');
+      for (const lname of Object.keys(dataset.encoders)) {
+        const idx = LAYER_INDEX[lname];
+        if (idx === undefined) continue;
+        const spec = dataset.encoders[lname][0];
+        if (!spec) continue;
+        const ccw = await readEncoder(idx, 0, 0);
+        const cw  = await readEncoder(idx, 0, 1);
+        const ec = ccw === null ? 'FAIL' : hex(ccw);
+        const ew = cw  === null ? 'FAIL' : hex(cw);
+        log('  ' + lname + ' ccw ' + spec.ccw + ' board=' + ec + ' expect=' + hex(TK.resolveToken(spec.ccw)) +
+            ' | cw ' + spec.cw + ' board=' + ew + ' expect=' + hex(TK.resolveToken(spec.cw)));
+        if (ccw !== null) compare(spec.ccw, ccw, lname + ' enc0-ccw');
+        if (cw  !== null) compare(spec.cw,  cw,  lname + ' enc0-cw');
+      }
+      log('');
+    }
+
+    // Summary
+    log('==== SUMMARY ====');
+    log('MISMATCHES (must be ZERO): ' + mismatches.length);
+    mismatches.forEach(m => log('  * ' + m));
+    log('UNRESOLVED tokens (must be ZERO): ' + unresolved.length);
+    unresolved.forEach(u => log('  * ' + u));
+    log('');
+    const pass = mismatches.length === 0 && unresolved.length === 0;
+    log('VERDICT: ' + (pass
+      ? 'PASS. Every position on all four layers matches the source-derived dataset. Pipeline confirmed.'
+      : 'ATTENTION: ' + mismatches.length + ' mismatch(es), ' + unresolved.length + ' unresolved - see above.'));
+    log('');
+
+    if (writeRaw) {
+      log('==== FULL RAW DUMP (position, token, board, expect) ====');
+      rawLines.forEach(l => log(l));
+      log('');
+    }
+
+    setStatus((pass ? 'PASS. ' : 'ATTENTION. ') + 'Report ready below. Use Copy report.');
+  } catch (err) {
+    log('Read error: ' + (err && err.message || err));
+    setStatus('Step 3 could not complete: ' + (err && err.message || err));
+  } finally {
+    $('btn-run').disabled = false;
+  }
+});
+
+// Step 4: copy / clear
+$('btn-copy').addEventListener('click', async () => {
+  reportBox.focus(); reportBox.select();
+  try { await navigator.clipboard.writeText(reportBox.value); setStatus('Report copied. Paste it into your reply.'); }
+  catch (_) { setStatus('Could not auto-copy. The text is selected; press Control+C.'); }
+});
+$('btn-clear').addEventListener('click', () => { reportBox.value = ''; setStatus('Report cleared.'); });
+</script>
+</body>
+</html>

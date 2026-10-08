@@ -1,0 +1,119 @@
+HOW KEYABLE WORKS
+====================
+
+A plain-English tour for anyone who wants to understand the app or build their
+own version. No code here, just concepts. If you can code, the whole thing is
+in one file (Project/KeyAble.html) and this explains what you are
+looking at.
+
+
+1. IT IS ONE FILE
+-----------------
+The entire app is a single HTML file. Inside it are three things:
+
+  - The page you see and hear (the markup and styling).
+  - The keyboard layout data (which keys exist on each model, and what they
+    are called). This is baked in as data, not fetched from anywhere.
+  - The logic that talks to the keyboard and reacts to what you do.
+
+There is no build step, no server, no database, and no external dependency.
+Open the file, and it runs. This is deliberate: a single file is easy to host,
+easy to share, easy to archive, and impossible to half-install.
+
+
+2. HOW IT TALKS TO THE KEYBOARD
+-------------------------------
+Keychron keyboards run open firmware called QMK, and expose a control channel
+called VIA. VIA is the same protocol the official Keychron Launcher and the
+VIA configurator (usevia.app) use. It lets software read and write the
+keyboard's key assignments over USB. Keychron's factory firmware has VIA built
+in and always on; there is no setting to turn it on or off.
+
+The browser reaches the keyboard using a web standard called WebHID. WebHID
+lets a web page talk to USB devices directly, with the user's permission, from
+inside the browser. This is why:
+
+  - You must use Chrome, Edge, or another Chromium browser. Firefox and Safari
+    do not implement WebHID.
+  - The first time you connect, the browser shows a device-picker prompt. That
+    is the browser asking your permission, not the app.
+  - Nothing goes over the internet. The connection is browser-to-keyboard on
+    your own machine.
+
+
+3. LAYERS: HOW ONE KEYBOARD HOLDS MAC AND WINDOWS SETUPS
+--------------------------------------------------------
+A QMK keyboard stores its key assignments in "layers". Think of a layer as one
+complete map of the whole board. Keychron keyboards ship with four:
+
+  Layer 0  - Mac, base (normal typing)
+  Layer 1  - Mac, function (what you get while holding Fn)
+  Layer 2  - Windows, base
+  Layer 3  - Windows, function
+
+The physical switch on the back of the board (Mac / Windows) chooses which
+pair of layers is active. This is why KeyAble asks which side you are
+editing: a remap has to be WRITTEN to a specific layer. Changing the "A" key
+on the Mac side writes to layer 0; the Windows side is untouched, and vice
+versa. There is deliberately no "write to both" option: shortcuts and system
+actions use different keys on a Mac and on Windows, so one change copied to
+both sides would be wrong on one of them.
+
+Not every board uses that order. A few (the V2 Max, K6 Pro, and wired V2)
+have five layers arranged differently, so the Windows and Fn layers are not
+where the others keep them. KeyAble never assumes the order: it looks up
+each model's real layer arrangement, asks the keyboard how many layers it has
+on connection as a safety check, and preserves the fifth layer untouched in
+backup and restore.
+
+Most keys (letters, numbers, function row) are identical on both sides. Only a
+handful of modifier keys actually differ between Mac and Windows (Command vs
+Windows key, Option vs Alt). KeyAble names each of those by both meanings,
+for example "Left Win (or Left Option on Mac)", so the name is right on
+either side.
+
+
+4. WHAT A "KEY" ACTUALLY IS
+---------------------------
+Each position on the board is identified by a row and column (for example row
+5, column 1). Each position holds a numeric "keycode" that tells the firmware
+what to send when pressed. "A" is one number; "Left Shift" is another; "do
+nothing" is another again.
+
+Remapping a key means: work out the row and column of the position you picked,
+work out the numeric keycode for the action you want, and write that number to
+that position on the chosen layer. Resetting a key means writing the factory
+number back. That factory number is the tricky part, and is covered in
+KEYBOARD-DATA.txt.
+
+
+5. THE STEPS YOU SEE IN THE APP
+-------------------------------
+The app is organised as a short sequence:
+
+  Connect        - browser device prompt, then the app reads the keyboard's
+                   USB product ID to work out which model it is and loads
+                   that model's layout data. Without a keyboard, demo mode
+                   lets you pick any model to explore.
+  Choose a key   - from a list, or by pressing it in Capture Mode.
+  Choose action  - choose what the key should do; a Ready to Apply dialog
+                   reads the change back, and nothing is written to the
+                   keyboard until it is confirmed.
+  Extras         - macros, RGB lighting, "review changes on this keyboard",
+                   save and restore, resets.
+
+Each step is a normal section of the page. Moving between them shows and hides
+sections and moves the screen-reader focus to the new section heading, rather
+than loading new pages.
+
+
+6. WHY BUILD IT THIS WAY
+------------------------
+- Single file: portable and durable. No toolchain to rot.
+- WebHID in the browser: no app to install, works cross-platform on any
+  Chromium browser, and never phones home.
+- Data baked in: the app works offline and from disk, and adding a keyboard is
+  a data change, not new plumbing.
+
+If you want to build your own remapper, those three choices are the ones worth
+copying. The rest is detail.

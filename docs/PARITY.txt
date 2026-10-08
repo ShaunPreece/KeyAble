@@ -1,0 +1,118 @@
+PARITY: WHAT KEYCHRON LAUNCHER CAN DO
+=====================================
+
+Keychron Launcher (launcher.keychron.com) is Keychron's own app for remapping
+its keyboards. It is very difficult to use with a screen reader, which is why
+KeyAble exists.
+
+Section 1 lists what KeyAble cannot do yet, so you can see straight away
+whether something you need is missing. The same list is in the app, under
+Help, "What KeyAble Can't Do Yet". Sections 2 to 9 list everything Launcher
+lets you assign to a key, grouped the way Launcher groups it.
+
+Launcher uses the standard QMK and VIA keycodes, with no proprietary
+extensions, plus a few Keychron keycodes defined in Keychron's firmware
+(keyboards/keychron/common/keychron_common.c in Keychron's QMK fork). That is
+where the codes below come from, since the live Launcher can only be driven
+in a browser.
+
+
+1. WHAT KEYABLE CAN'T DO YET
+----------------------------
+- Change keys on layers other than the Mac or Windows layer and its Fn layer,
+  for example the Fn2 layer.
+- Assign layer-switching keys (section 9).
+- Keys that hold several modifiers at once, such as Hyper (Ctrl, Shift, Alt
+  and Windows) and Meh (Ctrl, Shift and Alt). A single key can already send
+  all four modifiers with another key, from Build a Keyboard Shortcut.
+- Mouse keys.
+- Lighting keys (section 7). The backlight itself is fully controllable from
+  KeyAble's RGB Lighting section.
+- Keychron's wireless and battery keys (section 8).
+- Japanese and Korean input keys, and Japanese (JIS) keyboard layouts.
+- Keyboard-wide settings such as debounce and polling rate.
+- HE (Hall Effect) and Ultra 8K keyboards.
+
+Left out on purpose:
+- The audio and music mode keys. They need a speaker in the keyboard, which
+  Keychron keyboards don't have.
+- Firmware updates. A failed update can leave a keyboard unusable, so use
+  Keychron's Launcher for these.
+
+
+2. LAUNCHER'S MAIN SECTIONS
+---------------------------
+- Keymap: assign an action to each physical key, on each layer.
+- Macro: build key sequences and stored text.
+- Lighting: backlight effect, colour, brightness and speed.
+- Settings: keyboard-wide options such as debounce and polling rate.
+- Firmware: update the keyboard's firmware.
+
+The Keymap picker has these categories: Basic, Media, Macro, Special,
+Lighting, Custom and Layer. Sections 3 to 9 take them in that order.
+
+
+3. BASIC
+--------
+- Letters A to Z, digits 0 to 9, and the symbol keys.
+- Function keys F1 to F24.
+- Modifiers: left and right Ctrl, Shift, Alt, and Windows or Command.
+- Enter, Escape, Backspace, Tab, Space, Insert, Delete, Home, End, Page Up,
+  Page Down, and the arrow keys.
+- Caps Lock, Num Lock, Scroll Lock.
+- Numpad: 0 to 9, point, Enter, plus, minus, multiply, divide.
+- ISO-only keys: the extra backslash key and the hash key.
+- No action (the key does nothing).
+- Transparent (the key falls through to the layer below).
+
+
+4. MEDIA
+--------
+- Mute, Volume Up, Volume Down.
+- Play or Pause, Stop, Next Track, Previous Track.
+- Fast Forward, Rewind.
+- Screen brightness Up and Down.
+
+
+5. MACRO
+--------
+- Assign one of the keyboard's stored macro slots to a key.
+
+
+6. SPECIAL
+----------
+- Modifier bundles: Hyper (Ctrl, Shift, Alt and Windows together), Meh (Ctrl,
+  Shift and Alt), and the smaller pairs and triples.
+- Power: Sleep, Wake, Power.
+- Editing shortcuts: Cut, Copy, Paste, Undo, Redo, Select All, Find, Save.
+- Mouse keys: move the pointer, scroll in four directions, mouse buttons 1 to
+  5, and pointer acceleration.
+- Audio on and off, and music mode.
+- Application (context menu) key.
+- Japanese and Korean input keys: Hangul, Hanja, Katakana, Hiragana,
+  Zenkaku-Hankaku.
+
+
+7. LIGHTING
+-----------
+Keys that change the backlight when pressed: on and off, next and previous
+effect, hue, saturation, brightness and speed up and down.
+
+
+8. CUSTOM (KEYCHRON)
+--------------------
+- Mac keys: Mission Control, Launchpad, Spotlight, Siri, Screenshot.
+- Windows keys: Task View, File Explorer, Cortana or Copilot, Screenshot.
+- Wireless: Bluetooth device 1 to 3, 2.4 GHz dongle.
+- Battery level check.
+
+
+9. LAYER
+--------
+Keys that switch between the keyboard's layers:
+- Momentary: a layer is active while the key is held.
+- One-shot: the next key press uses a layer.
+- Toggle: switch a layer on or off.
+- Switch to: replace the current layer.
+- Default: change the base layer.
+- Layer-tap: a layer while held, a normal key when tapped.

@@ -1,0 +1,36 @@
+# OS / editor cruft
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+*.tmp
+*.bak
+*~
+
+# Secrets (belt and braces; none currently in tree)
+.env
+.env.*
+*.pem
+*.key
+credentials*
+secrets*
+.git-credentials
+
+# Node / build outputs (in case tooling gets added later)
+node_modules/
+dist/
+build/
+
+# Working notes are kept outside this repo.
+ProjectNotes.md
+ProjectMemory/
+
+# Claude Code instructions for this machine's setup; not part of the public repo.
+CLAUDE.md
+
+# Keychron's GPLv2 firmware source, fetched locally for the dataset parser.
+# The pinned commits are in docs/KEYBOARD-DATA.txt.
+ProjectAssets/keychron-firmware-src/
+
+# Build output of DevTools/build-factory-dataset.js; its content is inlined into the app.
+DevTools/factory-dataset.generated.js
