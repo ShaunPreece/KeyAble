@@ -11478,9 +11478,10 @@ function keysNotInBackup(data, layout) {
   return skip;
 }
 
-function skippedKeysText(layout, skip) {
+// The skipped keys' names as a list: "A and B", or "A or B" with type 'disjunction'.
+function skippedKeysText(layout, skip, type = 'conjunction') {
   const labels = [...skip].map(i => layout.keys[i].label);
-  return new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(labels);
+  return new Intl.ListFormat('en-GB', { type }).format(labels);
 }
 
 // The one knob entry per layer that validateBackup checks and executeRestore writes.
@@ -11817,7 +11818,8 @@ async function executeRestore() {
     playChirp(true);
     progress.finish(skip.size
       ? `Restore complete. ${skippedKeysText(layout, skip)} were left as they were, ` +
-        'because this backup did not save them. Every other key now matches the backup file.'
+        'because this backup did not save them. Every other key now matches the backup file. ' +
+        `If you remap ${skippedKeysText(layout, skip, 'disjunction')}, make a new backup so it includes them.`
       : 'Restore complete. Your keyboard now matches the backup file.');
   } catch (err) {
     playChirp(false);

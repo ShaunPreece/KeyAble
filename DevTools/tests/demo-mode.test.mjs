@@ -156,6 +156,8 @@ test('restoring a backup from before a key moved leaves that key alone', async (
   await page.locator('#restore-file-summary', { hasText: 'without Right Shift and Numpad 0' }).waitFor();
   await page.locator('#btn-confirm-restore').click();
   await page.locator('#backup-progress', { hasText: 'Restore complete.' }).waitFor({ timeout: 30000 });
+  assert.match(await page.locator('#backup-progress').textContent(),
+    /If you remap Right Shift or Numpad 0, make a new backup so it includes them\./);
 
   const after = await cells();
   assert.notEqual(before.rightShift, 0);
