@@ -1,9 +1,6 @@
 # Runs the browser tests inside a kill-on-close job object, so headless Edge and its
 # helper processes die with this script however it exits, then deletes the test profiles.
-# -CandidateFix runs the VIA tests with tests/candidate-fix.js in place of the app's sendVIA.
-param([switch]$CandidateFix)
 $ErrorActionPreference = 'Stop'
-if ($CandidateFix) { $env:KEYABLE_CANDIDATE_FIX = '1' }
 
 Add-Type -TypeDefinition @'
 using System;

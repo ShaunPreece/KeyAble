@@ -7706,6 +7706,13 @@ const CMD_SET_KEY      = 0x05;
 const CMD_DYNAMIC_KEYMAP_RESET = 0x06;   // VIA id_dynamic_keymap_reset - rewrites every key in the dynamic keymap with firmware defaults; takes effect immediately (id_eeprom_reset 0x0A only invalidates EEPROM until next reboot)
 const CMD_GET_ENCODER  = 0x14;   // VIA id_dynamic_keymap_get_encoder  args: [layer, encoder_id, clockwise]
 const CMD_SET_ENCODER  = 0x15;   // VIA id_dynamic_keymap_set_encoder  args: [layer, encoder_id, clockwise, kch, kcl]
+const CMD_CUSTOM_SET   = 0x07;   // VIA id_custom_set_value  args: [channel, value_id, ...value]
+const CMD_CUSTOM_GET   = 0x08;   // VIA id_custom_get_value  args: [channel, value_id]
+const CMD_CUSTOM_SAVE  = 0x09;   // VIA id_custom_save       args: [channel]
+// VIA id_dynamic_keymap_get_buffer  args: [offset_hi, offset_lo, size <= 28], data at bytes 4..
+// The buffer is every layer's keymap, big-endian 16-bit keycodes ordered layer, row,
+// column (QMK quantum/dynamic_keymap.h).
+const CMD_KEYMAP_GET_BUFFER = 0x12;
 
 // VIA dynamic macro buffer commands (verified against qmk/quantum/via.h).
 // Macros are stored as a single concatenated byte stream in a fixed-size
@@ -9175,6 +9182,9 @@ function goToSection(id, focusHeading = true) {
   if (captureActive && id !== 'step2') {
     endKeyCapture();
   }
+  // Leaving Step 2 stops its background keymap read, so the read does not hold up
+  // the next section's requests. Returning to Step 2 reads the keymap again.
+  if (id !== 'step2' && !$('sec-step2').hidden) keymapReadToken++;
 
   SECTIONS.forEach(s => {
     const el  = document.getElementById('sec-' + s);
@@ -9652,9 +9662,7 @@ function actionNameForCode(code) {
 }
 
 // Read the keycode of every entry in stepKeys from the layer a write would
-// target (writeTargetLayers). Encoder press is queried via CMD_GET_KEY (it
-// lives at a real row/col); encoder rotations use CMD_GET_ENCODER, which takes
-// [layer, encoder_id, clockwise].
+// target (writeTargetLayers): idx -> action, with defaults left out.
 async function readCurrentKeymap(token) {
   const result = new Map();
   if (isDemoMode || !isConnected || !hidDevice) return result;
@@ -9663,15 +9671,15 @@ async function readCurrentKeymap(token) {
   // "Current action" labels reflect exactly what will be edited.
   const layer = writeTargetLayers()[0];
   const isFn  = useFnLayer;
+  const keys  = stepKeys;
+  const codes = await readLayerKeys(layer, keys, { isCancelled: () => token !== keymapReadToken });
+  if (!codes || token !== keymapReadToken) return result;
 
-  for (let idx = 0; idx < stepKeys.length; idx++) {
-    if (token !== keymapReadToken) return result;   // a newer read superseded us
-    const key  = stepKeys[idx];
-    const code = await readKeyCodeOnLayer(layer, key);
-    if (code === null) continue;
-    const action = decodeAction(code, key, layer, isFn);
+  codes.forEach((code, idx) => {
+    if (code === null) return;
+    const action = decodeAction(code, keys[idx], layer, isFn);
     if (action !== 'Default') result.set(idx, action);
-  }
+  });
   return result;
 }
 
@@ -10065,6 +10073,87 @@ async function readKeyCodeOnLayer(layer, key) {
   } catch (_) { return null; }
 }
 
+// - Whole-layer keymap reads -
+// The keymap buffer command reads 28 bytes of the keymap a request, so a 6 by 21
+// layer takes 9 requests instead of one per key. A key's place in the buffer comes
+// from the layout's matrix `rows` and `cols`, which verify-keyboards.mjs checks
+// against each board's firmware. Boards it cannot check (the ZMK B6 Pro) are
+// covered at run time: the first whole-layer read on a connection is compared with
+// key-by-key reads, and any difference, or a board that does not answer the
+// command, keeps that connection on key-by-key reads.
+const KEYMAP_BUFFER_CHUNK = 28;   // a 32-byte report less command, offset and size
+let keymapBufferState = 'untested';   // per connection: 'untested' | 'trusted' | 'unusable'
+
+const matrixPos = key => `${key.row},${key.col}`;
+
+// Read `keys` (matrix keys, not knob rotations) on `layer`: a Map from "row,col" to
+// keycode, or null when the board does not answer or `isCancelled` turns true.
+// `onProgress(n)` is told how many of the keys have been read so far.
+async function readLayerMatrix(layer, keys, { onProgress = () => {}, isCancelled = () => false } = {}) {
+  const layout = activeLayout();
+  if (layout && keymapBufferState !== 'unusable') {
+    const fromBuffer = await readLayerFromBuffer(layer, layout, keys, isCancelled);
+    if (isCancelled()) return null;
+    if (fromBuffer && keymapBufferState === 'trusted') {
+      onProgress(keys.length);
+      return fromBuffer;
+    }
+    if (fromBuffer) {
+      const keyByKey = await readLayerKeyByKey(layer, keys, onProgress, isCancelled);
+      if (!keyByKey) return null;
+      keymapBufferState = keys.every(k => fromBuffer.get(matrixPos(k)) === keyByKey.get(matrixPos(k)))
+        ? 'trusted' : 'unusable';
+      return keyByKey;
+    }
+    keymapBufferState = 'unusable';
+  }
+  return readLayerKeyByKey(layer, keys, onProgress, isCancelled);
+}
+
+async function readLayerFromBuffer(layer, layout, keys, isCancelled) {
+  const layerBytes = layout.rows * layout.cols * 2;
+  const bytes = new Uint8Array(layerBytes);
+  for (let at = 0; at < layerBytes; at += KEYMAP_BUFFER_CHUNK) {
+    if (isCancelled()) return null;
+    const size   = Math.min(KEYMAP_BUFFER_CHUNK, layerBytes - at);
+    const offset = layer * layerBytes + at;
+    const reply  = await sendVIA([CMD_KEYMAP_GET_BUFFER, (offset >> 8) & 0xFF, offset & 0xFF, size]);
+    if (!reply || reply[0] !== CMD_KEYMAP_GET_BUFFER) return null;
+    bytes.set(reply.subarray(4, 4 + size), at);
+  }
+  const codes = new Map();
+  for (const key of keys) {
+    const i = (key.row * layout.cols + key.col) * 2;
+    codes.set(matrixPos(key), (bytes[i] << 8) | bytes[i + 1]);
+  }
+  return codes;
+}
+
+async function readLayerKeyByKey(layer, keys, onProgress, isCancelled) {
+  const codes = new Map();
+  for (const key of keys) {
+    if (isCancelled()) return null;
+    const code = await readKeyCodeOnLayer(layer, key);
+    if (code === null) return null;
+    codes.set(matrixPos(key), code);
+    onProgress(codes.size);
+  }
+  return codes;
+}
+
+// Read every entry of `keys` on `layer`, knob rotations included: an array of
+// keycodes in the same order, null where a knob read failed. Null overall when the
+// matrix read fails or is cancelled.
+async function readLayerKeys(layer, keys, options) {
+  const matrix = await readLayerMatrix(layer, keys.filter(k => !k.isRotation), options);
+  if (!matrix) return null;
+  const codes = [];
+  for (const key of keys) {
+    codes.push(key.isRotation ? await readKeyCodeOnLayer(layer, key) : matrix.get(matrixPos(key)));
+  }
+  return codes;
+}
+
 // Write `code` to `key` on `layer`. True when the board acknowledges.
 async function writeKeyCodeOnLayer(layer, key, code) {
   const high  = (code >> 8) & 0xFF;
@@ -10331,21 +10420,22 @@ async function scanChangedKeys() {
     return { rows, baseLayer, fnLayer, view, offline: true };
   }
 
-  for (let idx = 0; idx < stepKeys.length; idx++) {
-    const key = stepKeys[idx];
-    if (!key || key.label === 'Fn' || key.label === 'Fn2') continue;
-
-    const baseCode = await readKeyCodeOnLayer(baseLayer, key);
+  const keys      = stepKeys;
+  const baseCodes = await readLayerKeys(baseLayer, keys);
+  const fnCodes   = await readLayerKeys(fnLayer, keys);
+  keys.forEach((key, idx) => {
+    if (key.label === 'Fn' || key.label === 'Fn2') return;
+    const baseCode = baseCodes ? baseCodes[idx] : null;
     if (baseCode !== null) {
       const a = decodeAction(baseCode, key, baseLayer, false);
       if (a !== 'Default') rows.push({ idx, key, kind: 'base', action: a });
     }
-    const fnCode = await readKeyCodeOnLayer(fnLayer, key);
+    const fnCode = fnCodes ? fnCodes[idx] : null;
     if (fnCode !== null) {
       const a = decodeAction(fnCode, key, fnLayer, true);
       if (a !== 'Default') rows.push({ idx, key, kind: 'fn', action: a });
     }
-  }
+  });
   return { rows, baseLayer, fnLayer, view };
 }
 
@@ -10737,28 +10827,58 @@ function resetCaptureButton() {
 }
 
 // - VIA communication -
+// WebHID cannot pair a reply with its request: sendReport resolves once the report
+// is sent, and every reply arrives as a separate inputreport event. So requests go
+// out one at a time, and a reply is accepted only if it repeats its request's
+// leading bytes. VIA answers by rewriting the request buffer in place (QMK
+// quantum/via.c), so the command and its address (layer, row, column, or a buffer
+// offset) come back unchanged. A stray reply, such as one arriving after its
+// request timed out, is ignored instead of answering the next request.
+
+// Leading bytes each command's reply repeats. Commands not listed repeat byte 0 only.
+const VIA_ECHO_LENGTH = {
+  [CMD_GET_KEY]: 4, [CMD_SET_KEY]: 6,                 // layer, row, column (+ value)
+  [CMD_CUSTOM_SET]: 3, [CMD_CUSTOM_GET]: 3,           // channel, value id
+  [CMD_CUSTOM_SAVE]: 2,                               // channel
+  [CMD_MACRO_GET_BUFFER]: 4, [CMD_MACRO_SET_BUFFER]: 4,   // offset, size
+  [CMD_KEYMAP_GET_BUFFER]: 4,                         // offset, size
+  [CMD_GET_ENCODER]: 4, [CMD_SET_ENCODER]: 6,         // layer, encoder, direction (+ value)
+};
+const VIA_UNHANDLED = 0xFF;   // VIA's reply byte 0 for a command the firmware does not handle
+
+let viaQueue = Promise.resolve();
+
+// Send one VIA command and resolve with its reply, or null on timeout or a send
+// failure. Requests are queued, so callers may start several at once.
 function sendVIA(bytes, timeoutMs = 2000) {
+  const result = viaQueue.then(() => sendVIAOnce(bytes, timeoutMs));
+  viaQueue = result;
+  return result;
+}
+
+function sendVIAOnce(bytes, timeoutMs) {
   return new Promise(resolve => {
+    const device = hidDevice;   // a disconnect while queued must not redirect this request
+    if (!device) { resolve(null); return; }
     const buf = new Uint8Array(REPORT_LEN);
     bytes.forEach((b, i) => { buf[i] = b; });
+    const echo = VIA_ECHO_LENGTH[buf[0]] ?? 1;
+    const answers = reply =>
+      (reply[0] === buf[0] || reply[0] === VIA_UNHANDLED) &&
+      buf.subarray(1, echo).every((b, i) => reply[i + 1] === b);
 
-    const timer = setTimeout(() => {
-      hidDevice.removeEventListener('inputreport', handler);
-      resolve(null);
-    }, timeoutMs);
-
-    function handler(ev) {
+    const finish = value => {
       clearTimeout(timer);
-      hidDevice.removeEventListener('inputreport', handler);
-      resolve(new Uint8Array(ev.data.buffer));
+      device.removeEventListener('inputreport', onReport);
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    function onReport(ev) {
+      const reply = new Uint8Array(ev.data.buffer);
+      if (answers(reply)) finish(reply);
     }
-
-    hidDevice.addEventListener('inputreport', handler);
-    hidDevice.sendReport(0x00, buf).catch(() => {
-      clearTimeout(timer);
-      hidDevice.removeEventListener('inputreport', handler);
-      resolve(null);
-    });
+    device.addEventListener('inputreport', onReport);
+    device.sendReport(0x00, buf).catch(() => finish(null));
   });
 }
 
@@ -11056,6 +11176,7 @@ async function identifyKeyboard(vid, pid) {
 
     // Read the layer count BEFORE OS detection: it gates the per-model role map
     // that detectOSMode (and every read/write) relies on.
+    keymapBufferState = 'untested';
     deviceLayerCount = await detectLayerCount();
     currentOSMode = await detectOSMode();
     const modeLabel = osModeLabel(currentOSMode);
@@ -11171,6 +11292,7 @@ async function disconnectKeyboard(
   activeKbd     = null;
   currentOSMode = null;
   deviceLayerCount = null;
+  keymapBufferState = 'untested';
   selectedKey   = null;
   confirmedKey  = null;
   currentKeymap = new Map();
@@ -11465,18 +11587,12 @@ async function backupKeymap() {
     let done = 0;
 
     for (const layer of backupLayers) {
-      const codes = new Array(physicalKeys.length).fill(0);
-      for (let i = 0; i < physicalKeys.length; i++) {
-        const key = physicalKeys[i];
-        const reply = await sendVIA([CMD_GET_KEY, layer, key.row, key.col]);
-        if (!reply || reply[0] !== CMD_GET_KEY) {
-          throw new Error(`No response reading layer ${layer} key "${key.label}".`);
-        }
-        codes[i] = (reply[4] << 8) | reply[5];
-        done++;
-        progress.update(`Backing up keymap. Read ${done} of ${totalKeys} keys.`);
-      }
+      const codes = await readLayerKeys(layer, physicalKeys, {
+        onProgress: n => progress.update(`Backing up keymap. Read ${done + n} of ${totalKeys} keys.`),
+      });
+      if (!codes) throw new Error(`No response reading layer ${layer}.`);
       layers[String(layer)] = codes;
+      done += physicalKeys.length;
     }
 
     // Encoder rotations. Keychron boards have at most one encoder, id 0.
@@ -11723,16 +11839,12 @@ async function executeRestore() {
 //     SAVE (commit to EEPROM): [CMD_CUSTOM_SAVE, channel]
 //
 // Verified against QMK firmware quantum/via.h:
-//   id_custom_set_value = 0x07, get = 0x08, save = 0x09
+//   id_custom_set_value = 0x07, get = 0x08, save = 0x09 (CMD_CUSTOM_*, with the other commands)
 //   id_qmk_backlight_channel = 1   (monochrome)
 //   id_qmk_rgblight_channel  = 2   (single-strip RGB - unused by Keychron Max boards)
 //   id_qmk_rgb_matrix_channel = 3  (per-key RGB - used by V/Q Max, V/Q Pro)
 //   RGB matrix value IDs: brightness=1, effect=2, speed=3, colour=4 (hue,sat - 2 bytes)
 //   Backlight value IDs:  brightness=1, effect=2 (0=off, 1=breathing)
-
-const CMD_CUSTOM_SET  = 0x07;
-const CMD_CUSTOM_GET  = 0x08;
-const CMD_CUSTOM_SAVE = 0x09;
 
 const LIGHTING_CH_BACKLIGHT  = 1;
 const LIGHTING_CH_RGB_MATRIX = 3;

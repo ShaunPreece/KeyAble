@@ -21,6 +21,13 @@ const hex = n => '0x' + n.toString(16).toUpperCase().padStart(4, '0');
 
 function layoutProblems(layout, board) {
   const problems = [];
+  // The app reads whole layers from the firmware's keymap buffer by these numbers, so
+  // a wrong size reads every key from the wrong place.
+  const size = board.matrixSize;
+  if (!size) problems.push('the firmware declares no matrix size');
+  else if (layout.rows !== size.rows || layout.cols !== size.cols) {
+    problems.push(`matrix is ${layout.rows}x${layout.cols} in the app, ${size.rows}x${size.cols} in the firmware`);
+  }
   const index = new Map(board.keys.map((k, i) => [k.pos, i]));
   const appAt = new Set(layout.keys.map(k => `${k.row},${k.col}`));
   for (const k of layout.keys) {

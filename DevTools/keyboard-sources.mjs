@@ -101,6 +101,23 @@ export function standardCode(token, defs = {}) {
 }
 
 // ---- Firmware boards by product ID ----
+// Boards with a custom matrix scan (most wired ones) give their size in config.h, as
+// MATRIX_ROWS and MATRIX_COLS or as the pin lists, where every entry, NO_PIN
+// included, is one row or column.
+function configMatrixSize(dir) {
+  const file = path.join(dir, 'config.h');
+  if (!existsSync(file)) return null;
+  const text = readFileSync(file, 'utf8').replace(/\\\r?\n/g, ' ');
+  const count = name => {
+    const n = new RegExp(`#define\\s+MATRIX_${name}\\s+(\\d+)`).exec(text);
+    if (n) return Number(n[1]);
+    const pins = new RegExp(`#define\\s+MATRIX_${name.slice(0, 3)}_PINS\\s*\\{([^}]*)\\}`).exec(text);
+    return pins ? pins[1].split(',').filter(p => p.trim()).length : null;
+  };
+  const rows = count('ROWS'), cols = count('COLS');
+  return rows && cols ? { rows, cols } : null;
+}
+
 let firmwareIndex = null;
 function indexFirmware() {
   if (firmwareIndex) return firmwareIndex;
@@ -125,6 +142,7 @@ function indexFirmware() {
             matrixSize = { rows: def.matrix_pins.rows.length, cols: def.matrix_pins.cols.length };
           }
         }
+        matrixSize = configMatrixSize(d) || matrixSize;
       }
       const pid = parseInt(pidText, 16);
       if (!firmwareIndex.has(pid)) firmwareIndex.set(pid, []);

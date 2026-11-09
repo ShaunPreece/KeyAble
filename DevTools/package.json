@@ -4,8 +4,7 @@
   "description": "Development tools and tests for KeyAble.",
   "license": "MIT",
   "scripts": {
-    "test": "powershell -NoProfile -ExecutionPolicy Bypass -File tests/run-tests.ps1",
-    "test:candidate": "powershell -NoProfile -ExecutionPolicy Bypass -File tests/run-tests.ps1 -CandidateFix"
+    "test": "powershell -NoProfile -ExecutionPolicy Bypass -File tests/run-tests.ps1"
   },
   "devDependencies": {
     "playwright-core": "^1.65.0"

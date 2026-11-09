@@ -1,5 +1,5 @@
 // Checks that KeyAble reads and saves the right keycodes when requests to the keyboard
-// overlap. Runs the real app in headless Edge against the simulated keyboard in
+// overlap, and when it reads whole layers from the keymap buffer. Runs the real app in headless Edge against the simulated keyboard in
 // fake-keychron.js. Run with `npm test` in DevTools.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,10 +12,6 @@ import { chromium } from 'playwright-core';
 const here    = path.dirname(fileURLToPath(import.meta.url));
 const APP_URL = pathToFileURL(path.resolve(here, '../../Project/KeyAble.html')).href;
 const FAKE    = path.join(here, 'fake-keychron.js');
-const FIX     = path.join(here, 'candidate-fix.js');
-// Set by `npm run test:candidate`: the same tests, with candidate-fix.js replacing the
-// app's sendVIA.
-const USE_CANDIDATE_FIX = process.env.KEYABLE_CANDIDATE_FIX === '1';
 // Owned by this run and deleted in after(); the runner script deletes it too, in case
 // the process is killed.
 const PROFILE = path.join(tmpdir(), 'keyable-tests-profile');
@@ -39,7 +35,6 @@ before(async () => {
     channel: 'msedge', headless: true, acceptDownloads: true,
   });
   await context.addInitScript({ path: FAKE });
-  await context.addInitScript({ path: FIX });
 });
 
 after(async () => {
@@ -47,11 +42,12 @@ after(async () => {
   rmSync(PROFILE, { recursive: true, force: true });
 });
 
-// A fresh page with the remaps applied and the keyboard connected.
-async function connectedPage() {
+// A fresh page with the remaps applied and the keyboard connected. `bufferMode` is
+// how the simulated keyboard answers the keymap buffer command.
+async function connectedPage(bufferMode = 'normal') {
   const page = await context.newPage();
   await page.goto(APP_URL);
-  if (USE_CANDIDATE_FIX) await page.evaluate(() => window.__installCandidateFix());
+  await page.evaluate(mode => window.__fakeKeychron.setBufferMode(mode), bufferMode);
   await page.evaluate(remaps => {
     const layout = KEYCHRON_LAYOUTS[KEYBOARD_DB[window.__fakeKeychron.PID].layoutId];
     for (const [layer, label, code] of remaps) {
@@ -137,9 +133,8 @@ test('ticking and unticking Use with Fn reads back the chosen key', async () => 
   await page.close();
 });
 
-test('a backup started during the Step 2 read saves the real keymap', async () => {
-  const page = await connectedPage();
-  await enterAndLeaveStep2(page, 'Alt+1');
+// Back up from Step 1 and check the file holds the simulated keyboard's true codes.
+async function backupMatchesKeyboard(page) {
   const download = page.waitForEvent('download', { timeout: 30000 }).catch(() => null);
   await page.locator('#btn-backup').click();
   const progress = page.locator('#backup-progress');
@@ -159,8 +154,46 @@ test('a backup started during the Step 2 read saves the real keymap', async () =
     codes.forEach((code, i) => { if (code !== truth[layer][i]) wrong.push(`layer ${layer} key ${i}`); });
   }
   assert.deepEqual(wrong, [], `${wrong.length} keys saved with the wrong code`);
+}
+
+test('a backup started during the Step 2 read saves the real keymap', async () => {
+  const page = await connectedPage();
+  await enterAndLeaveStep2(page, 'Alt+1');
+  await backupMatchesKeyboard(page);
   await page.close();
 });
+
+// Commands sent since `from` in the simulated keyboard's log, counted by command byte.
+const commandsSince = (page, from) => page.evaluate(n =>
+  window.__fakeKeychron.log.slice(n).reduce((c, r) => ({ ...c, [r[0]]: (c[r[0]] || 0) + 1 }), {}), from);
+const logLength = page => page.evaluate(() => window.__fakeKeychron.log.length);
+
+test('once checked against key-by-key reads, whole layers are read from the keymap buffer', async () => {
+  const page = await connectedPage();
+  await page.keyboard.press('Alt+2');
+  await idle(page);
+  assert.equal(await page.evaluate(() => keymapBufferState), 'trusted');
+  await page.keyboard.press('Alt+1');
+  const from = await logLength(page);
+  await backupMatchesKeyboard(page);
+  const sent = await commandsSince(page, from);
+  assert.equal(sent[0x04], undefined, 'no single-key reads during the backup');
+  assert.ok(sent[0x12] > 0, 'the backup read the keymap buffer');
+  await page.close();
+});
+
+for (const mode of ['unhandled', 'shifted']) {
+  test(`a keyboard whose keymap buffer is ${mode} is read key by key`, async () => {
+    const page = await connectedPage(mode);
+    await page.keyboard.press('Alt+2');
+    await idle(page);
+    assert.deepEqual(await step2Actions(page), await expectedActions(page, WIN_BASE, false));
+    assert.equal(await page.evaluate(() => keymapBufferState), 'unusable');
+    await page.keyboard.press('Alt+1');
+    await backupMatchesKeyboard(page);
+    await page.close();
+  });
+}
 
 test('Review Changes opened during the Step 2 read lists exactly the changed keys', async () => {
   const page = await connectedPage();
