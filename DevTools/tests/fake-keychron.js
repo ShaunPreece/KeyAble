@@ -36,8 +36,8 @@
       for (const [pos, code] of Object.entries(layer)) keymap.set(`${l},${pos}`, code);
     });
     // A layout key at a position the factory data lacks gets its label's keycode on the
-    // base layers and KC_TRNS on the Fn layers, so these tests do not depend on that
-    // data mismatch, which data-consistency.test.mjs reports on its own.
+    // base layers and KC_TRNS on the Fn layers, so such a data mismatch fails only
+    // data-consistency.test.mjs, which reports it, and not these tests as well.
     // eslint-disable-next-line no-undef
     const layout = KEYCHRON_LAYOUTS[KEYBOARD_DB[PID].layoutId];
     // eslint-disable-next-line no-undef

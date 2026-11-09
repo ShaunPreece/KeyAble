@@ -48,7 +48,7 @@ test('the probe runs all four checks and reports what the simulator does', async
     'Check 1, two reads at once: FAIL',           // the simulator answers as firmware does
     'Check 2, replies repeat their request: PASS',
     'Check 3, whole-layer read: PASS',
-    'Check 4, layout positions: FAIL',            // V6 Max ANSI: Right Shift and Numpad 0
+    'Check 4, layout positions: PASS',
   ], await page.locator('#results').innerText());
   await page.close();
 });
