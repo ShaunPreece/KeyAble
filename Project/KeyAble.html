@@ -1001,7 +1001,7 @@
             <!-- populated at init by demoModelGroups -->
           </div>
         </div>
-        <p id="model-hint" class="hint">Grouped by series and size. Enter moves to the Load button.</p>
+        <p id="model-hint" class="hint">Grouped by series and size. Enter moves to the Confirm Model and Continue button.</p>
 
         <div class="btn-row" style="margin-top:0">
           <button id="btn-load-layout" class="primary" data-action="startDemoKeyboard" disabled>
@@ -1782,8 +1782,8 @@
 
         <h4 style="margin-top:1rem">Which keyboards does KeyAble work with?</h4>
         <p>
-          19 Keychron models across the Q, V, K, and B series, in their ANSI and ISO layouts
-          (JIS is not supported yet). Supported Keyboards has the full list. We have fully tested the V5 Max, V6 Max, Q6 Max, and B6 Pro on real
+          19 Keychron models across the Q, V, K, and B series, in ANSI and, for every model but
+          the ANSI-only B6 Pro, ISO layouts (JIS is not supported yet). Supported Keyboards has the full list. We have fully tested the V5 Max, V6 Max, Q6 Max, and B6 Pro on real
           hardware; the others are built from Keychron's firmware data and should work.
         </p>
 
@@ -1898,7 +1898,7 @@
         <h4 style="margin-top:1.25rem">Why was I warned that a key is risky to remap?</h4>
         <p>
           A few keys are important for keeping control of your keyboard and your screen reader,
-          for example Caps Lock or your only Fn key. If you remap one of these you could lose an
+          for example Caps Lock, Escape or Tab. If you remap one of these you could lose an
           important shortcut until you reset. The warning just lets you stop and think; you can
           still continue if you are sure.
         </p>
@@ -2158,8 +2158,11 @@
 //   rows/cols - the firmware's matrix size; whole-layer reads place keys by it
 //   keys      - { label, row, col }, the matrix coordinates the VIA protocol uses;
 //               isEncoder: true marks the knob press. Backups store keycodes in
-//               this order, so a layout whose keys move or reorder takes a new
-//               layoutId, and validateBackup then refuses older backups.
+//               this order, so a layout whose keys reorder takes a new layoutId,
+//               and validateBackup then refuses older backups.
+//   keysMovedIn - { version: [labels] }, keys whose position changed in that app
+//               version. A backup from an earlier version read them from the old
+//               position, so restore leaves them as they are (keysNotInBackup).
 //
 // JIS variants have no layout here: KEYBOARD_DB recognises them, and Step 2
 // reports that the model cannot be remapped.
@@ -2422,10 +2425,11 @@ const KEYCHRON_LAYOUTS = {
   // ============================================================
   // Right Shift (4,12) and Numpad 0 (5,17) follow the firmware's LAYOUT_ansi_109, which the
   // V6 Max ISO firmware shares. Keychron's VIA file puts them at (4,13) and (5,18), the
-  // Q6 Max ANSI's positions. Key order is kept as it was, because backups store keys in it.
+  // Q6 Max ANSI's positions, where KeyAble had them before 1.3.
   'v6_max_ansi_knob': {
     rows: 6,
     cols: 21,
+    keysMovedIn: { '1.3': ['Right Shift', 'Numpad 0'] },
     keys: [
       // Function row
       { label: 'Escape',          row: 0, col: 0  },
@@ -7663,19 +7667,20 @@ function activeLayerRoles() {
   const roles = model && model.roles;
   if (roles) {
     const expected = model.layers.length;
-    if (deviceLayerCount == null || deviceLayerCount === expected) return roles;
+    if (deviceLayerCount === null || deviceLayerCount === expected) return roles;
     console.warn(`KeyAble: layer-count mismatch (dataset expects ${expected}, device reports ${deviceLayerCount}); using default 4-layer map.`);
   }
   return DEFAULT_LAYER_ROLES;
 }
 
-// The Fn layer that pairs with a base layer, via the role map. Never assume
-// base + 1: on the 5-layer boards the Fn layer is elsewhere.
+// The Fn layer that pairs with the Mac or Windows base layer, via the role map.
+// Never assume base + 1: on the 5-layer boards the Fn layer is elsewhere, so any
+// other layer throws rather than writing to a guessed one.
 function fnLayerFor(baseLayer) {
   const R = activeLayerRoles();
   if (baseLayer === R.mac) return R.macFn;
   if (baseLayer === R.win) return R.winFn;
-  return baseLayer + 1;   // safety net for any unmapped base
+  throw new Error(`Layer ${baseLayer} is not a Mac or Windows base layer.`);
 }
 
 // Read the device's dynamic-keymap layer count (VIA 0x11), or null on failure.
@@ -9161,21 +9166,9 @@ function getStepKeys(layout) {
   return keys;
 }
 
-// Friendly default-action names for encoder positions, used by decodeAction so
-// the listbox shows e.g. "Knob - Press. Current action: Mute." rather than the
-// generic "Custom" we'd get from KEYCODE_TO_LABEL alone (which doesn't include
-// media keys).
-const MEDIA_KEYCODE_TO_LABEL = {
-  0x007F: 'Mute',
-  0x0080: 'Volume Up',
-  0x0081: 'Volume Down',
-  0x00AE: 'Play / Pause',
-  0x00AD: 'Stop',
-  0x00AB: 'Next Track',
-  0x00AC: 'Previous Track',
-  0x00BD: 'Brightness Up',
-  0x00BE: 'Brightness Down',
-};
+// Media key names by keycode, so a media action reads back by the name the Media
+// picker gives it (KEYCODE_TO_LABEL has no media keys).
+const MEDIA_KEYCODE_TO_LABEL = buildCodeToLabel(MEDIA_KEYS);
 
 const CODE_TO_LABEL = {
   'Escape':'Escape', 'F1':'F1','F2':'F2','F3':'F3','F4':'F4','F5':'F5','F6':'F6',
@@ -9434,7 +9427,7 @@ function activeLayout() {
 // label-based guess). layer is the DEVICE layer index; resolve it through the
 // role map, never assume the 4-layer order.
 function modelFactory() {
-  return (activeKbd && activeKbd.pid != null) ? FACTORY_KEYMAPS[activeKbd.pid] : undefined;
+  return activeKbd ? FACTORY_KEYMAPS[activeKbd.pid] : undefined;
 }
 function factoryCode(layer, key) {
   const model = modelFactory();
@@ -9497,14 +9490,18 @@ function decodeAction(code, key, layer, isFnLayer = false) {
   }
   if (code === 0x0000) return 'Disabled';
   if (code === 0x0001) return 'Default';   // KC_TRNS behaves as default (fall through on Fn)
+  return codeName(code) || 'Custom';
+}
+
+// The name of a macro, media key, basic keycode, System Key or modifier
+// combination, or null when the code is none of these.
+function codeName(code) {
   if (code >= QK_MACRO_BASE && code <= QK_MACRO_MAX) {
     return `Types Text (macro ${code - QK_MACRO_BASE + 1})`;
   }
   if (MEDIA_KEYCODE_TO_LABEL[code]) return MEDIA_KEYCODE_TO_LABEL[code];
   if (code <= 0xFF && KEYCODE_TO_LABEL[code]) return KEYCODE_TO_LABEL[code];
-  const named = systemOrComboName(code, currentViewOS());
-  if (named) return named;
-  return 'Custom';
+  return systemOrComboName(code, currentViewOS());
 }
 
 function expectedDefaultCode(key) {
@@ -9528,13 +9525,7 @@ const MAC_MODIFIER_NAMES = {
 function actionNameForCode(code) {
   if (code === undefined) return 'its factory default';
   if (code === 0x0000) return 'Disabled';
-  if (MAC_MODIFIER_NAMES[code]) return MAC_MODIFIER_NAMES[code];
-  if (code >= QK_MACRO_BASE && code <= QK_MACRO_MAX) return `Types Text (macro ${code - QK_MACRO_BASE + 1})`;
-  if (MEDIA_KEYCODE_TO_LABEL[code]) return MEDIA_KEYCODE_TO_LABEL[code];
-  if (code <= 0xFF && KEYCODE_TO_LABEL[code]) return KEYCODE_TO_LABEL[code];
-  const named = systemOrComboName(code, currentViewOS());
-  if (named) return named;
-  return 'its factory default';
+  return MAC_MODIFIER_NAMES[code] || codeName(code) || 'its factory default';
 }
 
 // Read the keycode of every entry in stepKeys from the layer a write would
@@ -9678,18 +9669,21 @@ function fillSelectListbox(listboxId, items, selected) {
   const listbox  = $(listboxId);
   const hadFocus = listbox.contains(document.activeElement);
   listbox.innerHTML = '';
-  items.forEach((it, i) => {
-    const opt = document.createElement('div');
-    opt.setAttribute('role', 'option');
-    opt.setAttribute('aria-selected', 'false');
-    opt.id            = `${listboxId}-o${i}`;
-    opt.dataset.value = String(it.value);
-    opt.dataset.label = it.label;
-    opt.className     = 'listbox-option';
-    opt.textContent   = it.label;
-    listbox.appendChild(opt);
-  });
+  items.forEach((it, i) => listbox.appendChild(makeListboxOption(listboxId, i, it)));
   finishListboxFill(listboxId, selected, hadFocus);
+}
+
+// One option of a custom listbox: item {value, label}, id unique by its index.
+function makeListboxOption(listboxId, index, item) {
+  const opt = document.createElement('div');
+  opt.setAttribute('role', 'option');
+  opt.setAttribute('aria-selected', 'false');
+  opt.id            = `${listboxId}-o${index}`;
+  opt.dataset.value = String(item.value);
+  opt.dataset.label = item.label;
+  opt.className     = 'listbox-option';
+  opt.textContent   = item.label;
+  return opt;
 }
 
 // Removing the focused option drops focus to the document (the screen reader reads
@@ -9715,17 +9709,7 @@ function fillGroupedSelectListbox(listboxId, groups, selected) {
     hdr.setAttribute('aria-hidden', 'true');
     hdr.textContent = g.label;
     grp.appendChild(hdr);
-    g.options.forEach(it => {
-      const opt = document.createElement('div');
-      opt.setAttribute('role', 'option');
-      opt.setAttribute('aria-selected', 'false');
-      opt.id            = `${listboxId}-o${n++}`;
-      opt.dataset.value = String(it.value);
-      opt.dataset.label = it.label;
-      opt.className     = 'listbox-option';
-      opt.textContent   = it.label;
-      grp.appendChild(opt);
-    });
+    g.options.forEach(it => grp.appendChild(makeListboxOption(listboxId, n++, it)));
     listbox.appendChild(grp);
   });
   finishListboxFill(listboxId, selected, hadFocus);
@@ -9763,11 +9747,11 @@ function confirmKeyFromSelect() {
 }
 
 // - Step 2 - confirm key selection (both methods) -
-// viaCapture = true when the selection came from Capture Mode. In that case
-// the key is by definition at default (firmware would have sent a different
-// keycode if it were already remapped), so the "Reset to default" button is
-// pointless and we hide it.
-function confirmKeySelection(idx, viaCapture = false) {
+// The Reset button stays visible after Capture Mode too. A captured key sends its own
+// code on the layer the switch selects, but its Fn action, or its base action on the
+// other OS layout, can still be changed; resetSelectedKeyToDefault reads both layers
+// and says when there is nothing to reset.
+function confirmKeySelection(idx) {
   const key     = stepKeys[idx];
 
   // Fn is per-remap: a freshly chosen key starts a fresh remap, so the Fn
@@ -9788,10 +9772,7 @@ function confirmKeySelection(idx, viaCapture = false) {
   // Reset button shows the specific key so screen-reader users hear which
   // key they're about to reset before they activate the button.
   const resetBtn = $('btn-reset-key');
-  if (resetBtn) {
-    resetBtn.textContent = `Reset ${keyDesc} To Default Action`;
-    resetBtn.hidden = !!viaCapture;
-  }
+  if (resetBtn) resetBtn.textContent = `Reset ${keyDesc} To Default Action`;
   $('key-selected-section').hidden = false;
   initUseFnLayer();   // sync the Fn checkbox in this section to the reset state
 
@@ -10653,7 +10634,7 @@ function endKeyCapture() {
     // Move focus to the "You have selected" heading BEFORE hiding the
     // capture-box. If we hide first, focus is yanked off the hidden input
     // onto <body> and NVDA re-narrates the whole region in the gap.
-    confirmKeySelection(captureLastKey.idx, true);
+    confirmKeySelection(captureLastKey.idx);
     $('capture-box').hidden = true;
   } else {
     $('capture-box').hidden = true;
@@ -10961,9 +10942,17 @@ async function checkPreviousDevices() {
 
 async function forgetSavedDevice(device) {
   const name = deviceFriendlyName(device);
+  if (typeof device.forget !== 'function') {
+    announce(`This browser cannot forget a keyboard from inside KeyAble. To remove ${name}, ` +
+             `remove its permission in the browser's site settings for this page.`);
+    return;
+  }
   try {
-    if (typeof device.forget === 'function') await device.forget();
-  } catch (_) {}
+    await device.forget();
+  } catch {
+    announce(`Could not forget ${name}. It can still connect to KeyAble.`);
+    return;
+  }
   announce(`${name} has been forgotten. KeyAble will need to be granted permission again to use this keyboard.`);
   await focusReconnectOrConnect();
 }
@@ -11369,11 +11358,12 @@ async function executeResetAll() {
     }
 
     playChirp(true);
-    const macroNote = macroStatus === 'cleared'
-      ? ' Stored text macros have also been cleared.'
-      : macroStatus === 'unsupported'
-        ? ''   // keyboard has no macro support - nothing to mention
-        : ' Note: stored text macros could not be cleared; re-run the reset or clear them manually from the Macro tab.';
+    let macroNote = '';   // stays empty when the keyboard has no macro support
+    if (macroStatus === 'cleared') {
+      macroNote = ' Stored text macros have also been cleared.';
+    } else if (macroStatus !== 'unsupported') {
+      macroNote = ' Note: stored text macros could not be cleared; re-run the reset or clear them manually from the Macro tab.';
+    }
     progress.finish(`Factory reset complete. All keys have been restored to their default functions.${macroNote}`);
   } catch (err) {
     playChirp(false);
@@ -11386,8 +11376,10 @@ async function executeResetAll() {
 // Bump KEYABLE_VERSION by hand at a real release (MAJOR.MINOR.PATCH: a small
 // fix is a PATCH, a new feature a MINOR); update KEYABLE_RELEASE_DATE (ISO)
 // to that day. showAppVersion writes it under the page title and the Help page.
-const KEYABLE_VERSION       = '1.2';
-const KEYABLE_RELEASE_DATE  = '2026-10-08';   // ISO yyyy-mm-dd
+// Backups record the version, and keysMovedIn is compared with it, so a change
+// that moves a key in a layout bumps it in the same commit.
+const KEYABLE_VERSION       = '1.3';
+const KEYABLE_RELEASE_DATE  = '2026-11-09';   // ISO yyyy-mm-dd
 
 // The human-friendly version string, e.g. "Version 1.2, released
 // 8 October 2026". Falls back to just the version if the date cannot be parsed.
@@ -11460,6 +11452,41 @@ function showAppVersion() {
 
 const BACKUP_FORMAT       = 'keyable-keymap';
 const BACKUP_VERSION      = 1;
+
+// Dotted version strings compared number by number, so '1.10' is later than '1.9'.
+function versionBefore(a, b) {
+  const pa = String(a).split('.').map(Number);
+  const pb = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] || 0;
+    const y = pb[i] || 0;
+    if (x !== y) return x < y;
+  }
+  return false;
+}
+
+// Indices of the layout's keys that a backup did not save: those listed in keysMovedIn for
+// a later version than the one that made it. A missing appVersion counts as earlier, which
+// can only leave keys untouched.
+function keysNotInBackup(data, layout) {
+  const made = typeof data.appVersion === 'string' ? data.appVersion : '0';
+  const skip = new Set();
+  for (const [version, labels] of Object.entries(layout.keysMovedIn || {})) {
+    if (!versionBefore(made, version)) continue;
+    layout.keys.forEach((k, i) => { if (labels.includes(k.label)) skip.add(i); });
+  }
+  return skip;
+}
+
+function skippedKeysText(layout, skip) {
+  const labels = [...skip].map(i => layout.keys[i].label);
+  return new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(labels);
+}
+
+// The one knob entry per layer that validateBackup checks and executeRestore writes.
+function backupEncoderEntry(data, layer) {
+  return data.encoders.find(e => e && e.id === 0 && e.layer === layer);
+}
 
 // Long HID operations (backup, restore, factory reset) report through a progress
 // box that is NOT a live region. It takes focus at the start, which reads the
@@ -11639,7 +11666,13 @@ function describeBackup(data) {
       d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
     : 'unknown date';
   const layerCount = data.layers ? Object.keys(data.layers).length : 0;
-  return `File: ${name}, ${layerCount} layers, saved ${when}.`;
+  const layout  = activeLayout();
+  const skip    = keysNotInBackup(data, layout);
+  const skipped = skip.size
+    ? ` An earlier version of KeyAble made this backup without ${skippedKeysText(layout, skip)}, ` +
+      `so those keys will be left as they are.`
+    : '';
+  return `File: ${name}, ${layerCount} layers, saved ${when}.${skipped}`;
 }
 
 function validateBackup(data) {
@@ -11679,7 +11712,7 @@ function validateBackup(data) {
   if (hasEncoder) {
     if (!Array.isArray(data.encoders)) return 'Backup is missing encoder data for this keyboard.';
     for (const layer of layerList) {
-      const entry = data.encoders.find(e => e && e.id === 0 && e.layer === layer);
+      const entry = backupEncoderEntry(data, layer);
       if (!entry) return `Backup is missing encoder data for layer ${layer}.`;
       if (!Number.isInteger(entry.ccw) || !Number.isInteger(entry.cw)) {
         return `Backup contains an invalid encoder keycode in layer ${layer}.`;
@@ -11745,13 +11778,14 @@ async function executeRestore() {
     const layout = activeLayout();
     const physicalKeys = layout.keys;
     const restoreLayers = fileLayerList(data);   // restore exactly what the file holds
-    const totalKeys    = physicalKeys.length * restoreLayers.length;
+    const skip         = keysNotInBackup(data, layout);
+    const toWrite      = physicalKeys.map((key, i) => ({ key, i })).filter(({ i }) => !skip.has(i));
+    const totalKeys    = toWrite.length * restoreLayers.length;
     let done = 0;
 
     for (const layer of restoreLayers) {
       const codes = data.layers[String(layer)];
-      for (let i = 0; i < physicalKeys.length; i++) {
-        const key  = physicalKeys[i];
+      for (const { key, i } of toWrite) {
         const code = codes[i];
         const high = (code >> 8) & 0xFF;
         const low  = code & 0xFF;
@@ -11764,8 +11798,9 @@ async function executeRestore() {
       }
     }
 
-    if (Array.isArray(data.encoders)) {
-      for (const entry of data.encoders) {
+    if (physicalKeys.some(k => k.isEncoder)) {
+      for (const layer of restoreLayers) {
+        const entry = backupEncoderEntry(data, layer);
         const high = (entry.cw  >> 8) & 0xFF;
         const lowC = entry.cw  & 0xFF;
         const highCCW = (entry.ccw >> 8) & 0xFF;
@@ -11780,7 +11815,10 @@ async function executeRestore() {
 
     currentKeymap = new Map();   // Step 2 cache is now stale
     playChirp(true);
-    progress.finish('Restore complete. Your keyboard now matches the backup file.');
+    progress.finish(skip.size
+      ? `Restore complete. ${skippedKeysText(layout, skip)} were left as they were, ` +
+        'because this backup did not save them. Every other key now matches the backup file.'
+      : 'Restore complete. Your keyboard now matches the backup file.');
   } catch (err) {
     playChirp(false);
     progress.finish(`Restore failed: ${err.message || String(err)}`);
@@ -11897,21 +11935,21 @@ function hueName(degrees) {
   return HUE_NAMES[Math.round(degrees / 30) % 12];
 }
 
-// Each lighting slider, keyed by its lightingState field: the input id, its
-// spoken aria-valuetext, the byte <-> UI conversions, and the VIA value id plus
-// payload that writes it. Hue and saturation share one colour command, so each
+// Each lighting slider, keyed by its lightingState field: the input id, its name in
+// messages, its spoken aria-valuetext, the byte <-> UI conversions, and the VIA value
+// id plus payload that writes it. Hue and saturation share one colour command, so each
 // sends the other's current value alongside its own. The hue's colour name comes
 // first, so a user arrowing through can stop as soon as they hear it.
 const percentText = ui => `${ui} percent`;
 const LIGHTING_SLIDERS = {
-  brightness: { id: 'lighting-brightness', spoken: percentText, toUi: percentFromByte, toByte: byteFromPercent,
+  brightness: { id: 'lighting-brightness', name: 'brightness', spoken: percentText, toUi: percentFromByte, toByte: byteFromPercent,
                 valueId: 1, payload: b => [b] },
-  speed:      { id: 'lighting-speed',      spoken: percentText, toUi: percentFromByte, toByte: byteFromPercent,
+  speed:      { id: 'lighting-speed',      name: 'effect speed', spoken: percentText, toUi: percentFromByte, toByte: byteFromPercent,
                 valueId: 3, payload: b => [b], rgbOnly: true },
-  hue:        { id: 'lighting-hue', spoken: ui => `${hueName(ui)}, ${ui} degrees`,
+  hue:        { id: 'lighting-hue', name: 'colour', spoken: ui => `${hueName(ui)}, ${ui} degrees`,
                 toUi: degreesFromByte, toByte: byteFromDegrees,
                 valueId: 4, payload: b => [b, lightingState.sat], rgbOnly: true },
-  sat:        { id: 'lighting-saturation', spoken: percentText, toUi: percentFromByte, toByte: byteFromPercent,
+  sat:        { id: 'lighting-saturation', name: 'saturation', spoken: percentText, toUi: percentFromByte, toByte: byteFromPercent,
                 valueId: 4, payload: b => [lightingState.hue, b], rgbOnly: true },
 };
 
@@ -12120,7 +12158,11 @@ async function onLightingSliderInput(ev, field) {
   if (byte === lightingState[field]) return;
 
   const ok = await lightingSet(lightingChannel, spec.valueId, spec.payload(byte));
-  if (!ok) return;
+  if (!ok) {
+    showLightingSlider(field);   // back to the level the keyboard still has
+    announce(`Could not change ${spec.name}. The keyboard did not respond.`);
+    return;
+  }
   lightingState[field] = byte;
   if (field === 'brightness') {
     if (byte > 0) lightingLastOnLevel = byte;
@@ -12714,7 +12756,7 @@ function layerName(l) {
   if (l === R.macFn) return 'Mac Fn';
   if (l === R.win)   return 'Windows';
   if (l === R.winFn) return 'Windows Fn';
-  if (R.fn2 != null && l === R.fn2) return 'Fn2';
+  if (R.fn2 !== undefined && l === R.fn2) return 'Fn2';
   return `layer ${l}`;
 }
 
@@ -13376,7 +13418,8 @@ function onMacroLayoutChange(value) {
 // step takes focus.
 function describeStepAction(step) {
   if (step.type === 'text') {
-    const safe = (step.text || '').replace(/\n/g, '↵').replace(/\t/g, '⇥');
+    // Words, not symbols: this text is spoken whenever the step takes focus.
+    const safe = (step.text || '').replace(/\n/g, ' new line ').replace(/\t/g, ' tab ');
     const shown = safe.length > 50 ? safe.slice(0, 47) + '...' : safe;
     return shown ? `Type "${shown}"` : 'Type (empty)';
   }

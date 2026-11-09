@@ -4,13 +4,14 @@
 // The page's own names, used inside page.evaluate:
 /* global KEYBOARD_DB, KEYCHRON_LAYOUTS, FACTORY_KEYMAPS, BUTTON_ACTIONS, DemoKeyboard,
    activeLayerRoles, activeLayout, deviceLayerCount, executeResetAll, hidDevice,
-   inDemoMode, scanChangedKeys, writeKeyCodeOnLayer */
+   inDemoMode, scanChangedKeys, writeKeyCodeOnLayer, restoreKeymapFileChosen */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { APP_URL, useEdge } from './edge.mjs';
 
 const V2_MAX_ANSI = 0x0920;   // a five-layer model, so its own role map matters
+const V6_MAX_ANSI = 0x0960;   // Right Shift and Numpad 0 moved in 1.3 (keysMovedIn)
 
 // No first-run welcome dialog: it would make the page inert.
 const skipWelcome = () => { try { localStorage.setItem('keyable-v1', '1'); } catch { /* blocked */ } };
@@ -93,7 +94,7 @@ test('Review Changes in demo finds base and Fn changes, and factory reset clears
     await writeKeyCodeOnLayer(R.win, key('B'), 0x007F);     // Mute
     await writeKeyCodeOnLayer(R.winFn, key('K'), 0x0005);   // B
   });
-  assert.deepEqual(await rows(), ['base B: Mute', 'fn K: B']);
+  assert.deepEqual(await rows(), ['base B: Mute / Unmute', 'fn K: B']);
 
   await page.evaluate(() => executeResetAll());
   await page.waitForFunction(() => hidDevice.keymap.every((c, i) => c === new DemoKeyboard(hidDevice.productId).keymap[i]));
@@ -121,6 +122,75 @@ test('a demo backup saves the simulated keyboard\'s keymap', async () => {
     return out;
   });
   assert.deepEqual(backup.layers, truth);
+  await page.close();
+});
+
+test('restoring a backup from before a key moved leaves that key alone', async () => {
+  const page = await demoPage(V6_MAX_ANSI);
+  const download = page.waitForEvent('download', { timeout: 30000 });
+  await page.locator('#btn-backup').click();
+  const backup = JSON.parse(readFileSync(await (await download).path(), 'utf8'));
+
+  const cells = () => page.evaluate(() => {
+    const win = activeLayerRoles().win;
+    const cell = label => {
+      const k = activeLayout().keys.find(key => key.label === label);
+      return hidDevice.keymap[hidDevice.cell(win, k.row, k.col)];
+    };
+    return { rightShift: cell('Right Shift'), numpad0: cell('Numpad 0'), a: cell('A') };
+  });
+  const before = await cells();
+
+  // A 1.2 backup read Right Shift and Numpad 0 from empty positions, so holds no key.
+  await page.evaluate(old => {
+    const keys = activeLayout().keys;
+    const at = label => keys.findIndex(k => k.label === label);
+    old.appVersion = '1.2';
+    for (const codes of Object.values(old.layers)) {
+      codes[at('Right Shift')] = 0;
+      codes[at('Numpad 0')] = 0;
+    }
+    old.layers[String(activeLayerRoles().win)][at('A')] = 0x0005;   // B: the rest is restored
+    restoreKeymapFileChosen({ target: { files: [new File([JSON.stringify(old)], 'old.json')] } });
+  }, backup);
+  await page.locator('#restore-file-summary', { hasText: 'without Right Shift and Numpad 0' }).waitFor();
+  await page.locator('#btn-confirm-restore').click();
+  await page.locator('#backup-progress', { hasText: 'Restore complete.' }).waitFor({ timeout: 30000 });
+
+  const after = await cells();
+  assert.notEqual(before.rightShift, 0);
+  assert.equal(after.rightShift, before.rightShift, 'Right Shift was left as it was');
+  assert.equal(after.numpad0, before.numpad0, 'Numpad 0 was left as it was');
+  assert.equal(after.a, 0x0005, 'the other keys were restored');
+  await page.close();
+});
+
+test('the Reset button shows for a key chosen by Capture Mode', async () => {
+  const page = await demoPage();
+  await page.evaluate(async () => {
+    const key = activeLayout().keys.find(k => k.label === 'H');
+    await writeKeyCodeOnLayer(activeLayerRoles().winFn, key, 0x0005);   // Fn+H types B
+  });
+  await page.keyboard.press('Alt+2');
+  await page.locator('#btn-capture').click();
+  await page.locator('#capture-box:visible').waitFor();
+  await page.keyboard.press('KeyH');
+  await page.locator('#h-key-selected', { hasText: 'H' }).waitFor();
+  assert.equal(await page.locator('#btn-reset-key').isVisible(), true);
+  await page.close();
+});
+
+test('a lighting slider the keyboard does not accept goes back and says so', async () => {
+  const page = await demoPage();
+  await page.keyboard.press('Alt+4');
+  await page.locator('#lighting-panel:visible').waitFor();
+  const slider = page.locator('#lighting-brightness');
+  const before = await slider.inputValue();
+  await page.evaluate(() => { hidDevice.lightingChannel = 0xEE; });   // every lighting set unhandled
+  await slider.focus();
+  await page.keyboard.press('ArrowRight');
+  await page.locator('#sr-live', { hasText: 'Could not change brightness.' }).waitFor();
+  assert.equal(await slider.inputValue(), before);
   await page.close();
 });
 
