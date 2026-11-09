@@ -86,6 +86,13 @@ that position on the chosen layer. Resetting a key means writing the factory
 number back. That factory number is the tricky part, and is covered in
 KEYBOARD-DATA.txt.
 
+Ordinary keys and shortcuts have the same numbers on every board, but macros,
+Keychron's own keys (Mission Control, Launchpad, the Mac Option and Command
+keys) and the lighting commands depend on how old the firmware is. On connect
+the app asks the keyboard which VIA protocol version it speaks (9 on the K2 Pro
+and K6 Pro, 11 on the wired Q, V and S boards, 12 on the Max boards) and uses
+the numbers and commands that version understands.
+
 
 5. THE STEPS YOU SEE IN THE APP
 -------------------------------

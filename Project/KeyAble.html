@@ -8117,6 +8117,8 @@ const CMD_SET_KEY      = 0x05;
 const CMD_DYNAMIC_KEYMAP_RESET = 0x06;   // VIA id_dynamic_keymap_reset - rewrites every key in the dynamic keymap with firmware defaults; takes effect immediately (id_eeprom_reset 0x0A only invalidates EEPROM until next reboot)
 const CMD_GET_ENCODER  = 0x14;   // VIA id_dynamic_keymap_get_encoder  args: [layer, encoder_id, clockwise]
 const CMD_SET_ENCODER  = 0x15;   // VIA id_dynamic_keymap_set_encoder  args: [layer, encoder_id, clockwise, kch, kcl]
+// Lighting. Before protocol 11 the same numbers are id_lighting_set/get_value and
+// id_lighting_save, with no channel byte (lightingRequest).
 const CMD_CUSTOM_SET   = 0x07;   // VIA id_custom_set_value  args: [channel, value_id, ...value]
 const CMD_CUSTOM_GET   = 0x08;   // VIA id_custom_get_value  args: [channel, value_id]
 const CMD_CUSTOM_SAVE  = 0x09;   // VIA id_custom_save       args: [channel]
@@ -8136,40 +8138,58 @@ const CMD_MACRO_GET_BUFFER      = 0x0E;   // args: [offset_hi, offset_lo, size] 
 const CMD_MACRO_SET_BUFFER      = 0x0F;   // args: [offset_hi, offset_lo, size, ...] echo reply
 
 // - Keycode numbering -
-// QMK 0.19 renumbered most keycodes above the modifier combinations, and VIA
-// protocol 12 marks the change. A board reporting an older protocol (the K2 Pro and
-// K6 Pro, whose only released firmware is 1.00) reads the new numbers as other keys
-// or as nothing, so every such code the app writes comes from the set the connected
-// board uses. Basic keys and modifier combinations (0x0000 to 0x1FFF) are the same
-// in both.
-//   macroBase, macroSlots: the code for "run macro 0" and how many macro codes exist.
-//     QMK 0.19+ has QK_MACRO_0..31 from 0x7700; older VIA has MACRO00..15 from 0x5F12.
-//   missionControl, launchpad: 0x00C1 / 0x00C2 are QMK 0.19+ basic codes. Older
-//     Keychron firmware has them as its own customs, which are also the only form
-//     those boards understand (in a macro, 0xC1 / 0xC2 are the unused KC_FN1 / KC_FN2).
-//   keychronNames: the Mac Option and Command customs, for spoken confirmations.
-//     The old numbers are Keychron's enum from USER00 (0x5F80), read from the K2 Pro
-//     and K6 Pro 1.00 binaries.
-const VIA_PROTOCOL_QMK_0_19 = 0x000C;
-const KEYCODES_QMK_0_19 = {
-  macroBase: 0x7700, macroSlots: 32,
-  missionControl: 0x00C1, launchpad: 0x00C2,
-  keychronNames: {
-    0x7E00: 'Left Option', 0x7E01: 'Right Option',
-    0x7E02: 'Left Command', 0x7E03: 'Right Command',
-  },
-};
-const KEYCODES_BEFORE_QMK_0_19 = {
+// Keychron firmware comes in three keycode numberings, told apart by the VIA protocol
+// version the board reports. Every code the app writes above the modifier
+// combinations (0x1FFF) comes from the connected board's set; basic keys and
+// modifier combinations are the same in all three. Read from the released binaries:
+//   Protocol 9 (K2 Pro, K6 Pro): QMK before 0.19. Macros are VIA's MACRO00..15 from
+//     0x5F12, and Keychron's own keys run from 0x5F80.
+//   Protocol 11 (wired Q1 Version 2, Q6, V1 to V6, S1 RGB): QMK 0.19 numbering, macros
+//     QK_MACRO_0..31 from 0x7700, Keychron keys from 0x7F00. These binaries have no
+//     table entry for QMK's own Mission Control and Launchpad codes (0x00C1/0x00C2),
+//     so the app writes Keychron's keys for them, as their factory keymaps do.
+//   Protocol 12 (the Max boards, S1 White): Keychron keys from 0x7E00, and the
+//     firmware's own Mission Control key presses QMK's 0x00C1 (keychron_common.c), so
+//     the app writes 0x00C1/0x00C2, which can also go in a macro.
+// keychronNames names Keychron's keys for spoken confirmations and Review Changes;
+// that is what tells Command and Option apart from Win and Alt on the same physical
+// keys. Each family's order is its firmware enum (protocol 12: keychron_common.h),
+// confirmed by where the keys sit in the factory keymaps. Keys past the last named
+// one shift with build options, so they are not named.
+const VIA_PROTOCOL_11 = 0x000B;
+const VIA_PROTOCOL_12 = 0x000C;
+const KEYCODES_PROTOCOL_9 = {
   macroBase: 0x5F12, macroSlots: 16,
   missionControl: 0x5F84, launchpad: 0x5F85,
   keychronNames: {
-    0x5F80: 'Left Option', 0x5F81: 'Right Option',
-    0x5F82: 'Left Command', 0x5F83: 'Right Command',
+    0x5F80: 'Left Option', 0x5F81: 'Right Option', 0x5F82: 'Left Command', 0x5F83: 'Right Command',
+    0x5F84: 'Mission Control', 0x5F85: 'Launchpad', 0x5F86: 'Task View', 0x5F87: 'File Explorer',
+    0x5F88: 'Screenshot', 0x5F89: 'Cortana',
   },
 };
-// The connected board's numbering. Set on connect from its protocol version; the
-// current numbering when the version could not be read.
-let deviceKeycodes = KEYCODES_QMK_0_19;
+const KEYCODES_PROTOCOL_11 = {
+  macroBase: 0x7700, macroSlots: 32,
+  missionControl: 0x7F00, launchpad: 0x7F01,
+  keychronNames: {
+    0x7F00: 'Mission Control', 0x7F01: 'Launchpad', 0x7F02: 'Left Option', 0x7F03: 'Right Option',
+    0x7F04: 'Left Command', 0x7F05: 'Right Command', 0x7F06: 'Siri', 0x7F07: 'Task View',
+    0x7F08: 'File Explorer', 0x7F09: 'Screenshot', 0x7F0A: 'Cortana',
+  },
+};
+const KEYCODES_PROTOCOL_12 = {
+  macroBase: 0x7700, macroSlots: 32,
+  missionControl: 0x00C1, launchpad: 0x00C2,
+  keychronNames: {
+    0x7E00: 'Left Option', 0x7E01: 'Right Option', 0x7E02: 'Left Command', 0x7E03: 'Right Command',
+    0x7E04: 'Mission Control', 0x7E05: 'Launchpad', 0x7E06: 'Task View', 0x7E07: 'File Explorer',
+    0x7E08: 'Screenshot', 0x7E09: 'Cortana',
+  },
+};
+// The connected board's VIA protocol version (null = not read), and its keycode
+// numbering, which is the newest when the version could not be read. Both are set
+// on connect.
+let viaProtocolVersion = null;
+let deviceKeycodes = KEYCODES_PROTOCOL_12;
 
 // The keyboard's VIA protocol version, or null when it does not answer.
 async function readViaProtocolVersion() {
@@ -8182,8 +8202,8 @@ async function readViaProtocolVersion() {
 }
 
 function keycodesForProtocol(version) {
-  return version !== null && version < VIA_PROTOCOL_QMK_0_19
-    ? KEYCODES_BEFORE_QMK_0_19 : KEYCODES_QMK_0_19;
+  if (version === null || version >= VIA_PROTOCOL_12) return KEYCODES_PROTOCOL_12;
+  return version >= VIA_PROTOCOL_11 ? KEYCODES_PROTOCOL_11 : KEYCODES_PROTOCOL_9;
 }
 
 // IMPORTANT: 0x0C / 0x0D are id_dynamic_keymap_macro_get_count / _buffer_size
@@ -8418,7 +8438,7 @@ function buildCodeToLabel(list) {
 }
 const SYSTEM_KEY_SET_WIN = { keys: SYSTEM_KEYS_WIN, names: buildCodeToLabel(SYSTEM_KEYS_WIN) };
 const SYSTEM_KEY_SETS_MAC = new Map(
-  [KEYCODES_QMK_0_19, KEYCODES_BEFORE_QMK_0_19].map(numbering => {
+  [KEYCODES_PROTOCOL_9, KEYCODES_PROTOCOL_11, KEYCODES_PROTOCOL_12].map(numbering => {
     const keys = SYSTEM_KEYS_MAC.map(k =>
       k.keycodeOf ? { label: k.label, code: numbering[k.keycodeOf] } : k);
     return [numbering, { keys, names: buildCodeToLabel(keys) }];
@@ -8429,6 +8449,15 @@ const SYSTEM_KEY_SETS_MAC = new Map(
 // board's keycode numbering.
 function systemKeySet(os) {
   return os === 'mac' ? SYSTEM_KEY_SETS_MAC.get(deviceKeycodes) : SYSTEM_KEY_SET_WIN;
+}
+
+// The System Keys to offer for an OS. A Keychron key (above 0x1FFF) is offered only
+// when the connected board's factory keymap holds it, which shows its firmware has
+// that key at that number.
+function offeredSystemKeys(os) {
+  const model = modelFactory();
+  const held = new Set(model ? model.layers.flatMap(Object.values) : []);
+  return systemKeySet(os).keys.filter(k => k.code <= 0x1FFF || held.has(k.code));
 }
 
 // - Shortcut key picker options -
@@ -10290,6 +10319,7 @@ function decodeAction(code, key, layer, isFnLayer = false) {
 // combination, or null when the code is none of these.
 function codeName(code) {
   if (isMacroKeycode(code)) return `Types Text (macro ${macroIndexFromKeycode(code) + 1})`;
+  if (deviceKeycodes.keychronNames[code]) return deviceKeycodes.keychronNames[code];
   if (MEDIA_KEYCODE_TO_LABEL[code]) return MEDIA_KEYCODE_TO_LABEL[code];
   if (code <= 0xFF && KEYCODE_TO_LABEL[code]) return KEYCODE_TO_LABEL[code];
   return systemOrComboName(code, currentViewOS());
@@ -10303,13 +10333,10 @@ function expectedDefaultCode(key) {
 
 // Friendly name for a raw 16-bit keycode, WITHOUT the "is it the factory value"
 // collapse that decodeAction does. Used to say what a key was actually set to.
-// Keychron's Mac Option and Command customs are not in the standard label map, so
-// they are named from deviceKeycodes: that is what lets a reset announcement tell
-// Command and Option apart from Win and Alt on the same physical keys.
 function actionNameForCode(code) {
   if (code === undefined) return 'its factory default';
   if (code === 0x0000) return 'Disabled';
-  return deviceKeycodes.keychronNames[code] || codeName(code) || 'its factory default';
+  return codeName(code) || 'its factory default';
 }
 
 // Read the keycode of every entry in stepKeys from the layer a write would
@@ -11443,11 +11470,11 @@ function resetCaptureButton() {
 // offset) come back unchanged. A stray reply, such as one arriving after its
 // request timed out, is ignored instead of answering the next request.
 
-// Leading bytes each command's reply repeats. Commands not listed repeat byte 0 only.
+// Leading bytes each command's reply repeats. Commands not listed repeat byte 0 only,
+// unless the caller passes its own length: lighting does, because its request layout
+// depends on the protocol version (lightingRequest).
 const VIA_ECHO_LENGTH = {
   [CMD_GET_KEY]: 4, [CMD_SET_KEY]: 6,                 // layer, row, column (+ value)
-  [CMD_CUSTOM_SET]: 3, [CMD_CUSTOM_GET]: 3,           // channel, value id
-  [CMD_CUSTOM_SAVE]: 2,                               // channel
   [CMD_MACRO_GET_BUFFER]: 4, [CMD_MACRO_SET_BUFFER]: 4,   // offset, size
   [CMD_KEYMAP_GET_BUFFER]: 4,                         // offset, size
   [CMD_GET_ENCODER]: 4, [CMD_SET_ENCODER]: 6,         // layer, encoder, direction (+ value)
@@ -11457,20 +11484,21 @@ const VIA_UNHANDLED = 0xFF;   // VIA's reply byte 0 for a command the firmware d
 let viaQueue = Promise.resolve();
 
 // Send one VIA command and resolve with its reply, or null on timeout or a send
-// failure. Requests are queued, so callers may start several at once.
-function sendVIA(bytes, timeoutMs = 2000) {
-  const result = viaQueue.then(() => sendVIAOnce(bytes, timeoutMs));
+// failure. Requests are queued, so callers may start several at once. `echoLength`
+// overrides VIA_ECHO_LENGTH for this request.
+function sendVIA(bytes, timeoutMs = 2000, echoLength = undefined) {
+  const result = viaQueue.then(() => sendVIAOnce(bytes, timeoutMs, echoLength));
   viaQueue = result;
   return result;
 }
 
-function sendVIAOnce(bytes, timeoutMs) {
+function sendVIAOnce(bytes, timeoutMs, echoLength) {
   return new Promise(resolve => {
     const device = hidDevice;   // a disconnect while queued must not redirect this request
     if (!device) { resolve(null); return; }
     const buf = new Uint8Array(REPORT_LEN);
     bytes.forEach((b, i) => { buf[i] = b; });
-    const echo = VIA_ECHO_LENGTH[buf[0]] ?? 1;
+    const echo = echoLength ?? VIA_ECHO_LENGTH[buf[0]] ?? 1;
     const answers = reply =>
       (reply[0] === buf[0] || reply[0] === VIA_UNHANDLED) &&
       buf.subarray(1, echo).every((b, i) => reply[i + 1] === b);
@@ -11497,14 +11525,16 @@ function sendVIAOnce(bytes, timeoutMs) {
 // the answer written over it. The keymap starts as the model's factory keymap.
 const DEMO_MACRO_SLOTS = 16;
 const DEMO_MACRO_BYTES = 1024;
-// The K2 Pro and K6 Pro firmware predates QMK 0.19, so their demos answer with a
-// protocol below 12 and use the older keycode numbering, as the real boards do.
-const DEMO_PROTOCOL_VERSION = VIA_PROTOCOL_QMK_0_19;
-const DEMO_PROTOCOL_VERSION_BEFORE_QMK_0_19 = 0x000B;
-const DEMO_PIDS_BEFORE_QMK_0_19 = new Set([
-  0x0220, 0x0221, 0x0222, 0x0223, 0x0224, 0x0225,   // K2 Pro
-  0x0260, 0x0261, 0x0262, 0x0263, 0x0264,           // K6 Pro
-]);
+// Each demo model answers the protocol whose Keychron keys its factory keymap holds,
+// so it uses the same keycode numbering and lighting commands as the real board.
+const DEMO_PROTOCOLS = [[0x0009, KEYCODES_PROTOCOL_9], [VIA_PROTOCOL_11, KEYCODES_PROTOCOL_11]];
+function demoProtocolVersion(factory) {
+  const codes = new Set(factory ? factory.layers.flatMap(Object.values) : []);
+  for (const [version, numbering] of DEMO_PROTOCOLS) {
+    if (Object.keys(numbering.keychronNames).some(c => codes.has(Number(c)))) return version;
+  }
+  return VIA_PROTOCOL_12;
+}
 
 class DemoKeyboard extends EventTarget {
   constructor(pid) {
@@ -11513,11 +11543,10 @@ class DemoKeyboard extends EventTarget {
     this.vendorId    = VIA_VID;
     this.productId   = pid;
     this.productName = entry.name;
-    this.protocolVersion = DEMO_PIDS_BEFORE_QMK_0_19.has(pid)
-      ? DEMO_PROTOCOL_VERSION_BEFORE_QMK_0_19 : DEMO_PROTOCOL_VERSION;
     this.opened      = true;
     this.layout  = KEYCHRON_LAYOUTS[entry.layoutId];
     this.factory = FACTORY_KEYMAPS[pid];
+    this.protocolVersion = demoProtocolVersion(this.factory);
     this.roles   = (this.factory && this.factory.roles) || DEFAULT_LAYER_ROLES;
     this.layerCount = this.factory ? this.factory.layers.length : 4;
     // White-backlit models have single-colour backlight, every other model per-key RGB.
@@ -11590,18 +11619,23 @@ class DemoKeyboard extends EventTarget {
   }
 
   // Lighting values by id: 1 brightness, 2 effect, then on RGB 3 speed and 4 hue
-  // and saturation. Another channel is unhandled, as on a board without it.
+  // and saturation. Another channel is unhandled, as on a board without it. Before
+  // protocol 11 there is no channel byte, RGB Matrix is the only target, and value
+  // ids are offset (lightingRequest).
   answerLighting(d) {
-    if (d[1] !== this.lightingChannel) { d[0] = VIA_UNHANDLED; return; }
+    const channels = this.protocolVersion >= VIA_PROTOCOL_11;
+    const channel = channels ? d[1] : LIGHTING_CH_RGB_MATRIX;
+    if (channel !== this.lightingChannel) { d[0] = VIA_UNHANDLED; return; }
     if (d[0] === CMD_CUSTOM_SAVE) return;
-    const id = d[2];
+    const id = channels ? d[2] : d[1] - LIGHTING_VALUE_ID_BASE_BEFORE_PROTOCOL_11;
+    const at = channels ? 3 : 2;   // where the value starts
     if (!(id in this.lighting) || (this.lightingChannel === LIGHTING_CH_BACKLIGHT && id > 2)) {
       d[0] = VIA_UNHANDLED;
       return;
     }
-    if (d[0] === CMD_CUSTOM_SET) this.lighting[id] = id === 4 ? [d[3], d[4]] : d[3];
-    else if (id === 4) { d[3] = this.lighting[4][0]; d[4] = this.lighting[4][1]; }
-    else d[3] = this.lighting[id];
+    if (d[0] === CMD_CUSTOM_SET) this.lighting[id] = id === 4 ? [d[at], d[at + 1]] : d[at];
+    else if (id === 4) { d[at] = this.lighting[4][0]; d[at + 1] = this.lighting[4][1]; }
+    else d[at] = this.lighting[id];
   }
 }
 
@@ -11949,7 +11983,8 @@ async function identifyKeyboard(vid, pid) {
     // Read the layer count BEFORE OS detection: it gates the per-model role map
     // that detectOSMode (and every read/write) relies on.
     keymapBufferState = 'untested';
-    deviceKeycodes = keycodesForProtocol(await readViaProtocolVersion());
+    viaProtocolVersion = await readViaProtocolVersion();
+    deviceKeycodes = keycodesForProtocol(viaProtocolVersion);
     deviceLayerCount = await detectLayerCount();
     currentOSMode = await detectOSMode();
     const modeLabel = osModeLabel(currentOSMode);
@@ -12046,7 +12081,8 @@ async function disconnectKeyboard(
   activeKbd     = null;
   currentOSMode = null;
   deviceLayerCount = null;
-  deviceKeycodes = KEYCODES_QMK_0_19;
+  viaProtocolVersion = null;
+  deviceKeycodes = KEYCODES_PROTOCOL_12;
   keymapBufferState = 'untested';
   selectedKey   = null;
   confirmedKey  = null;
@@ -12641,9 +12677,29 @@ async function executeRestore() {
 //   id_qmk_rgb_matrix_channel = 3  (per-key RGB - used by V/Q Max, V/Q Pro)
 //   RGB matrix value IDs: brightness=1, effect=2, speed=3, colour=4 (hue,sat - 2 bytes)
 //   Backlight value IDs:  brightness=1, effect=2 (0=off, 1=breathing)
+//
+// That format is VIA protocol 11 and later. Protocol 9 and 10 have no channel byte:
+// [0x07 or 0x08, value_id, ...data] and [0x09] to save. RGB Matrix is the only target
+// the app can reach that way, under value ids 0x80 to 0x83 (brightness, effect, speed,
+// colour, each with the meaning above); per-key white LEDs have no lighting command.
+// The K2 Pro and K6 Pro report protocol 9: their RGB binaries hold the 0x80..0x83
+// switch, and their White binaries have no lighting handler.
 
 const LIGHTING_CH_BACKLIGHT  = 1;
 const LIGHTING_CH_RGB_MATRIX = 3;
+const LIGHTING_VALUE_ID_BASE_BEFORE_PROTOCOL_11 = 0x7F;   // value id N is 0x7F + N
+
+function lightingHasChannels() {
+  return viaProtocolVersion === null || viaProtocolVersion >= VIA_PROTOCOL_11;
+}
+
+// The leading bytes of a lighting get or set in the board's format, which are also
+// the bytes its reply repeats; null when that format cannot reach the channel.
+function lightingRequest(cmd, channel, valueId) {
+  if (lightingHasChannels()) return [cmd, channel, valueId];
+  if (channel !== LIGHTING_CH_RGB_MATRIX) return null;
+  return [cmd, LIGHTING_VALUE_ID_BASE_BEFORE_PROTOCOL_11 + valueId];
+}
 
 // QMK RGB Matrix effect names - plain English so a blind user choosing one
 // can still pick something sensible-sounding for a sighted observer. Names
@@ -12770,23 +12826,24 @@ function lightingEffectName(index) {
 }
 
 async function lightingGet(channel, valueId, dataBytes = 1) {
-  const reply = await sendVIA([CMD_CUSTOM_GET, channel, valueId]);
+  const head = lightingRequest(CMD_CUSTOM_GET, channel, valueId);
+  if (!head) return null;
+  const reply = await sendVIA(head, undefined, head.length);
   if (!reply || reply[0] !== CMD_CUSTOM_GET) return null;
-  // reply: [echo cmd, channel, value_id, ...data]
-  const out = [];
-  for (let i = 0; i < dataBytes; i++) out.push(reply[3 + i]);
-  return out;
+  return Array.from(reply.subarray(head.length, head.length + dataBytes));
 }
 
 async function lightingSet(channel, valueId, dataBytes) {
-  const bytes = [CMD_CUSTOM_SET, channel, valueId, ...dataBytes];
-  const reply = await sendVIA(bytes);
+  const head = lightingRequest(CMD_CUSTOM_SET, channel, valueId);
+  if (!head) return false;
+  const reply = await sendVIA([...head, ...dataBytes], undefined, head.length);
   return !!(reply && reply[0] === CMD_CUSTOM_SET);
 }
 
 async function lightingSaveCommit() {
   if (lightingChannel === null) return false;
-  const reply = await sendVIA([CMD_CUSTOM_SAVE, lightingChannel]);
+  const head = lightingHasChannels() ? [CMD_CUSTOM_SAVE, lightingChannel] : [CMD_CUSTOM_SAVE];
+  const reply = await sendVIA(head, undefined, head.length);
   return !!(reply && reply[0] === CMD_CUSTOM_SAVE);
 }
 
@@ -13608,7 +13665,7 @@ function relabelModifiers() {
 }
 
 function refreshSystemActionList() {
-  populateStep3Listbox('system-listbox', systemKeySet(currentViewOS()).keys);
+  populateStep3Listbox('system-listbox', offeredSystemKeys(currentViewOS()));
 }
 
 // The switch-vs-view mismatch text, or the undetected "please

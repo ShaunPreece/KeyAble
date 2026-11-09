@@ -5,7 +5,7 @@
 /* global KEYBOARD_DB, KEYCHRON_LAYOUTS, FACTORY_KEYMAPS, BUTTON_ACTIONS, DemoKeyboard,
    activeLayerRoles, activeLayout, deviceLayerCount, executeResetAll, hidDevice,
    inDemoMode, scanChangedKeys, writeKeyCodeOnLayer, restoreKeymapFileChosen,
-   macroKeycode, isMacroKeycode, systemKeySet, codeName */
+   macroKeycode, offeredSystemKeys, codeName, LIST_STEP_TYPES, writeTarget:writable */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -13,7 +13,9 @@ import { APP_URL, useEdge } from './edge.mjs';
 
 const V2_MAX_ANSI = 0x0920;   // a five-layer model, so its own role map matters
 const V6_MAX_ANSI = 0x0960;   // Right Shift and Numpad 0 moved in 1.3 (keysMovedIn)
-const K2_PRO_ANSI = 0x0220;   // firmware before QMK 0.19, so the older keycode numbering
+const K2_PRO_ANSI = 0x0220;   // protocol 9 firmware: the oldest keycode numbering and lighting commands
+const K2_PRO_ANSI_WHITE = 0x0223;
+const V1_ANSI = 0x0310;       // protocol 11 firmware: Keychron keys from 0x7F00
 
 // No first-run welcome dialog: it would make the page inert.
 const skipWelcome = () => { try { localStorage.setItem('keyable-v1', '1'); } catch { /* blocked */ } };
@@ -84,22 +86,44 @@ test('a demo model uses its own factory data and layer roles', async () => {
 test('macros and Mission Control follow the keycode numbering of the firmware', async () => {
   const codes = async pid => {
     const page = await demoPage(pid);
-    const out = await page.evaluate(() => ({
-      macro: macroKeycode(2),
-      macroName: codeName(macroKeycode(2)),
-      reads0x7702: isMacroKeycode(0x7702),
-      reads0x5F14: isMacroKeycode(0x5F14),
-      missionControl: systemKeySet('mac').keys.find(k => k.label === 'Mission Control').code,
-    }));
+    const out = await page.evaluate(() => {
+      writeTarget = 'mac';   // names and macro steps follow the layout being edited
+      const mc = offeredSystemKeys('mac').find(k => k.label === 'Mission Control');
+      return {
+        macro: macroKeycode(2),
+        macroName: codeName(macroKeycode(2)),
+        missionControl: mc && mc.code,
+        missionControlName: mc && codeName(mc.code),
+        inMacroSteps: LIST_STEP_TYPES.system.items().some(k => k.label === 'Mission Control'),
+      };
+    });
     await page.close();
     return out;
   };
+  const macro3 = { macroName: 'Types Text (macro 3)', missionControlName: 'Mission Control' };
   assert.deepEqual(await codes(V2_MAX_ANSI),
-    { macro: 0x7702, macroName: 'Types Text (macro 3)',
-      reads0x7702: true, reads0x5F14: false, missionControl: 0x00C1 });
+    { ...macro3, macro: 0x7702, missionControl: 0x00C1, inMacroSteps: true });
+  assert.deepEqual(await codes(V1_ANSI),
+    { ...macro3, macro: 0x7702, missionControl: 0x7F00, inMacroSteps: false });
   assert.deepEqual(await codes(K2_PRO_ANSI),
-    { macro: 0x5F14, macroName: 'Types Text (macro 3)',
-      reads0x7702: false, reads0x5F14: true, missionControl: 0x5F84 });
+    { ...macro3, macro: 0x5F14, missionControl: 0x5F84, inMacroSteps: false });
+});
+
+test('lighting on protocol 9 firmware works on RGB boards and is unsupported on White ones', async () => {
+  const lighting = async pid => {
+    const page = await demoPage(pid);
+    await page.keyboard.press('Alt+4');
+    await page.locator('#lighting-panel:visible, #lighting-unsupported:visible').first().waitFor();
+    if (!await page.locator('#lighting-panel').isVisible()) { await page.close(); return 'unsupported'; }
+    const slider = page.locator('#lighting-brightness');
+    await slider.focus();
+    await page.keyboard.press('ArrowRight');
+    await page.waitForFunction(() => hidDevice.lighting[1] !== 128);
+    await page.close();
+    return 'works';
+  };
+  assert.equal(await lighting(K2_PRO_ANSI), 'works');
+  assert.equal(await lighting(K2_PRO_ANSI_WHITE), 'unsupported');
 });
 
 test('Review Changes in demo finds base and Fn changes, and factory reset clears them', async () => {
