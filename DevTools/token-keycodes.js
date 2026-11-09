@@ -59,6 +59,10 @@ Object.assign(STD, {
   // Single-colour backlight (0x7800 block) - White (non-RGB) board variants.
   BL_ON:0x7800, BL_OFF:0x7801, BL_TOGG:0x7802, BL_DOWN:0x7803, BL_UP:0x7804,
   BL_STEP:0x7805, BL_BRTG:0x7806,
+  // Single-colour LED matrix (0x7810 block, QK_LED_MATRIX) - mainline QMK, wired White boards.
+  LM_ON:0x7810, LM_OFF:0x7811, LM_TOGG:0x7812, LM_NEXT:0x7813, LM_PREV:0x7814,
+  LM_BRIU:0x7815, LM_BRID:0x7816, LM_SPDU:0x7817, LM_SPDD:0x7818,
+  LM_FLGN:0x7819, LM_FLGP:0x781A,
   // RGB matrix / underglow (0x7820 block) - wireless fork spelling.
   RGB_TOG:0x7820, RGB_MOD:0x7821, RGB_RMOD:0x7822,
   RGB_HUI:0x7823, RGB_HUD:0x7824, RGB_SAI:0x7825, RGB_SAD:0x7826,

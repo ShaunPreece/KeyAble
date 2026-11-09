@@ -56,7 +56,7 @@ browser; nothing is sent anywhere over the internet.
 
 ## Supported keyboards
 
-19 Keychron models across the Q, V, K, and B series (58 variants once you count
+22 Keychron models across the Q, V, K, S, and B series (67 variants once you count
 each ANSI, ISO, knob, and non-knob version separately). The full list is inside
 the app under Help, "Supported Keyboards".
 

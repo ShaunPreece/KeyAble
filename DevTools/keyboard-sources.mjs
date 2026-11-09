@@ -15,7 +15,8 @@
 //   git init <dir> && cd <dir> && git remote add origin <repo url>
 //   MSYS_NO_PATHCONV=1 git sparse-checkout set --no-cone 'keyboards/keychron/'
 //   git fetch --depth 1 --filter=blob:none origin <commit> && git checkout FETCH_HEAD
-// For via-keyboards the pattern is 'v3/keychron/' and the ref is master.
+// For via-keyboards the pattern is 'v3/keychron/' and the ref is master. qmk-mainline also
+// needs '/quantum/keycodes.h', the source of the keycode values in token-keycodes.js.
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

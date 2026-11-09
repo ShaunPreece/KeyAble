@@ -48,7 +48,7 @@ Both datasets were derived from Keychron's own public, open sources:
     Factory keymaps are the via keymaps, for example:
       keyboards/keychron/v6_max/ansi_encoder/keymaps/via/keymap.c
 
-  - Mainline QMK, for the wired Q and V boards, whose Keychron keymaps live
+  - Mainline QMK, for the wired Q, V and S boards, whose Keychron keymaps live
     there:
       repo:   https://github.com/qmk/qmk_firmware
       branch: master
