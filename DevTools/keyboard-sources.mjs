@@ -22,7 +22,8 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const Tokens  = require('./token-keycodes.js');
+const { resolveToken } = require('./token-keycodes.js');
+const { stripComments, layerBlocks, defines, expandDefines } = require('./keymap-source.js');
 const here    = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(here, '..');
 export const FW   = path.join(ROOT, 'ProjectAssets', 'keychron-firmware-src');
@@ -45,7 +46,20 @@ export function appTables(html = readFileSync(APP, 'utf8')) {
   };
 }
 
-const readJson = file => { try { return JSON.parse(readFileSync(file, 'utf8')); } catch { return null; } };
+// Files that exist but are not strict JSON, path relative to FW -> parse error. QMK
+// reads board files with a lenient parser, so a few in the pinned sources have
+// missing or trailing commas; a board whose file is listed here is missing from the
+// index, and callers report the list.
+export const unreadableJson = new Map();
+function readJson(file) {
+  if (!existsSync(file)) return null;
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch (err) {
+    unreadableJson.set(path.relative(FW, file).replace(/\\/g, '/'), err.message.split('\n')[0]);
+    return null;
+  }
+}
 const boardDefs = dir => ['info.json', 'keyboard.json'].map(f => readJson(path.join(dir, f))).filter(Boolean);
 function walkDirs(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -62,41 +76,10 @@ function walkFiles(dir, out = []) {
   return out;
 }
 
-// ---- keymap.c ----
-const stripComments = src => src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/.*$/gm, ' ');
-function splitTopLevel(s) {
-  const out = []; let depth = 0, cur = '';
-  for (const ch of s) {
-    if (ch === '(') depth++;
-    if (ch === ')') depth--;
-    if (ch === ',' && depth === 0) { out.push(cur.trim()); cur = ''; } else cur += ch;
-  }
-  if (cur.trim()) out.push(cur.trim());
-  return out;
-}
-function layerBlocks(src) {
-  const blocks = {};
-  const re = /\[(\w+)\]\s*=\s*(LAYOUT\w*)\s*\(/g;
-  let m;
-  while ((m = re.exec(src))) {
-    let depth = 1, i = re.lastIndex;
-    while (depth && i < src.length) { if (src[i] === '(') depth++; else if (src[i] === ')') depth--; i++; }
-    blocks[m[1]] = { macro: m[2], tokens: splitTopLevel(src.slice(re.lastIndex, i - 1)) };
-  }
-  return blocks;
-}
-function defines(src) {
-  const d = {};
-  for (const m of src.matchAll(/^#define\s+(\w+)\s+(.+)$/gm)) d[m[1]] = m[2].trim();
-  return d;
-}
-
 // A plain HID key's code (0x02 to 0xFF), or undefined for layers, Keychron customs,
 // lighting and media keys, which are compared by position only.
 export function standardCode(token, defs = {}) {
-  let t = token;
-  for (let i = 0; i < 4 && defs[t]; i++) t = defs[t];
-  const code = Tokens.resolveToken(t);
+  const code = resolveToken(expandDefines(token, defs));
   return Number.isInteger(code) && code > 0x0001 && code <= 0xFF ? code : undefined;
 }
 
@@ -158,7 +141,7 @@ function indexFirmware() {
 export function firmwareBoard(pid) {
   const sources = indexFirmware().get(pid) || [];
   if (!sources.length) return { error: 'NO FIRMWARE SOURCE' };
-  const wireless = /_max|_pro/.test(sources.map(s => s.dir).join(' '));
+  const wireless = /_max|_pro/.test(sources.map(s => s.source).join(' '));
   const src = sources.find(s => s.repo === (wireless ? 'keychron-fork' : 'qmk-mainline')) || sources[0];
   const keymapFile = (src.repo === 'keychron-fork' ? ['via', 'default'] : ['default', 'via'])
     .map(k => path.join(src.dir, 'keymaps', k, 'keymap.c')).find(f => existsSync(f));
@@ -166,15 +149,15 @@ export function firmwareBoard(pid) {
   const code    = stripComments(readFileSync(keymapFile, 'utf8'));
   const blocks  = layerBlocks(code);
   const defs    = defines(code);
-  const winName = Object.keys(blocks).find(n => /WIN_BASE/.test(n));
-  if (!winName) return { error: 'NO WINDOWS LAYER IN FIRMWARE', source: src.source };
-  const { macro, tokens } = blocks[winName];
+  const winBase = blocks.find(b => /WIN_BASE/.test(b.layer));
+  if (!winBase) return { error: 'NO WINDOWS LAYER IN FIRMWARE', source: src.source };
+  const { macro, tokens } = winBase;
   const matrix = src.layouts[macro] && src.layouts[macro].layout;
   if (!matrix) return { error: `FIRMWARE LAYOUT ${macro} NOT FOUND`, source: src.source };
   if (matrix.length !== tokens.length) {
-    return { error: `${macro} has ${matrix.length} positions but ${winName} has ${tokens.length} keys`, source: src.source };
+    return { error: `${macro} has ${matrix.length} positions but ${winBase.layer} has ${tokens.length} keys`, source: src.source };
   }
-  const macBase = blocks[Object.keys(blocks).find(n => /MAC_BASE/.test(n))];
+  const macBase = blocks.find(b => /MAC_BASE/.test(b.layer));
   const keys = matrix.map((k, i) => ({
     pos: `${k.matrix[0]},${k.matrix[1]}`, row: k.matrix[0], col: k.matrix[1],
     token: tokens[i], macToken: macBase ? macBase.tokens[i] : undefined, code: standardCode(tokens[i], defs),
@@ -225,8 +208,10 @@ export function viaBoards(pid) {
 // How a VIA definition compares with the firmware: positions only one of them has
 // (an encoder press is left out of VIA's list, so firmware-only knob presses are
 // expected), and whether the physical reading order of the shared positions matches,
-// allowing one key drawn at a different row, such as a tall ISO Enter.
-export function compareViaWithFirmware(fwKeys, via) {
+// allowing one key drawn at a different row, such as a tall ISO Enter. `agrees` when
+// neither has a position the other lacks, but for the knob press, and the order matches.
+export function compareViaWithFirmware(board, via) {
+  const fwKeys = board.keys;
   const fwSet = new Set(fwKeys.map(k => k.pos)), viaSet = new Set(via.keys.map(k => k.pos));
   const viaOnly = [...viaSet].filter(p => !fwSet.has(p));
   const fwOnly  = [...fwSet].filter(p => !viaSet.has(p));
@@ -237,7 +222,8 @@ export function compareViaWithFirmware(fwKeys, via) {
   const same = (s, t) => s.length === t.length && s.every((p, i) => p === t[i]);
   let sameOrder = same(a, b);
   if (!sameOrder) sameOrder = [...common].some(p => same(a.filter(x => x !== p), b.filter(x => x !== p)));
-  return { viaOnly, fwOnly, sameOrder };
+  const agrees = !viaOnly.length && fwOnly.length <= (board.hasEncoder ? 1 : 0) && sameOrder;
+  return { viaOnly, fwOnly, sameOrder, agrees };
 }
 
 // ---- Key names ----

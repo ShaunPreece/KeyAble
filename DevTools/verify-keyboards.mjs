@@ -10,9 +10,17 @@
 // FIRMWARE ONLY: the app matches the firmware and no VIA definition exists.
 //
 // Usage: node DevTools/verify-keyboards.mjs [--details]
-// Exit code 1 when any keyboard with a layout is not VERIFIED or FIRMWARE ONLY, or
-// when two matching boards name a key differently.
-import { appTables, firmwareBoard, viaBoards, compareViaWithFirmware, keyNaming } from './keyboard-sources.mjs';
+// Exit code 1 when any keyboard with a layout is not VERIFIED or FIRMWARE ONLY and is
+// not in KNOWN with the verdict it has, or when two matching boards name a key
+// differently.
+import { appTables, firmwareBoard, viaBoards, compareViaWithFirmware, keyNaming, unreadableJson } from './keyboard-sources.mjs';
+
+// Boards whose verdict is understood and accepted, by product ID. A board here that
+// gets any other verdict fails the run, so the entry is revisited.
+const KNOWN = {
+  0x0960: { verdict: 'SOURCES DISAGREE', reason: 'Keychron\'s VIA JSON has Right Shift and Numpad 0 one column right of the firmware' },
+  0x0762: { verdict: 'NO FIRMWARE SOURCE', reason: 'the B6 Pro is in neither pinned firmware source' },
+};
 
 const DETAILS = process.argv.includes('--details');
 const tables = appTables();
@@ -76,8 +84,8 @@ for (const [pidText, entry] of Object.entries(KEYBOARD_DB)) {
   const vias = viaBoards(pid);
   let viaAgrees = vias.length > 0;
   for (const v of vias) {
-    const c = compareViaWithFirmware(board.keys, v);
-    if (c.viaOnly.length || c.fwOnly.length > (board.hasEncoder ? 1 : 0) || !c.sameOrder) {
+    const c = compareViaWithFirmware(board, v);
+    if (!c.agrees) {
       viaAgrees = false;
       r.notes.push(`VIA ${v.source} disagrees with the firmware: VIA-only ${c.viaOnly.join(' ') || 'none'}, ` +
         `firmware-only ${c.fwOnly.join(' ') || 'none'}${c.sameOrder ? '' : ', physical order differs'}`);
@@ -96,12 +104,22 @@ for (const r of results) counts[r.verdict] = (counts[r.verdict] || 0) + 1;
 console.log(`KeyAble keyboards checked against their own firmware and VIA definitions: ${results.length}`);
 for (const [v, n] of Object.entries(counts)) console.log(`  ${v}: ${n}`);
 for (const c of conflicts) console.log(`  NAMING CONFLICT between matching boards: ${c}`);
+// A board whose VIA definition cannot be read would pass as FIRMWARE ONLY, so an
+// unreadable VIA file fails the run; an unreadable board file only hides boards.
+const unreadableVia = [...unreadableJson.keys()].filter(f => /via_json|via-keyboards/.test(f));
+for (const [file, error] of unreadableJson) console.log(`  UNREADABLE JSON, skipped: ${file}: ${error}`);
 console.log('');
 for (const r of results) {
+  const known = KNOWN[r.pid];
+  const accepted = known && known.verdict === r.verdict ? ` (known: ${known.reason})` : '';
   console.log(`${r.verdict.padEnd(16)} ${hex(r.pid)} ${r.name} [${r.layoutId}]` +
-    (r.problems.length ? `, ${r.problems.length} problems` : '') + (r.notes.length ? `; ${r.notes.join('; ')}` : ''));
+    (r.problems.length ? `, ${r.problems.length} problems` : '') + (r.notes.length ? `; ${r.notes.join('; ')}` : '') + accepted);
   if (DETAILS && r.source) console.log(`    source: ${r.source}`);
   if (DETAILS) for (const p of r.problems) console.log(`    - ${p}`);
 }
-process.exitCode = conflicts.length ||
-  results.some(r => !['VERIFIED', 'FIRMWARE ONLY', 'NO LAYOUT IN APP'].includes(r.verdict)) ? 1 : 0;
+const passes = r => ['VERIFIED', 'FIRMWARE ONLY', 'NO LAYOUT IN APP'].includes(r.verdict) ||
+  (KNOWN[r.pid] !== undefined && KNOWN[r.pid].verdict === r.verdict);
+const changedKnown = Object.keys(KNOWN).map(Number)
+  .filter(pid => !results.some(r => r.pid === pid && r.verdict === KNOWN[pid].verdict));
+for (const pid of changedKnown) console.log(`KNOWN entry ${hex(pid)} no longer matches its verdict; update or remove it.`);
+process.exitCode = conflicts.length || unreadableVia.length || changedKnown.length || !results.every(passes) ? 1 : 0;

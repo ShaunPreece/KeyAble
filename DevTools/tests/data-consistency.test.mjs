@@ -2,7 +2,7 @@
 // Edge only to read its inline tables; no keyboard is involved. Run with `npm test`.
 // The page's own names, used inside page.evaluate:
 /* global KEYBOARD_DB, KEYCHRON_LAYOUTS, FACTORY_KEYMAPS, DEFAULT_LAYER_ROLES,
-   LABEL_TO_KEYCODE, KEYCODE_TO_LABEL, hex4 */
+   LABEL_TO_KEYCODE, KEYCODE_TO_LABEL */
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -10,56 +10,63 @@ import { APP_URL, useEdge } from './edge.mjs';
 import { ROOT, appTables } from '../keyboard-sources.mjs';
 
 const newPage = useEdge('data');
-let page;
+const hex4 = n => '0x' + n.toString(16).toUpperCase().padStart(4, '0');
+
+// Every model with both a layout and factory data: its name, layoutId, layout keys and
+// Windows base layer, plus the app's label and keycode maps.
+let boards;
+let labelToCode;
+let codeToLabel;
 
 before(async () => {
-  page = await newPage();
+  const page = await newPage();
   await page.goto(APP_URL);
+  ({ boards, labelToCode, codeToLabel } = await page.evaluate(() => ({
+    boards: Object.entries(KEYBOARD_DB)
+      .filter(([pid, entry]) => FACTORY_KEYMAPS[pid] && KEYCHRON_LAYOUTS[entry.layoutId])
+      .map(([pid, entry]) => {
+        const model = FACTORY_KEYMAPS[pid];
+        return {
+          name: `${entry.name} [${entry.layoutId}]`,
+          keys: KEYCHRON_LAYOUTS[entry.layoutId].keys,
+          winBase: model.layers[(model.roles || DEFAULT_LAYER_ROLES).win],
+        };
+      }),
+    labelToCode: LABEL_TO_KEYCODE,
+    codeToLabel: KEYCODE_TO_LABEL,
+  })));
+  await page.close();
 });
 
-test('every key in a model\'s layout has a factory keycode at the same matrix position', async () => {
-  const problems = await page.evaluate(() => {
-    const out = [];
-    for (const [pid, entry] of Object.entries(KEYBOARD_DB)) {
-      const model  = FACTORY_KEYMAPS[pid];
-      const layout = KEYCHRON_LAYOUTS[entry.layoutId];
-      if (!model || !layout) continue;
-      const winBase = model.layers[(model.roles || DEFAULT_LAYER_ROLES).win];
-      const missing = layout.keys
-        .filter(k => winBase[`${k.row},${k.col}`] === undefined)
-        .map(k => `${k.label} (${k.row},${k.col})`);
-      if (missing.length) out.push(`${entry.name} [${entry.layoutId}]: ${missing.join(', ')}`);
-    }
-    return out;
-  });
+test("every key in a model's layout has a factory keycode at the same matrix position", () => {
+  const problems = [];
+  for (const board of boards) {
+    const missing = board.keys
+      .filter(k => board.winBase[`${k.row},${k.col}`] === undefined)
+      .map(k => `${k.label} (${k.row},${k.col})`);
+    if (missing.length) problems.push(`${board.name}: ${missing.join(', ')}`);
+  }
   assert.deepEqual(problems, [], `\n${problems.join('\n')}`);
 });
 
 // A key sitting at a real but WRONG position is invisible to the check above: the
 // position exists in the factory data, it just holds another key. On the Windows base
 // layer every standard key holds its own keycode, so the label must match.
-test('every standard key in a layout holds its own keycode in the factory data', async () => {
-  const problems = await page.evaluate(() => {
-    const out = [];
-    for (const [pid, entry] of Object.entries(KEYBOARD_DB)) {
-      const model  = FACTORY_KEYMAPS[pid];
-      const layout = KEYCHRON_LAYOUTS[entry.layoutId];
-      if (!model || !layout) continue;
-      const winBase = model.layers[(model.roles || DEFAULT_LAYER_ROLES).win];
-      const wrong = [];
-      for (const k of layout.keys) {
-        const expected = LABEL_TO_KEYCODE[k.label];
-        const actual   = winBase[`${k.row},${k.col}`];
-        // KC_NO, KC_TRNS and Keychron's own codes (0x7E00 up) say nothing about position:
-        // a key such as F13 may simply be unassigned on the Windows layer.
-        if (expected === undefined || actual === undefined || actual === expected) continue;
-        if (actual <= 0x0001 || actual >= 0x7E00) continue;
-        wrong.push(`${k.label} (${k.row},${k.col}) holds ${KEYCODE_TO_LABEL[actual] ?? hex4(actual)}`);
-      }
-      if (wrong.length) out.push(`${entry.name} [${entry.layoutId}]: ${wrong.join(', ')}`);
+test('every standard key in a layout holds its own keycode in the factory data', () => {
+  const problems = [];
+  for (const board of boards) {
+    const wrong = [];
+    for (const k of board.keys) {
+      const expected = labelToCode[k.label];
+      const actual   = board.winBase[`${k.row},${k.col}`];
+      // KC_NO, KC_TRNS and Keychron's own codes (0x7E00 up) say nothing about position:
+      // a key such as F13 may simply be unassigned on the Windows layer.
+      if (expected === undefined || actual === undefined || actual === expected) continue;
+      if (actual <= 0x0001 || actual >= 0x7E00) continue;
+      wrong.push(`${k.label} (${k.row},${k.col}) holds ${codeToLabel[actual] ?? hex4(actual)}`);
     }
-    return out;
-  });
+    if (wrong.length) problems.push(`${board.name}: ${wrong.join(', ')}`);
+  }
   assert.deepEqual(problems, [], `\n${problems.join('\n')}`);
 });
 

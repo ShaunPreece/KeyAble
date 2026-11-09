@@ -25,10 +25,6 @@
 const fs = require('fs');
 const path = require('path');
 
-// Canonical 4-layer order, for a parsed.json that carries no `layerEnum`.
-const LEGACY_LAYER_INDEX = { MAC_BASE: 0, MAC_FN: 1, WIN_BASE: 2, WIN_FN: 3 };
-const LEGACY_LAYER_COUNT = 4;
-
 function die(msg) { console.error('ERROR: ' + msg); process.exit(1); }
 
 const inputs = process.argv.slice(2);
@@ -44,15 +40,16 @@ for (const file of inputs) {
   if (Number.isNaN(pidNum)) die(`${file}: bad pid ${d.pid}`);
   if (dataset[pidNum]) die(`duplicate pid ${d.pid} (${file}) - two variants share a PID?`);
 
-  const idx   = (d.layerEnum && d.layerEnum.idx) || LEGACY_LAYER_INDEX;
-  const count = (d.layerEnum && d.layerEnum.names && d.layerEnum.names.length) || LEGACY_LAYER_COUNT;
+  if (!d.layerEnum || !d.roles) die(`${file}: no layerEnum or roles; re-run parse_factory_keymap.js on it`);
+  const idx   = d.layerEnum.idx;
+  const count = d.layerEnum.names.length;
 
   const layers = Array.from({ length: count }, () => ({}));
   for (const [name, positions] of Object.entries(d.layers || {})) {
     const li = idx[name];
     if (li === undefined) die(`${file}: unexpected layer name ${name}`);
     for (const p of positions) {
-      if (p.code == null) die(`${file}: ${name} (${p.row},${p.col}) has no code (token ${p.token})`);
+      if (typeof p.code !== 'number') die(`${file}: ${name} (${p.row},${p.col}) has no code (token ${p.token})`);
       layers[li][`${p.row},${p.col}`] = p.code;
     }
   }
@@ -62,16 +59,16 @@ for (const file of inputs) {
     const li = idx[name];
     if (li === undefined) die(`${file}: unexpected encoder layer ${name}`);
     encoders[li] = encs.map(e => {
-      if (e.ccwCode == null || e.cwCode == null) die(`${file}: ${name} encoder missing code`);
+      if (typeof e.ccwCode !== 'number' || typeof e.cwCode !== 'number') die(`${file}: ${name} encoder missing code`);
       return { ccw: e.ccwCode, cw: e.cwCode };
     });
   }
 
   // roles are emitted ONLY when non-canonical; the app uses its default
   // 4-layer map for every board without them.
-  const roles = d.roles || null;
-  const isCanonical = roles && count === 4 &&
-    roles.mac === 0 && roles.macFn === 1 && roles.win === 2 && roles.winFn === 3 && roles.fn2 == null;
+  const roles = d.roles;
+  const isCanonical = count === 4 &&
+    roles.mac === 0 && roles.macFn === 1 && roles.win === 2 && roles.winFn === 3 && roles.fn2 === undefined;
   dataset[pidNum] = { layers, encoders, roles: isCanonical ? null : roles };
   const keyCount = layers.reduce((n, m) => n + Object.keys(m).length, 0);
   const encCount = encoders.reduce((n, a) => n + a.length, 0);
