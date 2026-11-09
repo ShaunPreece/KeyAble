@@ -10,7 +10,8 @@
 // FIRMWARE ONLY: the app matches the firmware and no VIA definition exists.
 //
 // Usage: node DevTools/verify-keyboards.mjs [--details]
-// Exit code 1 when any keyboard with a layout is not VERIFIED or FIRMWARE ONLY.
+// Exit code 1 when any keyboard with a layout is not VERIFIED or FIRMWARE ONLY, or
+// when two matching boards name a key differently.
 import { appTables, firmwareBoard, viaBoards, compareViaWithFirmware, keyNaming } from './keyboard-sources.mjs';
 
 const DETAILS = process.argv.includes('--details');

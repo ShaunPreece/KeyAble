@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * build-factory-dataset.js  -  Phase 2 step 4 bundler.
+ * build-factory-dataset.js: bundles parsed keymaps into FACTORY_KEYMAPS.
  *
  * Reads the per-variant parsed.json files emitted by parse_factory_keymap.js and
  * emits ONE compact `FACTORY_KEYMAPS` object, keyed by numeric USB PID, ready to
@@ -8,14 +8,15 @@
  *
  * Shape per PID:
  *   {
- *     layers:   [ layer0, layer1, layer2, layer3 ],   // index = layer number
+ *     roles:    { mac, win, macFn, winFn, fn2 },      // only when not canonical
+ *     layers:   [ layer0, layer1, ... ],              // index = device layer
  *                 // each layer: { "row,col": code, ... }  (16-bit factory codes)
- *     encoders: [ enc0, enc1, enc2, enc3 ]             // index = layer number
+ *     encoders: [ enc0, enc1, ... ]                   // index = device layer
  *                 // each: [ { ccw: code, cw: code }, ... ]  index = encoderId
  *   }
  *
- * Layer numbering is the app's fixed order (matches the firmware enum):
- *   MAC_BASE=0, MAC_FN=1, WIN_BASE=2, WIN_FN=3.
+ * Each layer sits at its index in the model's own layer enum. The canonical
+ * 4-layer order is MAC_BASE=0, MAC_FN=1, WIN_BASE=2, WIN_FN=3.
  *
  * Usage:  node build-factory-dataset.js <parsed.json> [<parsed.json> ...]
  *   Writes DevTools/factory-dataset.generated.js and prints a summary.
@@ -24,9 +25,7 @@
 const fs = require('fs');
 const path = require('path');
 
-// Canonical 4-layer order, used only as the LEGACY fallback for parsed.json
-// files produced before the parser emitted a per-model `layerEnum` (the 48
-// already-built PIDs). New parses carry their own enum + roles.
+// Canonical 4-layer order, for a parsed.json that carries no `layerEnum`.
 const LEGACY_LAYER_INDEX = { MAC_BASE: 0, MAC_FN: 1, WIN_BASE: 2, WIN_FN: 3 };
 const LEGACY_LAYER_COUNT = 4;
 
@@ -45,9 +44,6 @@ for (const file of inputs) {
   if (Number.isNaN(pidNum)) die(`${file}: bad pid ${d.pid}`);
   if (dataset[pidNum]) die(`duplicate pid ${d.pid} (${file}) - two variants share a PID?`);
 
-  // Per-model enum + roles when the parser emitted them (5-layer boards and any
-  // re-parse); otherwise fall back to the canonical 4-layer order so previously
-  // built parsed.json stays byte-identical.
   const idx   = (d.layerEnum && d.layerEnum.idx) || LEGACY_LAYER_INDEX;
   const count = (d.layerEnum && d.layerEnum.names && d.layerEnum.names.length) || LEGACY_LAYER_COUNT;
 
@@ -71,8 +67,8 @@ for (const file of inputs) {
     });
   }
 
-  // roles are emitted ONLY when non-canonical, so the app falls back to its
-  // default 4-layer map for the (unchanged) 48 canonical PIDs.
+  // roles are emitted ONLY when non-canonical; the app uses its default
+  // 4-layer map for every board without them.
   const roles = d.roles || null;
   const isCanonical = roles && count === 4 &&
     roles.mac === 0 && roles.macFn === 1 && roles.win === 2 && roles.winFn === 3 && roles.fn2 == null;

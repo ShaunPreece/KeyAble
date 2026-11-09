@@ -1,5 +1,8 @@
 // Checks that the app's data tables agree with each other. Loads KeyAble in headless
 // Edge only to read its inline tables; no keyboard is involved. Run with `npm test`.
+// The page's own names, used inside page.evaluate:
+/* global KEYBOARD_DB, KEYCHRON_LAYOUTS, FACTORY_KEYMAPS, DEFAULT_LAYER_ROLES,
+   LABEL_TO_KEYCODE, KEYCODE_TO_LABEL, hex4 */
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';

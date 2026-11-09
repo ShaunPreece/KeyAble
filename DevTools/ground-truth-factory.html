@@ -309,7 +309,7 @@ $('btn-run').addEventListener('click', async () => {
 $('btn-copy').addEventListener('click', async () => {
   reportBox.focus(); reportBox.select();
   try { await navigator.clipboard.writeText(reportBox.value); setStatus('Report copied. Paste it into your reply.'); }
-  catch (_) { setStatus('Could not auto-copy. The text is selected; press Control+C.'); }
+  catch { setStatus('Could not auto-copy. The text is selected; press Control+C.'); }
 });
 $('btn-clear').addEventListener('click', () => { reportBox.value = ''; setStatus('Report cleared.'); });
 </script>

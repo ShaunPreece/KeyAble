@@ -1,21 +1,21 @@
 #!/usr/bin/env node
 /*
- * parse_factory_keymap.js  -  Phase 2 factory-default extractor.
+ * parse_factory_keymap.js: extracts one model's factory keymap from its firmware.
  *
  * Reads a Keychron QMK source PAIR for one model variant:
  *   - info.json   (defines layouts.LAYOUT_xxx.layout = ordered [row,col] list)
- *   - keymap.c    (defines all 4 layers in that same positional order,
+ *   - keymap.c    (defines every layer in that same positional order,
  *                  plus encoder_map for the rotary knob)
  *
- * Emits, for every layer (MAC_BASE / MAC_FN / WIN_BASE / WIN_FN), the factory
- * QMK token at each (row,col). This is the deterministic zip the notes call for:
- * info.json position order == keymap.c arg order, so we never guess.
+ * Writes parsed.json beside keymap.c with the factory QMK token at each
+ * (row,col) of every layer block. info.json position order equals keymap.c
+ * argument order, so the two zip together with no guessing.
  *
  * Each position is emitted with BOTH its raw QMK token (e.g. KC_LOPTN,
  * MO(MAC_FN), _______) AND the 16-bit code CMD_GET_KEY returns, resolved via
  * token-keycodes.js (the model-independent table shared by all models). Any
- * token the table cannot resolve is a hard error, so the batch never bundles a
- * gap silently.
+ * token the table cannot resolve is a hard error, so build-factory-dataset.js
+ * never bundles a gap.
  *
  * Usage:  node parse_factory_keymap.js <info.json> <keymap.c> [--winlock] [--maclock]
  *   --winlock / --maclock: set the Keychron lock-screen build flags for this

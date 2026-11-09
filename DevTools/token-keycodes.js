@@ -2,8 +2,7 @@
  * token-keycodes.js
  * Source-derived QMK/Keychron token -> 16-bit keycode table.
  *
- * Every value here is derived from the PINNED Keychron firmware source, NOT from
- * hardware and NOT from memory. Provenance:
+ * Every value mirrors the pinned Keychron firmware source:
  *   repo  : Keychron/qmk_firmware  branch wireless_playground
  *   commit: 666862cb8123b64a6b96718d739c6203ad99031f
  *   files : quantum/keycodes.h
@@ -20,11 +19,10 @@
 (function (root) {
   'use strict';
 
-  // Board layer name -> dynamic-keymap layer index. This is only the CANONICAL
-  // 4-layer order; boards with a different enum (5-layer V2 Max / K6 Pro / wired
-  // V2) MUST pass their own map via opts.layerIndex so MO() resolves against the
-  // real per-model enum, not this default. Resolving MO() against a hardcoded
-  // map is the latent bug that only bites the non-canonical boards.
+  // Board layer name -> dynamic-keymap layer index, in the CANONICAL 4-layer
+  // order. Boards with a different enum (5-layer V2 Max / K6 Pro / wired V2)
+  // MUST pass their own map via opts.layerIndex, or MO() resolves to the wrong
+  // layer.
   var LAYER_INDEX = { MAC_BASE: 0, MAC_FN: 1, WIN_BASE: 2, WIN_FN: 3 };
 
   // ---- Standard QMK keycodes (quantum/keycodes.h) --------------------------
@@ -125,6 +123,8 @@
   /*
    * resolveToken(token, opts) -> 16-bit number, or null if unknown.
    * opts.winLock / opts.macLock: Keychron lock-screen build flags (default false).
+   * opts.layerIndex: the model's layer enum, name -> index, for MO() (default
+   * LAYER_INDEX).
    */
   function resolveToken(token, opts) {
     if (token == null) return null;

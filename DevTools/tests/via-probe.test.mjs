@@ -1,5 +1,7 @@
 // Runs DevTools/via-probe.html against the simulated keyboard, so the probe is known to
 // work before it is pointed at a real board. Run with `npm test`.
+// The probe page's own name, used inside page.evaluate:
+/* global loadTables */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';

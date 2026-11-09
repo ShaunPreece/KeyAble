@@ -31,7 +31,7 @@ http.createServer((req, res) => {
       });
       res.end(data);
     });
-  } catch (e) {
+  } catch {
     res.writeHead(500); res.end('error');
   }
 }).listen(PORT, '127.0.0.1', () => {

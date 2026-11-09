@@ -162,7 +162,7 @@
   });
 
   // No first-run welcome dialog: it would make the page inert.
-  try { localStorage.setItem('keyable-v1', '1'); } catch (_) { /* storage blocked */ }
+  try { localStorage.setItem('keyable-v1', '1'); } catch { /* storage blocked */ }
 
   window.__fakeKeychron = {
     PID,
