@@ -94,7 +94,8 @@ The app is organised as a short sequence:
   Connect        - browser device prompt, then the app reads the keyboard's
                    USB product ID to work out which model it is and loads
                    that model's layout data. Without a keyboard, demo mode
-                   lets you pick any model to explore.
+                   connects to a simulated keyboard of any model, which
+                   answers the same commands, so every step can be explored.
   Choose a key   - from a list, or by pressing it in Capture Mode.
   Choose action  - choose what the key should do; a Ready to Apply dialog
                    reads the change back, and nothing is written to the
