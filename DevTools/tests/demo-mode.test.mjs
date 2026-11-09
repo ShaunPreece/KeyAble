@@ -131,3 +131,14 @@ test('lighting in demo loads the simulated settings', async () => {
   assert.equal(await page.locator('#lighting-panel').isVisible(), true);
   await page.close();
 });
+
+test('Capture Mode starts without a script error', async () => {
+  const page = await demoPage();
+  const errors = [];
+  page.on('pageerror', err => errors.push(err.message));
+  await page.keyboard.press('Alt+2');
+  await page.locator('#btn-capture').click();
+  await page.locator('#capture-box:visible').waitFor();
+  assert.deepEqual(errors, []);
+  await page.close();
+});

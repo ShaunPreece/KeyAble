@@ -7575,6 +7575,13 @@ function playBeep() {
   playTones([{ freq: 660, gain: 0.22, decay: 0.15, dur: 0.18 }]);
 }
 
+// Capture Mode heartbeat, every few seconds while it waits for a key: the start beep's
+// pitch, much quieter and shorter, so it reads as "still listening" without competing
+// with speech.
+function playCapturePulse() {
+  playTones([{ freq: 660, gain: 0.06, decay: 0.06, dur: 0.08 }]);
+}
+
 // Two sawtooths about 25 Hz apart beat fast enough to be heard as roughness, a
 // buzz rather than a clean tone; the slow decay keeps it from sounding like a blip.
 function playErrorBuzz() {
@@ -9564,6 +9571,9 @@ async function readCurrentKeymap(token) {
 }
 
 // - Generic single-select ARIA listbox: a drop-in <select> replacement -
+// Not a native <select>: arrowing through a closed one changes its value as it goes,
+// and screen readers present it differently from one to the next. This listbox
+// behaves the same in every screen reader and browser.
 // Used by every dropdown so behaviour is identical app-wide:
 // arrows / Home / End / first-letter move focus and the selection together, and
 // each move fires onChange(value, label). Enter or a click fire onCommit if
