@@ -28,11 +28,12 @@ KeyAble holds two separate datasets, for two separate jobs.
      Command, while the Windows layer holds the Windows key and Alt on the same
      physical keys, so a label-based reset would corrupt the Mac layer.
 
-Layout data is keyed by SHAPE (a layoutId such as "q6_ansi_knob"), which is
-deliberately shared between products with the same physical geometry (for
-example wired Q6 and Q6 Max both use q6_ansi_knob). The factory dataset is
-keyed by PID/model, because two boards can share a shape but ship different
-factory assignments.
+Layout data is keyed by a layoutId such as "q6_ansi_knob". Two products share
+one only when their firmware puts every key at the same matrix position: boards
+that look alike are often wired differently (the wired Q6 and the Q6 Max, or the
+Q1 versions 1 and 2, number their keys differently), so each gets its own entry.
+The factory dataset is keyed by PID/model, because two boards can share a layout
+but ship different factory assignments.
 
 
 2. WHERE IT CAME FROM
@@ -67,8 +68,10 @@ Both datasets were derived from Keychron's own public, open sources:
     on real hardware.
 
   - Keychron's VIA JSON files (the same files the Keychron Launcher and VIA
-    configurator load). These describe each board's physical layout and key
-    positions, and were used to build the layout data.
+    configurator load), from Keychron's fork (each board's via_json folder) and
+    from https://github.com/the-via/keyboards (v3/keychron). These describe each
+    board's physical layout and key positions, and are the second source every
+    layout is checked against.
 
   - The QMK / VIA keycode reference (docs/QMK_VIA_Keycode_Reference.txt).
     This maps human key names to the numeric keycodes the VIA
@@ -98,9 +101,13 @@ At a high level, adding a model is a data task, in this order:
      shows its ID on the "Keyboard Not Supported" screen, or read it from the
      model's info.json in the firmware source.
 
-  2. Get the layout. From the model's VIA JSON, work out every key position
-     and its name, and add a KEYCHRON_LAYOUTS entry (or reuse an existing
-     layoutId if the shape is identical to a model already supported).
+  2. Get the layout. Generate it from the firmware, never by hand:
+       node DevTools/layout-from-firmware.mjs entry <pid> <layoutId>
+     Each key's matrix position comes from the board's info.json or
+     keyboard.json, which QMK builds the keyboard from, and its name from the
+     Windows base layer of keymap.c. The script refuses a board whose VIA JSON
+     disagrees with its firmware. Reuse an existing layoutId only if the
+     generated keys are identical.
 
   3. Get the factory keymap. Find the model's keymap.c in the Keychron QMK
      source, and read every layer block (usually Mac base, Mac Fn, Windows
@@ -113,7 +120,13 @@ At a high level, adding a model is a data task, in this order:
      assignments. A board whose layer order differs from the usual four also
      needs a roles entry saying which layer is which.
 
-  5. Verify against hardware: connect the real board, confirm keys are named
+  5. Check every keyboard against its firmware and VIA JSON:
+       node DevTools/verify-keyboards.mjs --details
+     Both scripts read the firmware from sparse clones of the commits above,
+     plus the-via/keyboards, in ProjectAssets/keychron-firmware-src (see the
+     comment at the top of DevTools/keyboard-sources.mjs).
+
+  6. Verify against hardware: connect the real board, confirm keys are named
      correctly, remap one key and reset it, and confirm a full factory reset
      restores the true original values on both the Mac and Windows sides.
 
