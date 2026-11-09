@@ -20,6 +20,7 @@ import { appTables, firmwareBoard, viaBoards, compareViaWithFirmware, keyNaming,
 const KNOWN = {
   0x0960: { verdict: 'SOURCES DISAGREE', reason: 'Keychron\'s VIA JSON has Right Shift and Numpad 0 one column right of the firmware' },
   0x0762: { verdict: 'NO FIRMWARE SOURCE', reason: 'the B6 Pro is in neither pinned firmware source' },
+  0x0A54: { verdict: 'LAYOUT WRONG', reason: 'the source keymap is a copy of the ANSI one; the released binary holds the ISO layout, which the app uses' },
 };
 
 const DETAILS = process.argv.includes('--details');

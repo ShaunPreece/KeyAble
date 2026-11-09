@@ -21,6 +21,7 @@
 //     pasting entries from build-factory-dataset.js
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { ROOT, APP, appTables, firmwareBoard } from './keyboard-sources.mjs';
 
 const BIN_DIR  = path.join(ROOT, 'ProjectAssets', 'keychron-firmware-bin');
@@ -208,8 +209,10 @@ function apply() {
   console.log(`${changed} entries rewritten from shipped firmware`);
 }
 
+// Run as a command only, so other scripts can import findTable and descriptorPids.
 const [mode, ...args] = process.argv.slice(2);
-if (mode === 'fetch' && args.length) await fetchPages(args);
+if (!process.argv[1] || import.meta.url !== pathToFileURL(process.argv[1]).href) { /* imported */ }
+else if (mode === 'fetch' && args.length) await fetchPages(args);
 else if (mode === 'check') check(args.includes('--details'));
 else if (mode === 'apply') apply();
 else { console.error('usage: fetch <page url> [...] | check [--details] | apply'); process.exit(1); }
