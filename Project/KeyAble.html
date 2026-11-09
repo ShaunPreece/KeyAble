@@ -7471,6 +7471,9 @@ const KEYCHRON_LAYOUTS = {
 </script>
 <script>
 'use strict';
+// A classic script, not a module: the browser tests in DevTools/tests read and call its
+// top-level names from the page. The cost is that a later declaration with an existing
+// function name replaces it without an error.
 
 // - Welcome dialog -
 let welcomeTrigger = null;   // element that opened the dialog; null on first run
