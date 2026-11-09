@@ -8135,11 +8135,57 @@ const CMD_MACRO_GET_BUFFER_SIZE = 0x0D;   // -> reply bytes 1..2 = total buffer 
 const CMD_MACRO_GET_BUFFER      = 0x0E;   // args: [offset_hi, offset_lo, size]      reply: data at bytes 4..
 const CMD_MACRO_SET_BUFFER      = 0x0F;   // args: [offset_hi, offset_lo, size, ...] echo reply
 
-// QMK macro keycodes: QK_MACRO_0 = 0x7700, QK_MACRO_N = 0x7700 + N. QMK
-// upstream supports 32 slots (0x7700..0x771F); Keychron firmware typically
-// reports 16. We trust the firmware's reported count.
-const QK_MACRO_BASE = 0x7700;
-const QK_MACRO_MAX  = 0x771F;
+// - Keycode numbering -
+// QMK 0.19 renumbered most keycodes above the modifier combinations, and VIA
+// protocol 12 marks the change. A board reporting an older protocol (the K2 Pro and
+// K6 Pro, whose only released firmware is 1.00) reads the new numbers as other keys
+// or as nothing, so every such code the app writes comes from the set the connected
+// board uses. Basic keys and modifier combinations (0x0000 to 0x1FFF) are the same
+// in both.
+//   macroBase, macroSlots: the code for "run macro 0" and how many macro codes exist.
+//     QMK 0.19+ has QK_MACRO_0..31 from 0x7700; older VIA has MACRO00..15 from 0x5F12.
+//   missionControl, launchpad: 0x00C1 / 0x00C2 are QMK 0.19+ basic codes. Older
+//     Keychron firmware has them as its own customs, which are also the only form
+//     those boards understand (in a macro, 0xC1 / 0xC2 are the unused KC_FN1 / KC_FN2).
+//   keychronNames: the Mac Option and Command customs, for spoken confirmations.
+//     The old numbers are Keychron's enum from USER00 (0x5F80), read from the K2 Pro
+//     and K6 Pro 1.00 binaries.
+const VIA_PROTOCOL_QMK_0_19 = 0x000C;
+const KEYCODES_QMK_0_19 = {
+  macroBase: 0x7700, macroSlots: 32,
+  missionControl: 0x00C1, launchpad: 0x00C2,
+  keychronNames: {
+    0x7E00: 'Left Option', 0x7E01: 'Right Option',
+    0x7E02: 'Left Command', 0x7E03: 'Right Command',
+  },
+};
+const KEYCODES_BEFORE_QMK_0_19 = {
+  macroBase: 0x5F12, macroSlots: 16,
+  missionControl: 0x5F84, launchpad: 0x5F85,
+  keychronNames: {
+    0x5F80: 'Left Option', 0x5F81: 'Right Option',
+    0x5F82: 'Left Command', 0x5F83: 'Right Command',
+  },
+};
+// The connected board's numbering. Set on connect from its protocol version; the
+// current numbering when the version could not be read.
+let deviceKeycodes = KEYCODES_QMK_0_19;
+
+// The keyboard's VIA protocol version, or null when it does not answer.
+async function readViaProtocolVersion() {
+  if (!hidDevice) return null;
+  try {
+    const reply = await sendVIA([CMD_GET_PROTOCOL]);
+    if (!reply || reply[0] !== CMD_GET_PROTOCOL) return null;
+    return (reply[1] << 8) | reply[2];
+  } catch { return null; }
+}
+
+function keycodesForProtocol(version) {
+  return version !== null && version < VIA_PROTOCOL_QMK_0_19
+    ? KEYCODES_BEFORE_QMK_0_19 : KEYCODES_QMK_0_19;
+}
+
 // IMPORTANT: 0x0C / 0x0D are id_dynamic_keymap_macro_get_count / _buffer_size
 // in the VIA protocol - using those for encoder ops returns OK status but
 // touches macros instead of the encoder. The encoder commands are 0x14
@@ -8320,8 +8366,9 @@ const SYSTEM_KEYS_WIN = [
 // - System key list (Mac) -
 // Keychron's firmware sends its Mac system keys as ordinary Cmd+key combos
 // (keychron_common.c), so writing the combo directly works on every board and
-// firmware version. Only Mission Control / Launchpad use raw Apple usages
-// (0x00C1 / 0x00C2), which Keychron's firmware compiles in.
+// firmware version. Only Mission Control and Launchpad have codes of their own,
+// which differ with the board's keycode numbering: `keycodeOf` names the entry in
+// deviceKeycodes, and systemKeySet() fills in the code.
 // Not offered because macOS gives them no fixed shortcut to send: Dictation
 // (Fn or Control pressed twice), Do Not Disturb (no default shortcut), and Show
 // Desktop (F11, which collides with the function row and Mission Control's own
@@ -8343,8 +8390,8 @@ const SYSTEM_KEYS_MAC = [
   // App / window / system.
   { label: 'Spotlight Search (Cmd+Space)',     code: QK_LGUI | 0x2C },
   { label: 'App Switcher (Cmd+Tab)',           code: QK_LGUI | 0x2B },
-  { label: 'Mission Control',                  code: 0x00C1 },
-  { label: 'Launchpad',                        code: 0x00C2 },
+  { label: 'Mission Control',                  keycodeOf: 'missionControl' },
+  { label: 'Launchpad',                        keycodeOf: 'launchpad' },
   { label: 'Force Quit (Cmd+Option+Esc)',      code: (QK_LGUI|QK_LALT) | 0x29 },
 
   // Capture.
@@ -8369,8 +8416,20 @@ function buildCodeToLabel(list) {
   for (const { label, code } of list) if (!(code in m)) m[code] = label;
   return m;
 }
-const SYSTEM_KEYCODE_TO_LABEL_WIN = buildCodeToLabel(SYSTEM_KEYS_WIN);
-const SYSTEM_KEYCODE_TO_LABEL_MAC = buildCodeToLabel(SYSTEM_KEYS_MAC);
+const SYSTEM_KEY_SET_WIN = { keys: SYSTEM_KEYS_WIN, names: buildCodeToLabel(SYSTEM_KEYS_WIN) };
+const SYSTEM_KEY_SETS_MAC = new Map(
+  [KEYCODES_QMK_0_19, KEYCODES_BEFORE_QMK_0_19].map(numbering => {
+    const keys = SYSTEM_KEYS_MAC.map(k =>
+      k.keycodeOf ? { label: k.label, code: numbering[k.keycodeOf] } : k);
+    return [numbering, { keys, names: buildCodeToLabel(keys) }];
+  })
+);
+
+// The System Key list for an OS, and its code-to-name lookup, in the connected
+// board's keycode numbering.
+function systemKeySet(os) {
+  return os === 'mac' ? SYSTEM_KEY_SETS_MAC.get(deviceKeycodes) : SYSTEM_KEY_SET_WIN;
+}
 
 // - Shortcut key picker options -
 const SHORTCUT_KEYS = [
@@ -10183,7 +10242,7 @@ function factoryCode(layer, key) {
 // the Windows or Mac system-key names, and renders bare modifier combos with
 // Cmd/Option wording in a Mac view.
 function systemOrComboName(code, os) {
-  const sysMap = os === 'mac' ? SYSTEM_KEYCODE_TO_LABEL_MAC : SYSTEM_KEYCODE_TO_LABEL_WIN;
+  const sysMap = systemKeySet(os).names;
   if (sysMap[code]) return sysMap[code];
   // Generic QMK modifier-wrapped basic keycode: the high byte holds up to five
   // mod bits (0x1F00), the low byte a basic keycode. Restrict to 0x0100-0x1FFF
@@ -10230,9 +10289,7 @@ function decodeAction(code, key, layer, isFnLayer = false) {
 // The name of a macro, media key, basic keycode, System Key or modifier
 // combination, or null when the code is none of these.
 function codeName(code) {
-  if (code >= QK_MACRO_BASE && code <= QK_MACRO_MAX) {
-    return `Types Text (macro ${code - QK_MACRO_BASE + 1})`;
-  }
+  if (isMacroKeycode(code)) return `Types Text (macro ${macroIndexFromKeycode(code) + 1})`;
   if (MEDIA_KEYCODE_TO_LABEL[code]) return MEDIA_KEYCODE_TO_LABEL[code];
   if (code <= 0xFF && KEYCODE_TO_LABEL[code]) return KEYCODE_TO_LABEL[code];
   return systemOrComboName(code, currentViewOS());
@@ -10244,22 +10301,15 @@ function expectedDefaultCode(key) {
   return LABEL_TO_KEYCODE[key.label];
 }
 
-// Keychron Mac-layer modifier customs are distinct keycodes that are NOT in the
-// standard HID label map, so decodeAction would only ever call them "Default" or
-// "Custom". This map names them explicitly for spoken confirmations (e.g. the
-// reset announcement), which is what lets the user tell Command/Option apart
-// from the Windows Win/Alt values on the same physical keys.
-const MAC_MODIFIER_NAMES = {
-  0x7E00: 'Left Option', 0x7E01: 'Right Option',
-  0x7E02: 'Left Command', 0x7E03: 'Right Command',
-};
-
 // Friendly name for a raw 16-bit keycode, WITHOUT the "is it the factory value"
 // collapse that decodeAction does. Used to say what a key was actually set to.
+// Keychron's Mac Option and Command customs are not in the standard label map, so
+// they are named from deviceKeycodes: that is what lets a reset announcement tell
+// Command and Option apart from Win and Alt on the same physical keys.
 function actionNameForCode(code) {
   if (code === undefined) return 'its factory default';
   if (code === 0x0000) return 'Disabled';
-  return MAC_MODIFIER_NAMES[code] || codeName(code) || 'its factory default';
+  return deviceKeycodes.keychronNames[code] || codeName(code) || 'its factory default';
 }
 
 // Read the keycode of every entry in stepKeys from the layer a write would
@@ -11447,7 +11497,14 @@ function sendVIAOnce(bytes, timeoutMs) {
 // the answer written over it. The keymap starts as the model's factory keymap.
 const DEMO_MACRO_SLOTS = 16;
 const DEMO_MACRO_BYTES = 1024;
-const DEMO_PROTOCOL_VERSION = 0x000C;
+// The K2 Pro and K6 Pro firmware predates QMK 0.19, so their demos answer with a
+// protocol below 12 and use the older keycode numbering, as the real boards do.
+const DEMO_PROTOCOL_VERSION = VIA_PROTOCOL_QMK_0_19;
+const DEMO_PROTOCOL_VERSION_BEFORE_QMK_0_19 = 0x000B;
+const DEMO_PIDS_BEFORE_QMK_0_19 = new Set([
+  0x0220, 0x0221, 0x0222, 0x0223, 0x0224, 0x0225,   // K2 Pro
+  0x0260, 0x0261, 0x0262, 0x0263, 0x0264,           // K6 Pro
+]);
 
 class DemoKeyboard extends EventTarget {
   constructor(pid) {
@@ -11456,6 +11513,8 @@ class DemoKeyboard extends EventTarget {
     this.vendorId    = VIA_VID;
     this.productId   = pid;
     this.productName = entry.name;
+    this.protocolVersion = DEMO_PIDS_BEFORE_QMK_0_19.has(pid)
+      ? DEMO_PROTOCOL_VERSION_BEFORE_QMK_0_19 : DEMO_PROTOCOL_VERSION;
     this.opened      = true;
     this.layout  = KEYCHRON_LAYOUTS[entry.layoutId];
     this.factory = FACTORY_KEYMAPS[pid];
@@ -11552,7 +11611,7 @@ const put16At = (d, at, v) => { d[at] = (v >> 8) & 0xFF; d[at + 1] = v & 0xFF; }
 
 // How DemoKeyboard answers each VIA command; any other is unhandled.
 const DEMO_COMMANDS = {
-  [CMD_GET_PROTOCOL]: (kb, d) => put16At(d, 1, DEMO_PROTOCOL_VERSION),
+  [CMD_GET_PROTOCOL]: (kb, d) => put16At(d, 1, kb.protocolVersion),
   [CMD_GET_KEY]: (kb, d) => {
     const c = kb.cell(d[1], d[2], d[3]);
     put16At(d, 4, c < 0 ? 0 : kb.keymap[c]);
@@ -11890,6 +11949,7 @@ async function identifyKeyboard(vid, pid) {
     // Read the layer count BEFORE OS detection: it gates the per-model role map
     // that detectOSMode (and every read/write) relies on.
     keymapBufferState = 'untested';
+    deviceKeycodes = keycodesForProtocol(await readViaProtocolVersion());
     deviceLayerCount = await detectLayerCount();
     currentOSMode = await detectOSMode();
     const modeLabel = osModeLabel(currentOSMode);
@@ -11986,6 +12046,7 @@ async function disconnectKeyboard(
   activeKbd     = null;
   currentOSMode = null;
   deviceLayerCount = null;
+  deviceKeycodes = KEYCODES_QMK_0_19;
   keymapBufferState = 'untested';
   selectedKey   = null;
   confirmedKey  = null;
@@ -12995,11 +13056,22 @@ let macroSlots      = [];   // array of Uint8Array, one per slot, NOT including 
 let macroEditSlot   = -1;   // which slot we're editing (reuse or first free)
 
 function isMacroKeycode(code) {
-  return code >= QK_MACRO_BASE && code <= QK_MACRO_MAX;
+  const { macroBase, macroSlots } = deviceKeycodes;
+  return code >= macroBase && code < macroBase + macroSlots;
 }
 
 function macroIndexFromKeycode(code) {
-  return code - QK_MACRO_BASE;
+  return code - deviceKeycodes.macroBase;
+}
+
+function macroKeycode(slot) {
+  return deviceKeycodes.macroBase + slot;
+}
+
+// Slots a key can run. The buffer can hold more macros than the keyboard has macro
+// keycodes for (older firmware has 16), and a slot with no keycode is unreachable.
+function usableMacroSlots() {
+  return Math.min(macroSlotCount, deviceKeycodes.macroSlots);
 }
 
 // The keyboard's macro slot count and buffer size in bytes, or null when the
@@ -13068,7 +13140,7 @@ function macroBytesAvailableForSlot(slotIdx, currentlyEditing) {
 }
 
 function findFirstEmptyMacroSlot() {
-  for (let i = 0; i < macroSlots.length; i++) {
+  for (let i = 0; i < usableMacroSlots(); i++) {
     if (macroSlots[i].length === 0) return i;
   }
   return -1;
@@ -13411,7 +13483,7 @@ let macroSteps = [];
 let step3PendingCode = null;
 let step3PendingDesc = null;
 // When the staged action is a macro, applyRemap must first write the
-// macro bytes to the keyboard's macro buffer before assigning the QK_MACRO_N
+// macro bytes to the keyboard's macro buffer before assigning the macro
 // keycode to the key. step3PendingMacro carries that side-effect alongside the
 // usual code/desc. Null for non-macro remaps.
 let step3PendingMacro = null;   // { slot, bytes: number[] }
@@ -13536,7 +13608,7 @@ function relabelModifiers() {
 }
 
 function refreshSystemActionList() {
-  populateStep3Listbox('system-listbox', currentViewOS() === 'mac' ? SYSTEM_KEYS_MAC : SYSTEM_KEYS_WIN);
+  populateStep3Listbox('system-listbox', systemKeySet(currentViewOS()).keys);
 }
 
 // The switch-vs-view mismatch text, or the undetected "please
@@ -14089,7 +14161,7 @@ async function loadTextPanel() {
     macroSlotIsOpaque = true;
     warn.hidden = false;
     $('text-slot-info').textContent =
-      `Using macro slot ${slot + 1} of ${macroSlotCount}. The existing macro in this slot uses key presses or modifiers and cannot be loaded for editing in this version.`;
+      `Using macro slot ${slot + 1} of ${usableMacroSlots()}. The existing macro in this slot uses key presses or modifiers and cannot be loaded for editing in this version.`;
     announce('This key already has a macro that cannot be edited step-by-step. Activate Start a new macro to replace it, or choose a different action tab.');
     setTimeout(() => { const b = warn.querySelector('button'); if (b) b.focus(); }, 60);
     return;
@@ -14098,7 +14170,7 @@ async function loadTextPanel() {
   macroSteps = parsed;
   builder.hidden = false;
   $('text-slot-info').textContent =
-    `Using macro slot ${slot + 1} of ${macroSlotCount} on this keyboard.`;
+    `Using macro slot ${slot + 1} of ${usableMacroSlots()} on this keyboard.`;
   renderMacroBuilder();
 
   const stepCount = macroSteps.length;
@@ -14108,7 +14180,7 @@ async function loadTextPanel() {
   const bodyNote = stepCount === 0
     ? 'The step list is empty. Use Add Step to begin.'
     : `${plural(stepCount, 'step')} loaded from the existing macro.`;
-  announce(`Macro builder ready. Using macro slot ${slot + 1} of ${macroSlotCount}. ${bodyNote}${speedNote}`);
+  announce(`Macro builder ready. Using macro slot ${slot + 1} of ${usableMacroSlots()}. ${bodyNote}${speedNote}`);
 }
 
 // User opted in to overwriting an existing complex macro. Clear the warning,
@@ -14469,11 +14541,13 @@ function hideAllStepEditors() {
 }
 
 // Media Control and System Action steps share one list editor. System actions
-// follow the layout being edited, as the System Key tab does.
+// follow the layout being edited, as the System Key tab does. A macro can only tap
+// a basic key with modifiers (stepsToBytes), so a System Key whose code is above
+// that range (Mission Control and Launchpad on older firmware) is left out.
 const LIST_STEP_TYPES = {
   media:  { name: 'Media Control Step', label: 'Media control:', items: () => MEDIA_KEYS },
   system: { name: 'System Action Step', label: 'System action:',
-            items: () => currentViewOS() === 'mac' ? SYSTEM_KEYS_MAC : SYSTEM_KEYS_WIN },
+            items: () => systemKeySet(currentViewOS()).keys.filter(k => k.code <= 0x1FFF) },
 };
 
 function openStepEditor(type, mode /* 'add' | 'edit' */, prefill) {
@@ -14712,7 +14786,7 @@ function confirmMacro() {
   }
 
   step3PendingMacro = { slot: macroEditSlot, bytes: ev.bytes };
-  const code = QK_MACRO_BASE + macroEditSlot;
+  const code = macroKeycode(macroEditSlot);
   const stepNote = plural(macroSteps.length, 'step');
   const speedMs = currentMacroSpeed();
   const speedNote = speedMs > 0
@@ -14963,7 +15037,7 @@ function bindFormControls() {
   // Effects apply live, so focus must never pick one on the user's behalf.
   initSelectListbox('lighting-effect-listbox', { onChange: (v) => onLightingEffectChange(v), selectOnFocus: false });
   populateStep3Listbox('media-listbox',  MEDIA_KEYS);
-  populateStep3Listbox('system-listbox', SYSTEM_KEYS_WIN);
+  populateStep3Listbox('system-listbox', SYSTEM_KEY_SET_WIN.keys);
 
   // Nav links are wired by delegation on the navlist.
   document.querySelector('.navlist').addEventListener('click', e => {

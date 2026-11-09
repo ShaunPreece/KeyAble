@@ -4,7 +4,8 @@
 // The page's own names, used inside page.evaluate:
 /* global KEYBOARD_DB, KEYCHRON_LAYOUTS, FACTORY_KEYMAPS, BUTTON_ACTIONS, DemoKeyboard,
    activeLayerRoles, activeLayout, deviceLayerCount, executeResetAll, hidDevice,
-   inDemoMode, scanChangedKeys, writeKeyCodeOnLayer, restoreKeymapFileChosen */
+   inDemoMode, scanChangedKeys, writeKeyCodeOnLayer, restoreKeymapFileChosen,
+   macroKeycode, isMacroKeycode, systemKeySet, codeName */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -12,6 +13,7 @@ import { APP_URL, useEdge } from './edge.mjs';
 
 const V2_MAX_ANSI = 0x0920;   // a five-layer model, so its own role map matters
 const V6_MAX_ANSI = 0x0960;   // Right Shift and Numpad 0 moved in 1.3 (keysMovedIn)
+const K2_PRO_ANSI = 0x0220;   // firmware before QMK 0.19, so the older keycode numbering
 
 // No first-run welcome dialog: it would make the page inert.
 const skipWelcome = () => { try { localStorage.setItem('keyable-v1', '1'); } catch { /* blocked */ } };
@@ -77,6 +79,27 @@ test('a demo model uses its own factory data and layer roles', async () => {
   assert.equal(state.layers, 5);
   assert.equal(state.demo, true);
   await page.close();
+});
+
+test('macros and Mission Control follow the keycode numbering of the firmware', async () => {
+  const codes = async pid => {
+    const page = await demoPage(pid);
+    const out = await page.evaluate(() => ({
+      macro: macroKeycode(2),
+      macroName: codeName(macroKeycode(2)),
+      reads0x7702: isMacroKeycode(0x7702),
+      reads0x5F14: isMacroKeycode(0x5F14),
+      missionControl: systemKeySet('mac').keys.find(k => k.label === 'Mission Control').code,
+    }));
+    await page.close();
+    return out;
+  };
+  assert.deepEqual(await codes(V2_MAX_ANSI),
+    { macro: 0x7702, macroName: 'Types Text (macro 3)',
+      reads0x7702: true, reads0x5F14: false, missionControl: 0x00C1 });
+  assert.deepEqual(await codes(K2_PRO_ANSI),
+    { macro: 0x5F14, macroName: 'Types Text (macro 3)',
+      reads0x7702: false, reads0x5F14: true, missionControl: 0x5F84 });
 });
 
 test('Review Changes in demo finds base and Fn changes, and factory reset clears them', async () => {
