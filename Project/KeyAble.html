@@ -11971,20 +11971,23 @@ async function identifyKeyboard(vid, pid) {
 
   if (entry) {
     activeKbd = { ...entry, vid, pid };
+    viaProtocolVersion = await readViaProtocolVersion();
+    deviceKeycodes = keycodesForProtocol(viaProtocolVersion);
     playChirp(true);
     if (inDemoMode()) {
       setStatus(`Demo mode. ${displayKbdName(entry.name)}. No keyboard is connected, so nothing is written to a keyboard.`, 'ok');
       showIdentified(entry.name, entry.size, 'Demo mode, no keyboard connected');
     } else {
       setStatus(`Successfully connected. ${entry.name}`, 'ok');
-      showIdentified(entry.name, entry.size, idStr);
+      // The protocol version decides keycode numbering and lighting commands, so it
+      // is shown for anyone reporting a problem.
+      const protocolStr = viaProtocolVersion === null ? 'unknown' : String(viaProtocolVersion);
+      showIdentified(entry.name, entry.size, `${idStr} / VIA protocol ${protocolStr}`);
     }
 
     // Read the layer count BEFORE OS detection: it gates the per-model role map
     // that detectOSMode (and every read/write) relies on.
     keymapBufferState = 'untested';
-    viaProtocolVersion = await readViaProtocolVersion();
-    deviceKeycodes = keycodesForProtocol(viaProtocolVersion);
     deviceLayerCount = await detectLayerCount();
     currentOSMode = await detectOSMode();
     const modeLabel = osModeLabel(currentOSMode);
