@@ -9,7 +9,7 @@
   // dark flash. A saved choice wins; otherwise the system setting decides.
   (function () {
     let t = null;
-    try { t = localStorage.getItem('keyable-theme'); } catch (_) {}
+    try { t = localStorage.getItem('keyable-theme'); } catch { /* storage blocked: follow the system */ }
     if (t !== 'light' && t !== 'dark') {
       t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     }
@@ -362,7 +362,7 @@
   .lighting-row .hint { margin-top: .35rem; margin-bottom: 0; }
 
 
-  /* - Reset table - */
+  /* - Key names in text - */
   kbd {
     display: inline-block;
     padding: .1rem .45rem;
@@ -732,11 +732,8 @@
 </dialog>
 
 <!-- - Risky key warning dialog -
-     Sits at body level (not nested inside Step 2's section) so that when
-     showModal() opens it, NVDA's browse-mode virtual cursor can't wander
-     into the surrounding section content. We also set `inert` on the
-     title / nav / main containers while it's open, which hides them from
-     ALL screen-reader navigation (browse + focus) - belt and braces. -->
+     At body level like every dialog: openDialog() makes every other body child
+     inert, which keeps NVDA's browse-mode cursor inside the dialog. -->
 <dialog id="key-warning"
         class="danger-card"
         aria-labelledby="h-key-warning"
@@ -1457,9 +1454,9 @@
             Reading macro state...
           </p>
 
-          <!-- Existing macro contains key-press or modifier escapes that this
-               version cannot round-trip into the step builder. Only option in
-               v1 is to overwrite - make that explicit before they start. -->
+          <!-- Shown when the key's macro holds key-press or modifier escapes,
+               which the step builder cannot load. The only option is to replace
+               it, so that is said before the user starts. -->
           <div id="macro-overwrite-warning" class="status-box error" role="status" hidden style="margin-bottom:.85rem">
             <span class="status-icon" aria-hidden="true">⚠</span>
             <div>
@@ -2149,26 +2146,20 @@
   </footer>
 </div>
 
-<!-- keychron_layouts.js inlined so the HTML works from any folder -->
+<!-- Keyboard layout data, inline so the app is a single file. -->
 <script>
-// Keychron Keyboard Layout Data
-// Sources: Official Keychron VIA JSON files + keymap.c WIN_BASE layers
-//   QMK wired (Q/V series):   github.com/the-via/keyboards  tree/master/v3/keychron/
-//   QMK wireless (Max/Pro/K): github.com/Keychron/qmk_firmware  branch wireless_playground
-//   ZMK (B series):           github.com/Keychron/zmk  branch keychron_bpro
+// Keychron keyboard layouts: the matrix position and name of every key.
+// Each layout matches its keyboard's own firmware (Keychron's QMK fork, branch
+// wireless_playground, and mainline QMK for the wired Q and V boards), which
+// DevTools/verify-keyboards.mjs checks; DevTools/layout-from-firmware.mjs writes new
+// entries. The B6 Pro runs Keychron's ZMK firmware instead: see its entry.
 //
 // Each layout entry:
-//   pid    - USB product ID reported by the keyboard over HID
-//   rows/cols - matrix dimensions from VIA JSON "matrix" field
-//   keys   - array of { label, row, col } in VIA JSON visual order
-//             row/col are the EXACT matrix coordinates the VIA HID protocol uses
-//             isEncoder: true marks rotary knob press keys
-//
-// Accuracy notes:
-//   v5_max_ansi_knob, v6_max_ansi_knob - verified directly from Keychron VIA JSON + keymap.c
-//   q6_ansi, q6_ansi_knob, q1_ansi, q1_ansi_knob - verified from VIA repo + keymap.c
-//   k2_ansi, k6_ansi - verified from Keychron QMK fork wireless_playground + keymap.c
-//   b6_ansi - derived from ZMK overlay RC() positions; hardware-tested
+//   rows/cols - the firmware's matrix size; whole-layer reads place keys by it
+//   keys      - { label, row, col }, the matrix coordinates the VIA protocol uses;
+//               isEncoder: true marks the knob press. Backups store keycodes in
+//               this order, so a layout whose keys move or reorder takes a new
+//               layoutId, and validateBackup then refuses older backups.
 //
 // JIS variants have no layout here: KEYBOARD_DB recognises them, and Step 2
 // reports that the model cannot be remapped.
@@ -2180,12 +2171,10 @@ const KEYCHRON_LAYOUTS = {
   // VIA JSON: keychron/v5_max/via_json/v5_ansi_encoder.json
   // keymap.c: keychron/v5_max/ansi_encoder/keymaps/default/keymap.c
   // matrix: rows=6, cols=19  PID: 0x0950
-  // LAYOUT_ansi_98 - confirmed from official Keychron wireless_playground branch
-  // Note: no Menu key right of Space (Right Alt, Fn, Right Ctrl only - user confirmed)
-  // Note: F-row matrix skips col 1 (Esc->F1 gap) and col 6 (F4->F5 gap) - normal for this PCB
+  // LAYOUT_ansi_98, Keychron wireless_playground branch
+  // No Menu key right of Space: Right Alt, Fn and Right Ctrl only.
+  // The F-row matrix skips col 1 (Esc->F1 gap) and col 6 (F4->F5 gap).
   // ============================================================
-  // Key 'v5_max_ansi_knob' is shared by both V5 wired (0x0351) and V5 Max
-  // (0x0950). This data is sourced from V5 Max firmware; wired V5 may differ.
   'v5_max_ansi_knob': {
     rows: 6,
     cols: 19,
@@ -2558,10 +2547,9 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V6 Max ISO with Knob  (100% full-size + numpad, ISO 109 keys + encoder)
-  // VIA JSON: keychron/v6_max/iso_encoder/info.json (wireless_playground branch)
+  // info.json: keychron/v6_max/iso_encoder/info.json (wireless_playground branch)
   // keymap.c:  keychron/v6_max/iso_encoder/keymaps/default/keymap.c
-  // matrix: rows=6, cols=21  PID: 0x0961
-  // LAYOUT_iso_110 - confirmed from official Keychron wireless_playground branch (2026-05-10)
+  // matrix: rows=6, cols=21  PID: 0x0961  LAYOUT_iso_110
   // ISO deltas from v6_max_ansi_knob:
   //   (2,13) = Enter (L-shape, h=2)            was ANSI Backslash on v6_max_ansi_knob
   //   (3,12) = Non-US Hash (KC_NUHS)           was ANSI Enter on v6_max_ansi_knob
@@ -4626,7 +4614,6 @@ const KEYCHRON_LAYOUTS = {
   // Nav cluster keys cross-wired into main scan rows:
   //   End at (3,12), Page Down at (3,15), Pause/Break at (4,15)
   // RGB Mode key at (3,14) - dedicated lighting control key
-  // (0,15) is KC_NO in WIN_BASE (Scroll Lock - unassigned by default, can be remapped)
   // ============================================================
   'v3_ansi': {
     rows: 6,
@@ -6561,12 +6548,11 @@ const KEYCHRON_LAYOUTS = {
   //   github.com/Keychron/zmk branch keychron_bpro
   //   overlay: app/boards/shields/keychron/b6/us/keychron_b6_us.overlay
   //   keymap:  app/boards/shields/keychron/b6/us/keychron_b6_us.keymap
-  // PID: 0x0762  (confirmed by physical hardware connection 2026-05-03)
-  // matrix: rows=8, cols=18
-  // WARNING: ZMK matrix uses scattered RC() positions unlike QMK sequential layout.
-  //   These coordinates match the ZMK overlay RC(row,col) scan positions exactly.
-  //   The VIA HID protocol re-implemented in Keychron ZMK uses these same coordinates.
-  //   Hardware remapping verification still recommended.
+  // PID: 0x0762  matrix: rows=8, cols=18
+  // ZMK places keys at scattered RC() positions, unlike QMK's sequential layout.
+  //   These coordinates are the overlay's RC(row,col) scan positions, which the
+  //   VIA protocol in Keychron's ZMK uses too. verify-keyboards.mjs has no source
+  //   for this board, so the layout rests on the overlay and on hardware testing.
   // ============================================================
   'b6_ansi': {
     rows: 8,
@@ -7561,7 +7547,9 @@ function playTones(tones) {
       end = Math.max(end, at + dur);
     });
     setTimeout(() => ctx.close().catch(() => {}), end * 1000 + 250);
-  } catch (_) {}
+  } catch {
+    // No Web Audio: the tones only accompany spoken messages, so the app carries on silently.
+  }
 }
 
 function playChirp(success) {
@@ -7698,7 +7686,7 @@ async function detectLayerCount() {
     if (!reply || reply[0] !== CMD_DYNAMIC_KEYMAP_GET_LAYER_COUNT) return null;
     const n = reply[1];
     return (n >= 1 && n <= 32) ? n : null;
-  } catch (_) { return null; }
+  } catch { return null; }
 }
 
 // - QMK modifier bits (high byte of 16-bit keycode) -
@@ -8827,7 +8815,7 @@ const FACTORY_KEYMAPS = {
 // protocol KeyAble speaks, so they cannot be remapped here. We recognise the
 // PID only so we can give an accurate message instead of the generic
 // "not responding" one a non-VIA board would otherwise trigger.
-// NOTE: PID below came from a user report; not yet verified against firmware.
+// The PID below is not verified against firmware.
 const ZMK_BOARDS = {
   0x0C61: 'Keychron V6 Ultra',
 };
@@ -9960,7 +9948,7 @@ async function readKeyCodeOnLayer(layer, key) {
       if (!reply || reply[0] !== CMD_GET_KEY) return null;
     }
     return (reply[4] << 8) | reply[5];
-  } catch (_) { return null; }
+  } catch { return null; }
 }
 
 // - Whole-layer keymap reads -
@@ -10421,7 +10409,6 @@ async function resetAllChanged() {
   }
 
   setButtonBusy(btnAll, false);
-  const remaining = list.querySelectorAll('li').length;
   const heading   = $('changed-keys-heading');
   // Focus lands on the heading, so the outcome lives there; clear the progress line.
   $('changed-keys-count').textContent = '';
@@ -10900,7 +10887,7 @@ function deviceFriendlyName(device) {
 async function checkPreviousDevices() {
   if (!navigator.hid) return;
   let devices;
-  try { devices = await navigator.hid.getDevices(); } catch (_) { return; }
+  try { devices = await navigator.hid.getDevices(); } catch { return; }
 
   const keychrons    = devices.filter(d => d.vendorId === VIA_VID && !isWirelessReceiver(d));
   const btnContainer = $('reconnect-buttons');
@@ -11148,7 +11135,7 @@ async function detectOSMode() {
     if (layer === R.mac) return 'mac';
     if (layer === R.win) return 'windows';
     return 'unknown';
-  } catch (_) {
+  } catch {
     return 'unknown';
   }
 }
@@ -11222,7 +11209,7 @@ function reportUnknownKeyboard() {
 
 async function disconnectFromUnsupported() {
   if (hidDevice) {
-    try { await hidDevice.close(); } catch (_) {}
+    try { await hidDevice.close(); } catch { /* already gone: released either way */ }
     hidDevice = null;
   }
   $('sec-unsupported').hidden = true;
@@ -11269,7 +11256,8 @@ async function disconnectKeyboard(
   playChirp(false);
 
   if (hidDevice) {
-    try { await hidDevice.close(); } catch (_) {}
+    // An unplugged keyboard cannot be closed, and is released either way.
+    try { await hidDevice.close(); } catch { /* nothing to release */ }
     hidDevice = null;
   }
   activeKbd     = null;
@@ -11376,7 +11364,7 @@ async function executeResetAll() {
     let macroStatus = 'cleared';
     try {
       macroStatus = await clearMacroBuffer();
-    } catch (_) {
+    } catch {
       macroStatus = 'failed';
     }
 
@@ -11715,7 +11703,7 @@ function restoreKeymapFileChosen(event) {
     let data;
     try {
       data = JSON.parse(reader.result);
-    } catch (err) {
+    } catch {
       setStatus('Selected file is not valid JSON.', 'error');
       announce('Selected file is not valid JSON. Restore cancelled.');
       return;
@@ -12188,12 +12176,12 @@ const MACRO_DEFAULT_SPEED_MS = 30;       // default pause between key presses; 0
 // writeTarget setting.
 let writeTarget = null;   // 'mac' | 'windows' | null (undetected, no choice yet)
 
-// Fn-layer mode. When true, a remap targets the function layer (base + 1) so
-// the action happens on "Fn + this key" instead of the key on its own. It is an
-// axis orthogonal to writeTarget: writeTarget chooses the OS side (Mac/Windows/
-// both), useFnLayer chooses base vs Fn within that side. Deliberately NOT
-// a saved setting, and OFF on every load, so a fresh session
-// never silently writes to the Fn layer (unlike the remembered write target).
+// Fn-layer mode. When true, a remap targets the Fn layer paired with the base
+// layer (fnLayerFor), so the action happens on "Fn + this key" instead of the key
+// on its own. writeTarget chooses the OS side (Mac or Windows), useFnLayer chooses
+// base or Fn within that side. Deliberately NOT a saved setting, and OFF on every
+// load, so a fresh session never silently writes to the Fn layer (unlike the
+// remembered write target).
 let useFnLayer = false;
 
 function currentMacroLayout() {
@@ -12204,9 +12192,8 @@ function currentMacroLayout() {
 // Smart default: when a keyboard connects and the user hasn't explicitly
 // chosen a layout yet, guess from the physical layout. ISO physical shape
 // strongly correlates with UK / European OS layouts; ANSI / JIS correlate
-// with US. Wrong roughly 10% of the time - that's what the override is
-// for. We treat any explicit user choice as final and never overwrite it
-// on future connections.
+// with US. The guess can be wrong, which is what the override is for. An
+// explicit user choice is final and never overwritten on future connections.
 function applySmartLayoutDefault() {
   if (readSetting('macroLayoutChosen') === 'true') return;
   if (!activeKbd || !activeKbd.layoutId) return;
@@ -12926,7 +12913,8 @@ function commitWriteTarget(value, speak = true) {
 }
 
 // Initial state when Step 3 loads: a remembered explicit choice wins; otherwise
-// follow the switch; undetected switch => nothing selected (asked for on staging).
+// follow the switch. With the switch undetected nothing is selected, and
+// stageRemap asks for a layout before the first change.
 function initWriteTarget() {
   const saved  = readSetting('writeTargetChosen') === 'true' ? readSetting('writeTarget') : null;
   const stored = (saved === 'mac' || saved === 'windows') ? saved : null;
@@ -13669,7 +13657,7 @@ function activateMenuItem(item) {
 function onMenuKey(ev) {
   const els = menuItemEls();
   const i = els.indexOf(document.activeElement);
-  let next = null;
+  let next;
   switch (ev.key) {
     case 'ArrowDown': next = els[(i + 1) % els.length]; break;
     case 'ArrowUp':   next = els[(i - 1 + els.length) % els.length]; break;
