@@ -27,6 +27,7 @@ const fs = require('fs');
 const path = require('path');
 const { resolveToken } = require('./token-keycodes.js');
 const { stripComments, layerBlocks, defines, expandDefines } = require('./keymap-source.js');
+const Hjson = require('hjson');
 
 function die(msg) { console.error('ERROR: ' + msg); process.exit(1); }
 
@@ -69,9 +70,10 @@ function extractEncoderMap(src) {
   return out;
 }
 
-// Layout matrix order from info.json.
+// Layout matrix order from info.json, read as Hjson as QMK reads it: some board files
+// have missing or trailing commas.
 function parseInfoLayouts(raw) {
-  const info = JSON.parse(raw);
+  const info = Hjson.parse(raw);
   const layouts = {};
   for (const [name, def] of Object.entries(info.layouts || {})) {
     layouts[name] = (def.layout || []).map(k => k.matrix); // [ [row,col], ... ]

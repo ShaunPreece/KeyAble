@@ -24,7 +24,8 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { resolveToken } = require('./token-keycodes.js');
 const { stripComments, layerBlocks, defines, expandDefines } = require('./keymap-source.js');
-const here    = path.dirname(fileURLToPath(import.meta.url));
+const Hjson = require('hjson');
+const here   = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(here, '..');
 export const FW   = path.join(ROOT, 'ProjectAssets', 'keychron-firmware-src');
 export const APP  = path.join(ROOT, 'Project', 'KeyAble.html');
@@ -46,21 +47,26 @@ export function appTables(html = readFileSync(APP, 'utf8')) {
   };
 }
 
-// Files that exist but are not strict JSON, path relative to FW -> parse error. QMK
-// reads board files with a lenient parser, so a few in the pinned sources have
-// missing or trailing commas; a board whose file is listed here is missing from the
-// index, and callers report the list.
-export const unreadableJson = new Map();
-function readJson(file) {
+// Files that exist but could not be parsed, path relative to FW -> parse error. A board
+// or VIA definition whose file is listed here is missing from the index, and callers
+// report the list.
+export const unreadableFiles = new Map();
+function readSource(file, parse) {
   if (!existsSync(file)) return null;
   try {
-    return JSON.parse(readFileSync(file, 'utf8'));
+    return parse(readFileSync(file, 'utf8'));
   } catch (err) {
-    unreadableJson.set(path.relative(FW, file).replace(/\\/g, '/'), err.message.split('\n')[0]);
+    unreadableFiles.set(path.relative(FW, file).replace(/\\/g, '/'), err.message.split('\n')[0]);
     return null;
   }
 }
-const boardDefs = dir => ['info.json', 'keyboard.json'].map(f => readJson(path.join(dir, f))).filter(Boolean);
+// QMK reads info.json and keyboard.json as Hjson, so board files in the pinned sources
+// with missing or trailing commas still compile; reading them any stricter hides those
+// boards. VIA and Keychron Launcher parse definitions as strict JSON, so a VIA file that
+// fails JSON.parse is broken for them too.
+const readBoardFile = file => readSource(file, Hjson.parse);
+const readViaFile   = file => readSource(file, JSON.parse);
+const boardDefs = dir => ['info.json', 'keyboard.json'].map(f => readBoardFile(path.join(dir, f))).filter(Boolean);
 function walkDirs(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const p = path.join(dir, name);
@@ -194,7 +200,7 @@ export function viaBoards(pid) {
     const roots = [path.join(FW, 'keychron-fork', 'keyboards', 'keychron'), path.join(FW, 'via-keyboards', 'v3', 'keychron')];
     for (const root of roots.filter(existsSync)) {
       for (const f of walkFiles(root).filter(f => f.endsWith('.json') && (/via_json/.test(f) || f.includes('via-keyboards')))) {
-        const j = readJson(f);
+        const j = readViaFile(f);
         if (!j || !j.productId || !j.layouts || !j.layouts.keymap) continue;
         const p = parseInt(j.productId, 16);
         if (!viaIndex.has(p)) viaIndex.set(p, []);

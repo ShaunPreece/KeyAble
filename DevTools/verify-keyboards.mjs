@@ -13,7 +13,7 @@
 // Exit code 1 when any keyboard with a layout is not VERIFIED or FIRMWARE ONLY and is
 // not in KNOWN with the verdict it has, or when two matching boards name a key
 // differently.
-import { appTables, firmwareBoard, viaBoards, compareViaWithFirmware, keyNaming, unreadableJson } from './keyboard-sources.mjs';
+import { appTables, firmwareBoard, viaBoards, compareViaWithFirmware, keyNaming, unreadableFiles } from './keyboard-sources.mjs';
 
 // Boards whose verdict is understood and accepted, by product ID. A board here that
 // gets any other verdict fails the run, so the entry is revisited.
@@ -106,8 +106,8 @@ for (const [v, n] of Object.entries(counts)) console.log(`  ${v}: ${n}`);
 for (const c of conflicts) console.log(`  NAMING CONFLICT between matching boards: ${c}`);
 // A board whose VIA definition cannot be read would pass as FIRMWARE ONLY, so an
 // unreadable VIA file fails the run; an unreadable board file only hides boards.
-const unreadableVia = [...unreadableJson.keys()].filter(f => /via_json|via-keyboards/.test(f));
-for (const [file, error] of unreadableJson) console.log(`  UNREADABLE JSON, skipped: ${file}: ${error}`);
+const unreadableVia = [...unreadableFiles.keys()].filter(f => /via_json|via-keyboards/.test(f));
+for (const [file, error] of unreadableFiles) console.log(`  UNREADABLE, skipped: ${file}: ${error}`);
 console.log('');
 for (const r of results) {
   const known = KNOWN[r.pid];
