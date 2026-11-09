@@ -63,6 +63,9 @@ test('every standard key in a layout holds its own keycode in the factory data',
       // a key such as F13 may simply be unassigned on the Windows layer.
       if (expected === undefined || actual === undefined || actual === expected) continue;
       if (actual <= 0x0001 || actual >= 0x7E00) continue;
+      // HID gives the ISO # key two codes, Backslash (0x31) and Non-US Hash (0x32), and the
+      // K2 Pro and K6 Pro ISO firmware sends 0x31 from it.
+      if (k.label === 'Non-US Hash' && actual === 0x0031) continue;
       wrong.push(`${k.label} (${k.row},${k.col}) holds ${codeToLabel[actual] ?? hex4(actual)}`);
     }
     if (wrong.length) problems.push(`${board.name}: ${wrong.join(', ')}`);

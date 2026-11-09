@@ -73,6 +73,26 @@ Both datasets were derived from Keychron's own public, open sources:
     board's physical layout and key positions, and are the second source every
     layout is checked against.
 
+  - Keychron's released firmware binaries, the .bin files on Keychron's
+    firmware download pages. These are what keyboards actually run, and they
+    can differ from the source: Keychron builds each release from whatever
+    commit it chooses, and the source moves on afterwards. Wherever a binary
+    exists, the factory dataset holds the binary's codes, and the entry says
+    which file they came from. Positions and names still come from the source,
+    because a binary holds only numbers in matrix order. On the boards checked
+    so far, the binaries differ from the source in three ways:
+      - Wireless Max boards: the source has an N-key rollover toggle on Fn+N
+        that no released firmware has, and the White versions ship with
+        backlight speed keys on Fn+T and Fn+G that the source leaves empty.
+      - Wired Q, V and S boards: the released firmware predates QMK's
+        renumbering of lighting keys and Keychron's own keys, so those keys
+        hold different numbers from the source.
+      - K2 Pro and K6 Pro: the released firmware uses QMK's older keycode
+        numbering throughout, so layer, lighting and Keychron keys all hold
+        different numbers from the source.
+    The binaries are not included in this repository; DevTools/firmware-
+    binaries.mjs downloads them.
+
   - The QMK / VIA keycode reference (docs/QMK_VIA_Keycode_Reference.txt).
     This maps human key names to the numeric keycodes the VIA
     protocol writes, and documents the "Any" raw-keycode field, modifier
@@ -126,13 +146,23 @@ At a high level, adding a model is a data task, in this order:
      order differs from the usual four. Copy the new entries into
      FACTORY_KEYMAPS in KeyAble.html.
 
-  5. Check every keyboard against its firmware and VIA JSON:
+  5. Replace the factory codes with the shipped ones, where Keychron publishes
+     a binary for the model:
+       node DevTools/firmware-binaries.mjs fetch <Keychron firmware page URL>
+       node DevTools/firmware-binaries.mjs check --details
+       node DevTools/firmware-binaries.mjs apply
+     It finds the board's keymap table in the binary from the shape the source
+     predicts, lists every key where the two differ, and writes the shipped
+     codes into FACTORY_KEYMAPS. A binary with a key outside the layout, or a
+     different knob map, is reported and left for a person to look at.
+
+  6. Check every keyboard against its firmware and VIA JSON:
        node DevTools/verify-keyboards.mjs --details
      Both scripts read the firmware from sparse clones of the commits above,
      plus the-via/keyboards, in ProjectAssets/keychron-firmware-src (see the
      comment at the top of DevTools/keyboard-sources.mjs).
 
-  6. Verify against hardware: connect the real board, confirm keys are named
+  7. Verify against hardware: connect the real board, confirm keys are named
      correctly, remap one key and reset it, and confirm a full factory reset
      restores the true original values on both the Mac and Windows sides.
 
@@ -156,7 +186,10 @@ a remap is possible.
 6. THE SHORT VERSION
 --------------------
 The data is real, sourced, and verified against Keychron's own open firmware.
-Adding a keyboard means sourcing its layout (VIA JSON) and its factory keymap
-(keymap.c), converting to keycodes, keying the factory data by PID, and
-testing on the actual board. No reverse engineering of closed software was
-involved; it is all built on the open QMK/VIA ecosystem.
+Adding a keyboard means generating its layout from the firmware source
+(info.json and keymap.c, checked against the VIA JSON), parsing its factory
+keymap, replacing the factory codes with those in Keychron's released binary
+where there is one, keying the factory data by PID, and testing on the actual
+board. No reverse engineering of closed software was involved: the firmware is
+GPL-licensed QMK, and the binaries are read only to find a table whose layout
+the source already gives.
