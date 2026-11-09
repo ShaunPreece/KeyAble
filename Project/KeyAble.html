@@ -8869,6 +8869,30 @@ const SECTION_TITLES = {
 
 const SECTIONS = ['connect', 'step2', 'step3', 'help', 'lighting'];
 
+// - Saved settings -
+// Every name KeyAble saves in the browser's site storage. The head script reads the
+// theme before this script runs, so it repeats 'keyable-theme' as a literal.
+// A layout setting is a remembered value plus a "chosen" flag, so a default worked
+// out from a connected keyboard never overwrites a deliberate choice.
+const SETTING_NAMES = {
+  theme:             'keyable-theme',                  // 'light' | 'dark'
+  welcomed:          'keyable-v1',                     // set once the welcome dialog has shown
+  macroSpeed:        'keyable-macro-speed-v1',         // milliseconds between key presses
+  macroLayout:       'keyable-macro-layout-v1',        // 'us' | 'uk'
+  macroLayoutChosen: 'keyable-macro-layout-user-v1',   // 'true' once the user has chosen
+  writeTarget:       'keyable-write-target-v1',        // 'mac' | 'windows'
+  writeTargetChosen: 'keyable-write-target-user-v1',   // 'true' once the user has chosen
+};
+
+// A browser that blocks site storage throws on every access: settings then read as
+// unset and are not kept.
+function readSetting(name) {
+  try { return localStorage.getItem(SETTING_NAMES[name]); } catch (_) { return null; }
+}
+function saveSetting(name, value) {
+  try { localStorage.setItem(SETTING_NAMES[name], String(value)); } catch (_) { /* not kept */ }
+}
+
 // - Application state -
 // The keyboard KeyAble talks to: a WebHID device, or the simulated DemoKeyboard in
 // demo mode. Set while connecting, before the keyboard has answered, and cleared on
@@ -11379,13 +11403,9 @@ function appVersionText() {
 // The head script has already set data-theme. With no saved choice the theme
 // keeps following the system setting live; once the button is used, the
 // choice is saved and wins.
-const THEME_KEY = 'keyable-theme';
-
 function savedTheme() {
-  try {
-    const t = localStorage.getItem(THEME_KEY);
-    return (t === 'light' || t === 'dark') ? t : null;
-  } catch (_) { return null; }
+  const t = readSetting('theme');
+  return (t === 'light' || t === 'dark') ? t : null;
 }
 
 function applyTheme(theme) {
@@ -11403,7 +11423,7 @@ function initThemeToggle() {
   $('theme-toggle').addEventListener('click', () => {
     const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     applyTheme(next);
-    try { localStorage.setItem(THEME_KEY, next); } catch (_) {}
+    saveSetting('theme', next);
     announce(`Dark mode is now ${next === 'dark' ? 'on' : 'off'}.`);
   });
 }
@@ -12152,32 +12172,22 @@ const SS_UP_CODE    = 0x03;
 const SS_DELAY_CODE = 0x04;
 
 const MACRO_DEFAULT_SPEED_MS = 30;       // default pause between key presses; 0 = no delay bytes inserted
-const MACRO_SPEED_STORAGE    = 'keyable-macro-speed-v1';
-const MACRO_LAYOUT_STORAGE   = 'keyable-macro-layout-v1';        // 'us' | 'uk' - current setting
-const MACRO_LAYOUT_USER_SET  = 'keyable-macro-layout-user-v1';   // 'true' once the user has explicitly chosen
 
-// Write target = which OS layout the user is editing / writing to.
-// Mirrors the macro-layout precedent: a remembered current value plus a
-// "user has explicitly chosen" flag so the switch-derived default never
-// overwrites a deliberate choice on later connections.
-const WRITE_TARGET_STORAGE   = 'keyable-write-target-v1';        // 'mac' | 'windows'
-const WRITE_TARGET_USER_SET  = 'keyable-write-target-user-v1';   // 'true' once the user has explicitly chosen
+// Write target = which OS layout the user is editing / writing to, saved as the
+// writeTarget setting.
 let writeTarget = null;   // 'mac' | 'windows' | null (undetected, no choice yet)
 
 // Fn-layer mode. When true, a remap targets the function layer (base + 1) so
 // the action happens on "Fn + this key" instead of the key on its own. It is an
 // axis orthogonal to writeTarget: writeTarget chooses the OS side (Mac/Windows/
 // both), useFnLayer chooses base vs Fn within that side. Deliberately NOT
-// persisted to localStorage and defaults OFF every load, so a fresh session
+// a saved setting, and OFF on every load, so a fresh session
 // never silently writes to the Fn layer (unlike the remembered write target).
 let useFnLayer = false;
 
 function currentMacroLayout() {
-  try {
-    const stored = localStorage.getItem(MACRO_LAYOUT_STORAGE);
-    if (stored === 'uk' || stored === 'us') return stored;
-  } catch (_) {}
-  return 'us';
+  const stored = readSetting('macroLayout');
+  return (stored === 'uk' || stored === 'us') ? stored : 'us';
 }
 
 // Smart default: when a keyboard connects and the user hasn't explicitly
@@ -12187,12 +12197,9 @@ function currentMacroLayout() {
 // for. We treat any explicit user choice as final and never overwrite it
 // on future connections.
 function applySmartLayoutDefault() {
-  try {
-    if (localStorage.getItem(MACRO_LAYOUT_USER_SET) === 'true') return;
-  } catch (_) { return; }
+  if (readSetting('macroLayoutChosen') === 'true') return;
   if (!activeKbd || !activeKbd.layoutId) return;
-  const detected = /_iso/.test(activeKbd.layoutId) ? 'uk' : 'us';
-  try { localStorage.setItem(MACRO_LAYOUT_STORAGE, detected); } catch (_) {}
+  saveSetting('macroLayout', /_iso/.test(activeKbd.layoutId) ? 'uk' : 'us');
 }
 
 // Convert used/available bytes to plain-language "X% full" - never says
@@ -12898,12 +12905,10 @@ function stagedAwaitingWriteTarget() {
 // Step 2 list and spoken current action follow, then announce.
 function commitWriteTarget(value, speak = true) {
   writeTarget = (value === 'mac' || value === 'windows') ? value : null;
-  try {
-    if (writeTarget) {
-      localStorage.setItem(WRITE_TARGET_STORAGE, writeTarget);
-      localStorage.setItem(WRITE_TARGET_USER_SET, 'true');
-    }
-  } catch (_) {}
+  if (writeTarget) {
+    saveSetting('writeTarget', writeTarget);
+    saveSetting('writeTargetChosen', 'true');
+  }
   applyWriteTargetView();
   refreshCurrentKeymap();
   if (speak) announceCurrentActionForKey('Saved. ' + writeTargetSummary());
@@ -12912,13 +12917,8 @@ function commitWriteTarget(value, speak = true) {
 // Initial state when Step 3 loads: a remembered explicit choice wins; otherwise
 // follow the switch; undetected switch => nothing selected (asked for on staging).
 function initWriteTarget() {
-  let stored = null;
-  try {
-    if (localStorage.getItem(WRITE_TARGET_USER_SET) === 'true') {
-      const s = localStorage.getItem(WRITE_TARGET_STORAGE);
-      if (s === 'mac' || s === 'windows') stored = s;
-    }
-  } catch (_) {}
+  const saved  = readSetting('writeTargetChosen') === 'true' ? readSetting('writeTarget') : null;
+  const stored = (saved === 'mac' || saved === 'windows') ? saved : null;
 
   if (stored)                           writeTarget = stored;
   else if (currentOSMode === 'mac')     writeTarget = 'mac';
@@ -13282,7 +13282,7 @@ async function loadTextPanel() {
 
   // Speed slider. Priority: delay detected in the existing slot -> saved
   // preference -> default.
-  const stored = parseInt(localStorage.getItem(MACRO_SPEED_STORAGE), 10);
+  const stored = parseInt(readSetting('macroSpeed'), 10);
   const preferred = (Number.isFinite(stored) && stored >= 0 && stored <= 100)
     ? stored : MACRO_DEFAULT_SPEED_MS;
   const slotDelay = detectMacroDelay(macroSlots[slot]);
@@ -13294,8 +13294,8 @@ async function loadTextPanel() {
 
   // Layout dropdown. If the user hasn't explicitly chosen, guess from the
   // connected keyboard's physical layout (ANSI/JIS -> US, ISO -> UK). Once
-  // they manually pick a value via the dropdown, we set MACRO_LAYOUT_USER_SET
-  // and never auto-overwrite again.
+  // they manually pick a value via the dropdown, the macroLayoutChosen setting
+  // stops any later guess.
   applySmartLayoutDefault();
   setSelectListboxValue('macro-layout-listbox', currentMacroLayout());
 
@@ -13355,18 +13355,15 @@ function currentMacroSpeed() {
 function onTextSpeedInput(ev) {
   const ms = parseInt(ev.target.value, 10) || 0;
   ev.target.setAttribute('aria-valuetext', `${ms} milliseconds between key presses`);
-  try { localStorage.setItem(MACRO_SPEED_STORAGE, String(ms)); } catch (_) {}
+  saveSetting('macroSpeed', ms);
   // Slower speed = more delay bytes inside text steps -> fewer bytes free.
   renderMacroBuilder();
 }
 
 function onMacroLayoutChange(value) {
   const layout = (value === 'uk') ? 'uk' : 'us';
-  try {
-    localStorage.setItem(MACRO_LAYOUT_STORAGE, layout);
-    // Mark as user-set so future keyboard connections don't auto-override.
-    localStorage.setItem(MACRO_LAYOUT_USER_SET, 'true');
-  } catch (_) {}
+  saveSetting('macroLayout', layout);
+  saveSetting('macroLayoutChosen', 'true');   // later connections no longer guess it
   // Space cost differs by layout - re-render the counter and re-check
   // the Apply button. If a step editor is open it'll pick up the new
   // layout the next time its counter refreshes (or on save).
@@ -14178,8 +14175,8 @@ function initStep3Listboxes() {
   if (navigator.hid) navigator.hid.addEventListener('disconnect', onHidDisconnect);
 
   // Show the welcome dialog on first run only; the flag persists the choice.
-  if (!localStorage.getItem('keyable-v1')) {
-    localStorage.setItem('keyable-v1', '1');
+  if (!readSetting('welcomed')) {
+    saveSetting('welcomed', '1');
     setTimeout(() => openWelcomeDialog(null), 300);
   }
 })();
