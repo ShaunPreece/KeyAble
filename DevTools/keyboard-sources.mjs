@@ -229,9 +229,24 @@ export function compareViaWithFirmware(fwKeys, via) {
 // - any other key takes the name the boards matching their firmware give the same token;
 // - a key with nothing on the Windows base layer is named by its Mac base key, as F13
 //   to F16 are on the 100% boards;
-// - a key with nothing on either base layer gets "Unassigned Key (after X)", X being the
-//   key before it, because no source says what is printed on it.
+// - a key with nothing on either base layer takes its name from EMPTY_KEY_NAMES when the
+//   board is listed there, and otherwise gets "Unassigned Key (after X)", X being the key
+//   before it, because no source says what is printed on it.
 const EMPTY = /^(KC_NO|XXXXXXX|_______|KC_TRNS)$/;
+
+// Physical keys that Keychron's firmware leaves empty, by firmware folder and position.
+// The wired V3, V6 and Q6 have nothing on the key after Print Screen, in Keychron's own
+// branch as well as QMK's. The Max version of each board has the same key in the same
+// place holding KC_CTANA on Windows and KC_SIRI on Mac, which is why it is named for them.
+const EMPTY_KEY_NAMES = {
+  'keychron/v3/': { '0,15': 'Voice Assistant' },
+  'keychron/v6/': { '0,15': 'Voice Assistant' },
+  'keychron/q6/': { '0,15': 'Voice Assistant' },
+};
+const emptyKeyName = (board, pos) => {
+  const entry = Object.entries(EMPTY_KEY_NAMES).find(([dir]) => board.source && board.source.includes(dir));
+  return entry && entry[1][pos];
+};
 
 export function keyNaming(tables, boardFor = firmwareBoard) {
   const { KEYCHRON_LAYOUTS, KEYBOARD_DB, LABEL_TO_KEYCODE } = tables;
@@ -276,6 +291,8 @@ export function keyNaming(tables, boardFor = firmwareBoard) {
         if (tokenNames.has(mac)) return { label: tokenNames.get(mac) };
         return { error: `no name for Mac key ${mac} at (${k.pos})` };
       }
+      const printed = emptyKeyName(board, k.pos);
+      if (printed) return { label: printed };
       const before = i > 0 ? nameOf(board, i - 1) : null;
       return { label: before && before.label ? `Unassigned Key (after ${before.label})` : 'Unassigned Key' };
     }
