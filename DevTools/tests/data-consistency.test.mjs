@@ -1,30 +1,15 @@
 // Checks that the app's data tables agree with each other. Loads KeyAble in headless
 // Edge only to read its inline tables; no keyboard is involved. Run with `npm test`.
-import { test, before, after } from 'node:test';
+import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { chromium } from 'playwright-core';
+import { APP_URL, useEdge } from './edge.mjs';
 
-const here    = path.dirname(fileURLToPath(import.meta.url));
-const APP_URL = pathToFileURL(path.resolve(here, '../../Project/KeyAble.html')).href;
-const PROFILE = path.join(tmpdir(), 'keyable-tests-profile-data');
-
-let context;
+const newPage = useEdge('data');
 let page;
 
 before(async () => {
-  rmSync(PROFILE, { recursive: true, force: true });
-  context = await chromium.launchPersistentContext(PROFILE, { channel: 'msedge', headless: true });
-  page = await context.newPage();
+  page = await newPage();
   await page.goto(APP_URL);
-});
-
-after(async () => {
-  await context?.close();
-  rmSync(PROFILE, { recursive: true, force: true });
 });
 
 test('every key in a model\'s layout has a factory keycode at the same matrix position', async () => {

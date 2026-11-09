@@ -726,8 +726,8 @@
   </p>
   </div>
   <div class="btn-row" style="margin-top:1.25rem">
-    <button id="welcome-close" class="primary" onclick="getStartedFromWelcome()">Get Started</button>
-    <button onclick="goToHelp()">More Help</button>
+    <button id="welcome-close" class="primary" data-action="getStartedFromWelcome">Get Started</button>
+    <button data-action="goToHelp">More Help</button>
   </div>
 </dialog>
 
@@ -744,8 +744,8 @@
   <h3 id="h-key-warning" tabindex="-1">Caution Before You Continue.</h3>
   <p id="key-warning-text" style="margin-bottom:.85rem"></p>
   <div class="btn-row" style="margin-top:0">
-    <button id="btn-warning-cancel" autofocus onclick="cancelKeyWarning()">Choose a Different Key</button>
-    <button id="btn-warning-continue" class="danger" onclick="confirmKeyWarning()">I Understand, Continue Anyway</button>
+    <button id="btn-warning-cancel" autofocus data-action="cancelKeyWarning">Choose a Different Key</button>
+    <button id="btn-warning-continue" class="danger" data-action="confirmKeyWarning">I Understand, Continue Anyway</button>
   </div>
 </dialog>
 
@@ -761,10 +761,10 @@
   <h3 id="h-reset-choice" tabindex="-1">This key has two changes.</h3>
   <p id="reset-choice-desc" style="margin-bottom:.85rem"></p>
   <div class="btn-row" style="margin-top:0">
-    <button id="btn-reset-both" autofocus onclick="resetChoiceSelected('both')">Reset both actions</button>
-    <button id="btn-reset-base-only"   onclick="resetChoiceSelected('base')">Reset the normal action only</button>
-    <button id="btn-reset-fn-only"     onclick="resetChoiceSelected('fn')">Reset the Fn action only</button>
-    <button id="btn-reset-choice-cancel" onclick="resetChoiceCancel()">Cancel</button>
+    <button id="btn-reset-both" autofocus data-action="resetChoiceSelected" data-choice="both">Reset both actions</button>
+    <button id="btn-reset-base-only"   data-action="resetChoiceSelected" data-choice="base">Reset the normal action only</button>
+    <button id="btn-reset-fn-only"     data-action="resetChoiceSelected" data-choice="fn">Reset the Fn action only</button>
+    <button id="btn-reset-choice-cancel" data-action="resetChoiceCancel">Cancel</button>
   </div>
 </dialog>
 
@@ -782,8 +782,8 @@
   <p id="changed-keys-count" aria-live="polite"></p>
   <ul id="changed-keys-list" class="changed-keys-list"></ul>
   <div class="btn-row" style="margin-top:.5rem">
-    <button id="btn-changed-reset-all" class="danger" hidden onclick="resetAllChanged()">Reset All Listed Keys</button>
-    <button id="btn-changed-close" onclick="closeChangedKeys()">Close This List</button>
+    <button id="btn-changed-reset-all" class="danger" hidden data-action="resetAllChanged">Reset All Listed Keys</button>
+    <button id="btn-changed-close" data-action="closeChangedKeys">Close This List</button>
   </div>
 </dialog>
 
@@ -803,8 +803,8 @@
     Are you sure you want to continue?
   </p>
   <div class="btn-row" style="margin-top:0">
-    <button id="btn-cancel-reset" autofocus onclick="cancelResetAll()">Cancel</button>
-    <button id="btn-confirm-reset" class="danger" onclick="executeResetAll()">
+    <button id="btn-cancel-reset" autofocus data-action="cancelResetAll">Cancel</button>
+    <button id="btn-confirm-reset" class="danger" data-action="executeResetAll">
       Yes, Reset All Keys
     </button>
   </div>
@@ -823,8 +823,8 @@
   </p>
   <p id="restore-file-summary" style="margin-bottom:.85rem;color:var(--muted)"></p>
   <div class="btn-row" style="margin-top:0">
-    <button id="btn-cancel-restore" autofocus onclick="cancelRestore()">Cancel</button>
-    <button id="btn-confirm-restore" class="danger" onclick="executeRestore()">
+    <button id="btn-cancel-restore" autofocus data-action="cancelRestore">Cancel</button>
+    <button id="btn-confirm-restore" class="danger" data-action="executeRestore">
       Yes, Restore This Setup
     </button>
   </div>
@@ -852,8 +852,8 @@
   </fieldset>
   <p id="wt-dialog-error" class="hint" role="alert" style="margin-top:.75rem"></p>
   <div class="btn-row" style="margin-top:.5rem">
-    <button id="btn-wt-save" class="primary" onclick="saveWriteTargetDialog()">Save</button>
-    <button id="btn-wt-cancel" onclick="cancelWriteTargetDialog()">Cancel</button>
+    <button id="btn-wt-save" class="primary" data-action="saveWriteTargetDialog">Save</button>
+    <button id="btn-wt-cancel" data-action="cancelWriteTargetDialog">Cancel</button>
   </div>
 </dialog>
 
@@ -866,9 +866,9 @@
   <h3 id="h-apply-confirm" tabindex="-1">Ready to Apply.</h3>
   <p id="apply-confirm-text" style="margin-bottom:.85rem"></p>
   <div class="btn-row" style="margin-top:0">
-    <button id="btn-apply-remap" class="success" autofocus onclick="applyRemap()">Apply Remap</button>
-    <button onclick="cancelRemap()">Change Action</button>
-    <button onclick="changeKeyFromConfirm()">Change Key</button>
+    <button id="btn-apply-remap" class="success" autofocus data-action="applyRemap">Apply Remap</button>
+    <button data-action="cancelRemap">Change Action</button>
+    <button data-action="changeKeyFromConfirm">Change Key</button>
   </div>
 </dialog>
 
@@ -927,10 +927,10 @@
           Edge, Chrome, and Brave.
         </p>
         <div class="btn-row">
-          <button id="btn-connect" class="primary" onclick="connectKeyboard()">
+          <button id="btn-connect" class="primary" data-action="connectKeyboard">
             Connect Keyboard to KeyAble
           </button>
-          <button id="btn-demo" onclick="startDemoMode()">
+          <button id="btn-demo" data-action="startDemoMode">
             Try KeyAble Without a Keyboard (Demo)
           </button>
         </div>
@@ -968,10 +968,10 @@
           you know it.
         </p>
         <div class="btn-row">
-          <button class="primary" onclick="reportUnknownKeyboard()">
+          <button class="primary" data-action="reportUnknownKeyboard">
             Report This Keyboard ID
           </button>
-          <button onclick="disconnectFromUnsupported()">
+          <button data-action="disconnectFromUnsupported">
             Disconnect and Go Back
           </button>
         </div>
@@ -1007,7 +1007,7 @@
         <p id="model-hint" class="hint">Grouped by series and size. Enter moves to the Load button.</p>
 
         <div class="btn-row" style="margin-top:0">
-          <button id="btn-load-layout" class="primary" onclick="startDemoKeyboard()" disabled>
+          <button id="btn-load-layout" class="primary" data-action="startDemoKeyboard" disabled>
             Confirm Model and Continue
           </button>
         </div>
@@ -1025,7 +1025,7 @@
 
         <div class="action-menu">
           <div class="action-item">
-            <button id="btn-continue" class="success" aria-describedby="desc-continue" onclick="goToSection('step2')">
+            <button id="btn-continue" class="success" aria-describedby="desc-continue" data-action="goToSection" data-section="step2">
               Customize Keyboard
             </button>
             <p id="desc-continue" class="action-desc">Change what keys do, create shortcuts and macros, and adjust lighting.</p>
@@ -1038,26 +1038,26 @@
           <h4 id="h-manage-setup">Manage Your Setup.</h4>
           <div class="action-menu">
             <div class="action-item">
-              <button id="btn-backup" aria-describedby="desc-backup" onclick="backupKeymap()">
+              <button id="btn-backup" aria-describedby="desc-backup" data-action="backupKeymap">
                 Save Current Keyboard Setup to a File
               </button>
               <p id="desc-backup" class="action-desc">Keep a copy of this keyboard's setup so you can restore it later.</p>
             </div>
             <div class="action-item">
-              <button id="btn-restore" aria-describedby="desc-restore" onclick="restoreKeymapPrompt()">
+              <button id="btn-restore" aria-describedby="desc-restore" data-action="restoreKeymapPrompt">
                 Restore a Saved Keyboard Setup from a File
               </button>
               <p id="desc-restore" class="action-desc">Write a saved setup back to this keyboard, replacing what is on it now.</p>
             </div>
             <!-- Opens #changed-keys-panel, a modal <dialog> near the top of <body>. -->
             <div class="action-item">
-              <button id="btn-changed-keys" aria-describedby="desc-changed-keys" onclick="openChangedKeys()">
+              <button id="btn-changed-keys" aria-describedby="desc-changed-keys" data-action="openChangedKeys">
                 Review Changes on This Keyboard
               </button>
               <p id="desc-changed-keys" class="action-desc">List the keys on your current layout that differ from factory, and reset any of them.</p>
             </div>
             <div class="action-item">
-              <button id="btn-reset-all" class="danger" aria-describedby="desc-reset-all" onclick="confirmResetAll()">
+              <button id="btn-reset-all" class="danger" aria-describedby="desc-reset-all" data-action="confirmResetAll">
                 Reset Keyboard to Default Settings
               </button>
               <p id="desc-reset-all" class="action-desc">Undo all your changes and return every key to its factory function.</p>
@@ -1068,7 +1068,7 @@
         <div class="action-group">
           <div class="action-menu">
             <div class="action-item">
-              <button id="btn-disconnect" class="danger" aria-describedby="desc-disconnect" onclick="disconnectKeyboard()">
+              <button id="btn-disconnect" class="danger" aria-describedby="desc-disconnect" data-action="disconnectKeyboard">
                 Disconnect Keyboard
               </button>
               <p id="desc-disconnect" class="action-desc">Your changes stay on the keyboard.</p>
@@ -1082,8 +1082,7 @@
                accept="application/json,.json"
                style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0"
                aria-hidden="true"
-               tabindex="-1"
-               onchange="restoreKeymapFileChosen(event)">
+               tabindex="-1">
 
         <!-- Progress boxes are deliberately NOT live regions: see startProgress(). -->
         <div id="reset-progress"
@@ -1096,7 +1095,7 @@
       </div>
 
       <div class="section-footer">
-        <button onclick="openWelcomeDialog(this)">Help</button>
+        <button data-action="openWelcomeDialog">Help</button>
       </div>
     </section>
 
@@ -1114,7 +1113,7 @@
           <span>Connect a keyboard from Step 1 before choosing a key to remap.</span>
         </div>
         <div class="section-footer">
-          <button onclick="goToSection('connect')">Return to Step 1. Connect Keyboard. (Alt+1)</button>
+          <button data-action="goToSection" data-section="connect">Return to Step 1. Connect Keyboard. (Alt+1)</button>
         </div>
       </div>
 
@@ -1224,7 +1223,7 @@
         </p>
 
         <div style="margin-top:1rem">
-          <button id="btn-capture" onclick="startKeyCapture()">Start Capture Mode</button>
+          <button id="btn-capture" data-action="toggleKeyCapture">Start Capture Mode</button>
         </div>
 
         <div id="capture-box"
@@ -1266,19 +1265,19 @@
           <div id="fn-layer-wrap" class="s3-fieldset" style="margin-top:1rem;margin-bottom:0">
             <div class="checkbox-row">
               <label class="checkbox-label"><input type="checkbox" id="use-fn-layer"
-                aria-describedby="use-fn-help" onchange="onUseFnLayerChange()"> Use with the Fn key (put this on the Fn layer)</label>
+                aria-describedby="use-fn-help"> Use with the Fn key (put this on the Fn layer)</label>
             </div>
             <p id="use-fn-help" class="hint">When ticked, your new action only happens while you hold Fn and press this key, for example Fn plus Home. The key keeps its normal action when Fn is not held. Leave this unticked to change what the key does on its own.</p>
           </div>
 
           <div class="btn-row" style="margin-top:.75rem">
-            <button id="btn-remap-key" class="success" onclick="attemptRemapKey()">
+            <button id="btn-remap-key" class="success" data-action="attemptRemapKey">
               Remap Selected Key
             </button>
-            <button id="btn-reset-key" onclick="resetSelectedKeyToDefault()">
+            <button id="btn-reset-key" data-action="resetSelectedKeyToDefault">
               Reset This Key To Default Action
             </button>
-            <button onclick="chooseADifferentKey()">
+            <button data-action="chooseADifferentKey">
               Choose a Different Key
             </button>
           </div>
@@ -1302,7 +1301,7 @@
           <span id="step3-not-connected-msg"></span>
         </div>
         <div class="section-footer">
-          <button id="step3-not-connected-btn" onclick="goToSection('connect')">Return to Step 1. Connect Keyboard. (Alt+1)</button>
+          <button id="step3-not-connected-btn" data-action="goToSection" data-section="connect">Return to Step 1. Connect Keyboard. (Alt+1)</button>
         </div>
       </div>
 
@@ -1313,7 +1312,7 @@
            unchosen, and stageRemap asks for it before the confirmation opens. -->
       <div class="s3-fieldset" style="margin-bottom:1rem">
         <p id="wt-summary"></p>
-        <button id="btn-wt-change" aria-describedby="wt-summary" onclick="openWriteTargetDialog()">Choose Mac or Windows Layout</button>
+        <button id="btn-wt-change" aria-describedby="wt-summary" data-action="openWriteTargetDialog">Choose Mac or Windows Layout</button>
       </div>
 
       <!-- Action type chooser: APG tabs with manual activation. Arrows move focus,
@@ -1373,10 +1372,10 @@
         <fieldset class="s3-fieldset">
           <legend>Modifiers.</legend>
           <div class="checkbox-row">
-            <label class="checkbox-label"><input type="checkbox" id="mod-ctrl"  onchange="updateShortcutPreview()"> <span id="lbl-mod-ctrl">Ctrl</span></label>
-            <label class="checkbox-label"><input type="checkbox" id="mod-shift" onchange="updateShortcutPreview()"> <span id="lbl-mod-shift">Shift</span></label>
-            <label class="checkbox-label"><input type="checkbox" id="mod-alt"   onchange="updateShortcutPreview()"> <span id="lbl-mod-alt">Alt</span></label>
-            <label class="checkbox-label"><input type="checkbox" id="mod-gui"   onchange="updateShortcutPreview()"> <span id="lbl-mod-gui">Win</span></label>
+            <label class="checkbox-label"><input type="checkbox" id="mod-ctrl"> <span id="lbl-mod-ctrl">Ctrl</span></label>
+            <label class="checkbox-label"><input type="checkbox" id="mod-shift"> <span id="lbl-mod-shift">Shift</span></label>
+            <label class="checkbox-label"><input type="checkbox" id="mod-alt"> <span id="lbl-mod-alt">Alt</span></label>
+            <label class="checkbox-label"><input type="checkbox" id="mod-gui"> <span id="lbl-mod-gui">Win</span></label>
           </div>
         </fieldset>
         <span id="shortcut-key-label" class="lb-label" style="margin-top:.5rem">Key to combine with modifiers:</span>
@@ -1389,7 +1388,7 @@
         <p id="shortcut-key-hint" class="hint">Numpad keys are in their own group, and numpad digits only type numbers with Num Lock on.</p>
         <div id="shortcut-preview" class="shortcut-preview" aria-live="polite" aria-atomic="true">No shortcut built yet.</div>
         <div class="btn-row" style="margin-top:1rem">
-          <button onclick="confirmShortcut()">Use This Shortcut</button>
+          <button data-action="confirmShortcut">Use This Shortcut</button>
         </div>
       </div>
 
@@ -1431,7 +1430,7 @@
         <h3 id="h-panel-disable" tabindex="-1">Disable Key.</h3>
         <p id="at-disable-desc">The key does nothing when pressed. Its current function is removed.</p>
         <div class="btn-row">
-          <button onclick="selectDisableAction()">Confirm: Disable This Key</button>
+          <button data-action="selectDisableAction">Confirm: Disable This Key</button>
         </div>
       </div>
 
@@ -1469,7 +1468,7 @@
                 cannot load step-by-step for editing. If you continue, building
                 a new macro below will replace the existing one when you apply.
               </p>
-              <button type="button" onclick="startFreshMacro()">Start a new macro for this key</button>
+              <button type="button" data-action="startFreshMacro">Start a new macro for this key</button>
             </div>
           </div>
 
@@ -1532,8 +1531,7 @@
               <input type="range"
                      id="text-speed"
                      min="0" max="100" step="5" value="30"
-                     aria-valuetext="30 milliseconds between key presses"
-                     oninput="onTextSpeedInput(event)">
+                     aria-valuetext="30 milliseconds between key presses">
               <p class="hint">
                 Higher is slower but more reliable. Increase this if characters get dropped when
                 the macro plays back. This only affects typing within text steps - pause steps
@@ -1542,7 +1540,7 @@
             </div>
 
             <div class="btn-row" style="margin-top:1rem">
-              <button id="btn-confirm-macro" onclick="confirmMacro()" disabled>
+              <button id="btn-confirm-macro" data-action="confirmMacro" disabled>
                 Use This Macro
               </button>
             </div>
@@ -1563,7 +1561,6 @@
                       autocorrect="off"
                       autocapitalize="off"
                       aria-describedby="step-text-hint"
-                      oninput="onStepTextInput(event)"
                       style="width:100%;padding:.7rem .85rem;font-size:1rem;font-family:inherit;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;resize:vertical;min-height:5rem"></textarea>
             <p id="step-text-hint" class="hint" style="margin-top:.35rem">
               Supported: letters, digits, punctuation, space, Enter, Tab. Other characters will be removed.
@@ -1574,8 +1571,8 @@
               0 characters.
             </p>
             <div class="btn-row" style="margin-top:1rem">
-              <button id="btn-save-step-text" onclick="saveStepEditor()" disabled>Save Step</button>
-              <button onclick="cancelStepEditor()">Cancel</button>
+              <button id="btn-save-step-text" data-action="saveStepEditor" disabled>Save Step</button>
+              <button data-action="cancelStepEditor">Cancel</button>
             </div>
           </div>
 
@@ -1588,10 +1585,10 @@
             <fieldset class="s3-fieldset">
               <legend>Modifiers (optional).</legend>
               <div class="checkbox-row">
-                <label class="checkbox-label"><input type="checkbox" id="step-mod-ctrl"  onchange="updateStepKeyPreview()"> <span id="lbl-step-mod-ctrl">Ctrl</span></label>
-                <label class="checkbox-label"><input type="checkbox" id="step-mod-shift" onchange="updateStepKeyPreview()"> <span id="lbl-step-mod-shift">Shift</span></label>
-                <label class="checkbox-label"><input type="checkbox" id="step-mod-alt"   onchange="updateStepKeyPreview()"> <span id="lbl-step-mod-alt">Alt</span></label>
-                <label class="checkbox-label"><input type="checkbox" id="step-mod-gui"   onchange="updateStepKeyPreview()"> <span id="lbl-step-mod-gui">Win</span></label>
+                <label class="checkbox-label"><input type="checkbox" id="step-mod-ctrl"> <span id="lbl-step-mod-ctrl">Ctrl</span></label>
+                <label class="checkbox-label"><input type="checkbox" id="step-mod-shift"> <span id="lbl-step-mod-shift">Shift</span></label>
+                <label class="checkbox-label"><input type="checkbox" id="step-mod-alt"> <span id="lbl-step-mod-alt">Alt</span></label>
+                <label class="checkbox-label"><input type="checkbox" id="step-mod-gui"> <span id="lbl-step-mod-gui">Win</span></label>
               </div>
             </fieldset>
             <span id="step-key-label" class="lb-label" style="margin-top:.5rem">Key to press:</span>
@@ -1604,8 +1601,8 @@
             <p id="step-key-hint" class="hint">Numpad keys are in their own group, and numpad digits only type numbers with Num Lock on.</p>
             <div id="step-key-preview" class="shortcut-preview" aria-live="polite" aria-atomic="true">No key chosen yet.</div>
             <div class="btn-row" style="margin-top:1rem">
-              <button id="btn-save-step-key" onclick="saveStepEditor()" disabled>Save Step</button>
-              <button onclick="cancelStepEditor()">Cancel</button>
+              <button id="btn-save-step-key" data-action="saveStepEditor" disabled>Save Step</button>
+              <button data-action="cancelStepEditor">Cancel</button>
             </div>
           </div>
 
@@ -1621,8 +1618,8 @@
             </div>
             <p id="step-list-hint" class="hint">Enter saves the step.</p>
             <div class="btn-row" style="margin-top:1rem">
-              <button id="btn-save-step-list" onclick="saveStepEditor()" disabled>Save Step</button>
-              <button onclick="cancelStepEditor()">Cancel</button>
+              <button id="btn-save-step-list" data-action="saveStepEditor" disabled>Save Step</button>
+              <button data-action="cancelStepEditor">Cancel</button>
             </div>
           </div>
 
@@ -1638,14 +1635,13 @@
                    id="step-pause-input"
                    min="1" max="9999" step="1"
                    value="500"
-                   aria-describedby="step-pause-hint"
-                   oninput="onStepPauseInput(event)">
+                   aria-describedby="step-pause-hint">
             <p id="step-pause-hint" class="hint" style="margin-top:.35rem">
               From 1 to 9999 milliseconds. Use to give an application time to respond between steps.
             </p>
             <div class="btn-row" style="margin-top:1rem">
-              <button id="btn-save-step-pause" onclick="saveStepEditor()" disabled>Save Step</button>
-              <button onclick="cancelStepEditor()">Cancel</button>
+              <button id="btn-save-step-pause" data-action="saveStepEditor" disabled>Save Step</button>
+              <button data-action="cancelStepEditor">Cancel</button>
             </div>
           </div>
         </div>
@@ -2059,7 +2055,7 @@
           <span>Connect a keyboard from Step 1 to control its RGB lighting.</span>
         </div>
         <div class="section-footer">
-          <button onclick="goToSection('connect')">Return to Step 1. Connect Keyboard. (Alt+1)</button>
+          <button data-action="goToSection" data-section="connect">Return to Step 1. Connect Keyboard. (Alt+1)</button>
         </div>
       </div>
 
@@ -2083,7 +2079,7 @@
         </p>
 
         <div class="btn-row">
-          <button id="btn-lighting-toggle" class="primary" onclick="toggleLighting()">
+          <button id="btn-lighting-toggle" class="primary" data-action="toggleLighting">
             Turn Backlighting Off
           </button>
         </div>
@@ -2098,8 +2094,7 @@
           <input type="range"
                  id="lighting-brightness"
                  min="0" max="100" step="5" value="50"
-                 aria-valuetext="50 percent"
-                 oninput="onLightingSliderInput(event, 'brightness')">
+                 aria-valuetext="50 percent">
         </div>
 
         <div class="lighting-row">
@@ -2118,8 +2113,7 @@
           <input type="range"
                  id="lighting-speed"
                  min="0" max="100" step="5" value="50"
-                 aria-valuetext="50 percent"
-                 oninput="onLightingSliderInput(event, 'speed')">
+                 aria-valuetext="50 percent">
           <p class="hint">Only affects animated effects.</p>
         </div>
 
@@ -2129,8 +2123,7 @@
             <input type="range"
                    id="lighting-hue"
                    min="0" max="360" step="5" value="0"
-                   aria-valuetext="red, 0 degrees"
-                   oninput="onLightingSliderInput(event, 'hue')">
+                   aria-valuetext="red, 0 degrees">
             <p class="hint">Sets the colour for solid-colour and hue-based effects.</p>
           </div>
 
@@ -2139,8 +2132,7 @@
             <input type="range"
                    id="lighting-saturation"
                    min="0" max="100" step="5" value="100"
-                   aria-valuetext="100 percent"
-                   oninput="onLightingSliderInput(event, 'sat')">
+                   aria-valuetext="100 percent">
           </div>
         </div>
       </div>
@@ -8887,10 +8879,10 @@ const SETTING_NAMES = {
 // A browser that blocks site storage throws on every access: settings then read as
 // unset and are not kept.
 function readSetting(name) {
-  try { return localStorage.getItem(SETTING_NAMES[name]); } catch (_) { return null; }
+  try { return localStorage.getItem(SETTING_NAMES[name]); } catch { return null; }
 }
 function saveSetting(name, value) {
-  try { localStorage.setItem(SETTING_NAMES[name], String(value)); } catch (_) { /* not kept */ }
+  try { localStorage.setItem(SETTING_NAMES[name], String(value)); } catch { /* not kept */ }
 }
 
 // - Application state -
@@ -10124,7 +10116,7 @@ function focusAfterUnbusy(btn) {
   setTimeout(() => btn.focus(), 100);
 }
 
-// Bound once at document capture, so it runs before any onclick. Enter and
+// Bound once at document capture, so it runs before any button action. Enter and
 // Space on a button also arrive as clicks.
 function busyButtonClickGuard(ev) {
   const btn = ev.target.closest && ev.target.closest('button');
@@ -10339,7 +10331,7 @@ function renderChangedKeys(scan) {
     btn.id    = `chg-reset-${i}`;
     btn.textContent = `Reset ${label}`;
     btn.setAttribute('aria-describedby', `chg-label-${i}`);
-    btn.onclick = () => resetChangedRow(i);
+    btn.addEventListener('click', () => resetChangedRow(i));
 
     li.appendChild(span);
     li.appendChild(btn);
@@ -10459,7 +10451,6 @@ function startKeyCapture() {
 
   const btn       = $('btn-capture');
   btn.textContent = 'Stop Capture Mode';
-  btn.onclick     = endKeyCapture;
 
   playBeep();
   // No live-region announce here - the hidden capture-input's aria-label
@@ -10677,7 +10668,6 @@ function resetCaptureButton() {
   const btn = $('btn-capture');
   if (!btn) return;
   btn.textContent = 'Start Capture Mode';
-  btn.onclick     = startKeyCapture;
   btn.disabled    = false;
 }
 
@@ -10812,45 +10802,19 @@ class DemoKeyboard extends EventTarget {
 
   // Turn a request into its reply, in place.
   answer(d) {
-    const u16 = (hi, lo) => (hi << 8) | lo;
-    const put16 = (at, v) => { d[at] = (v >> 8) & 0xFF; d[at + 1] = v & 0xFF; };
-    const keymapBytes = this.keymap.length * 2;
-    switch (d[0]) {
-      case CMD_GET_PROTOCOL: put16(1, DEMO_PROTOCOL_VERSION); break;
-      case CMD_GET_KEY: { const c = this.cell(d[1], d[2], d[3]); put16(4, c < 0 ? 0 : this.keymap[c]); break; }
-      case CMD_SET_KEY: { const c = this.cell(d[1], d[2], d[3]); if (c >= 0) this.keymap[c] = u16(d[4], d[5]); break; }
-      case CMD_DYNAMIC_KEYMAP_RESET: this.resetKeymap(); break;
-      case CMD_CUSTOM_SET:
-      case CMD_CUSTOM_GET:
-      case CMD_CUSTOM_SAVE: this.answerLighting(d); break;
-      case CMD_MACRO_GET_COUNT: d[1] = DEMO_MACRO_SLOTS; break;
-      case CMD_MACRO_GET_BUFFER_SIZE: put16(1, DEMO_MACRO_BYTES); break;
-      case CMD_MACRO_GET_BUFFER: {
-        const at = u16(d[1], d[2]);
-        for (let i = 0; i < d[3]; i++) d[4 + i] = this.macros[at + i] ?? 0;
-        break;
-      }
-      case CMD_MACRO_SET_BUFFER: {
-        const at = u16(d[1], d[2]);
-        for (let i = 0; i < d[3] && at + i < DEMO_MACRO_BYTES; i++) this.macros[at + i] = d[4 + i];
-        break;
-      }
-      case CMD_DYNAMIC_KEYMAP_GET_LAYER_COUNT: d[1] = this.layerCount; break;
-      case CMD_KEYMAP_GET_BUFFER: {
-        const at = u16(d[1], d[2]);
-        for (let i = 0; i < d[3]; i++) {
-          const byte = at + i;
-          const code = byte < keymapBytes ? this.keymap[byte >> 1] : 0;
-          d[4 + i] = byte % 2 === 0 ? (code >> 8) & 0xFF : code & 0xFF;
-        }
-        break;
-      }
-      case CMD_GET_ENCODER: put16(4, this.encoders.get(`${d[1]},${d[2]},${d[3]}`) ?? 0); break;
-      case CMD_SET_ENCODER: this.encoders.set(`${d[1]},${d[2]},${d[3]}`, u16(d[4], d[5])); break;
-      case CMD_KC_GET_DEFAULT_LAYER: d[1] = this.roles.win; break;   // the switch is on Windows
-      default: d[0] = VIA_UNHANDLED;
-    }
+    const handler = DEMO_COMMANDS[d[0]];
+    if (handler) handler(this, d);
+    else d[0] = VIA_UNHANDLED;
     return d;
+  }
+
+  readKeymapBuffer(d) {
+    const at = u16At(d, 1);
+    for (let i = 0; i < d[3]; i++) {
+      const byte = at + i;
+      const code = byte < this.keymap.length * 2 ? this.keymap[byte >> 1] : 0;
+      d[4 + i] = byte % 2 === 0 ? (code >> 8) & 0xFF : code & 0xFF;
+    }
   }
 
   // Lighting values by id: 1 brightness, 2 effect, then on RGB 3 speed and 4 hue
@@ -10868,6 +10832,42 @@ class DemoKeyboard extends EventTarget {
     else d[3] = this.lighting[id];
   }
 }
+
+// Big-endian 16-bit values in a report, as VIA sends them.
+const u16At = (d, at) => (d[at] << 8) | d[at + 1];
+const put16At = (d, at, v) => { d[at] = (v >> 8) & 0xFF; d[at + 1] = v & 0xFF; };
+
+// How DemoKeyboard answers each VIA command; any other is unhandled.
+const DEMO_COMMANDS = {
+  [CMD_GET_PROTOCOL]: (kb, d) => put16At(d, 1, DEMO_PROTOCOL_VERSION),
+  [CMD_GET_KEY]: (kb, d) => {
+    const c = kb.cell(d[1], d[2], d[3]);
+    put16At(d, 4, c < 0 ? 0 : kb.keymap[c]);
+  },
+  [CMD_SET_KEY]: (kb, d) => {
+    const c = kb.cell(d[1], d[2], d[3]);
+    if (c >= 0) kb.keymap[c] = u16At(d, 4);
+  },
+  [CMD_DYNAMIC_KEYMAP_RESET]: kb => kb.resetKeymap(),
+  [CMD_CUSTOM_SET]:  (kb, d) => kb.answerLighting(d),
+  [CMD_CUSTOM_GET]:  (kb, d) => kb.answerLighting(d),
+  [CMD_CUSTOM_SAVE]: (kb, d) => kb.answerLighting(d),
+  [CMD_MACRO_GET_COUNT]: (kb, d) => { d[1] = DEMO_MACRO_SLOTS; },
+  [CMD_MACRO_GET_BUFFER_SIZE]: (kb, d) => put16At(d, 1, DEMO_MACRO_BYTES),
+  [CMD_MACRO_GET_BUFFER]: (kb, d) => {
+    const at = u16At(d, 1);
+    for (let i = 0; i < d[3]; i++) d[4 + i] = kb.macros[at + i] ?? 0;
+  },
+  [CMD_MACRO_SET_BUFFER]: (kb, d) => {
+    const at = u16At(d, 1);
+    for (let i = 0; i < d[3] && at + i < DEMO_MACRO_BYTES; i++) kb.macros[at + i] = d[4 + i];
+  },
+  [CMD_DYNAMIC_KEYMAP_GET_LAYER_COUNT]: (kb, d) => { d[1] = kb.layerCount; },
+  [CMD_KEYMAP_GET_BUFFER]: (kb, d) => kb.readKeymapBuffer(d),
+  [CMD_GET_ENCODER]: (kb, d) => put16At(d, 4, kb.encoders.get(`${d[1]},${d[2]},${d[3]}`) ?? 0),
+  [CMD_SET_ENCODER]: (kb, d) => kb.encoders.set(`${d[1]},${d[2]},${d[3]}`, u16At(d, 4)),
+  [CMD_KC_GET_DEFAULT_LAYER]: (kb, d) => { d[1] = kb.roles.win; },   // the switch is on Windows
+};
 
 const inDemoMode = () => hidDevice instanceof DemoKeyboard;
 
@@ -12658,11 +12658,11 @@ function loadStep3() {
     if (activeKbd && !selectedKey) {
       msg.textContent = 'Choose a key to remap first. Go to Step 2, pick a key, then come back here to choose an action for it.';
       btn.textContent = `Back to Step 2. Choose a Key to Customize. ${navKeyHint(2)}`;
-      btn.onclick     = () => goToSection('step2');
+      btn.dataset.section = 'step2';
     } else {
       msg.textContent = 'Connect a keyboard from Step 1, then choose a key in Step 2, before choosing an action here.';
       btn.textContent = `Return to Step 1. Connect Keyboard. ${navKeyHint(1)}`;
-      btn.onclick     = () => goToSection('connect');
+      btn.dataset.section = 'connect';
     }
     return;
   }
@@ -13363,7 +13363,7 @@ function onTextSpeedInput(ev) {
 function onMacroLayoutChange(value) {
   const layout = (value === 'uk') ? 'uk' : 'us';
   saveSetting('macroLayout', layout);
-  saveSetting('macroLayoutChosen', 'true');   // later connections no longer guess it
+  saveSetting('macroLayoutChosen', 'true');   // stops later connections guessing it
   // Space cost differs by layout - re-render the counter and re-check
   // the Apply button. If a step editor is open it'll pick up the new
   // layout the next time its counter refreshes (or on save).
@@ -14051,9 +14051,9 @@ function showRemapResult(success, errMsg) {
       '<div>' +
         '<p id="s3-result-msg" style="font-weight:700;margin-bottom:.5rem"></p>' +
         '<div class="btn-row" style="margin-top:.75rem">' +
-          '<button class="success" onclick="goToSection(\'step2\')">Remap Another Key</button>' +
-          '<button onclick="goToSection(\'step3\')">Remap This Key Again</button>' +
-          '<button onclick="goToSection(\'connect\')">Finished</button>' +
+          '<button class="success" data-action="goToSection" data-section="step2">Remap Another Key</button>' +
+          '<button data-action="goToSection" data-section="step3">Remap This Key Again</button>' +
+          '<button data-action="goToSection" data-section="connect">Finished</button>' +
         '</div>' +
       '</div>';
     const layerNote = writeTargetLayerNote();
@@ -14082,6 +14082,56 @@ function initStep3Listboxes() {
   initSelectListbox('single-listbox', { onCommit: stage });
   initSelectListbox('media-listbox',  { onCommit: stage });
   initSelectListbox('system-listbox', { onCommit: stage });
+}
+
+// - Button actions and form controls -
+// A button names its action in data-action, and one click listener runs it, so
+// buttons added later (such as the remap result's) need no wiring. Actions that
+// take no argument are listed by function name.
+const withoutArguments = fns =>
+  Object.fromEntries(Object.entries(fns).map(([name, fn]) => [name, () => fn()]));
+
+const BUTTON_ACTIONS = {
+  ...withoutArguments({
+    applyRemap, attemptRemapKey, backupKeymap, cancelKeyWarning, cancelRemap,
+    cancelResetAll, cancelRestore, cancelStepEditor, cancelWriteTargetDialog,
+    changeKeyFromConfirm, chooseADifferentKey, closeChangedKeys, confirmKeyWarning,
+    confirmMacro, confirmResetAll, confirmShortcut, connectKeyboard,
+    disconnectFromUnsupported, disconnectKeyboard, executeResetAll, executeRestore,
+    getStartedFromWelcome, goToHelp, openChangedKeys, openWriteTargetDialog,
+    reportUnknownKeyboard, resetAllChanged, resetChoiceCancel, resetSelectedKeyToDefault,
+    restoreKeymapPrompt, saveStepEditor, saveWriteTargetDialog, selectDisableAction,
+    startDemoKeyboard, startDemoMode, startFreshMacro, toggleLighting,
+  }),
+  goToSection:         btn => goToSection(btn.dataset.section),
+  openWelcomeDialog:   btn => openWelcomeDialog(btn),
+  resetChoiceSelected: btn => resetChoiceSelected(btn.dataset.choice),
+  toggleKeyCapture:    () => (captureActive ? endKeyCapture() : startKeyCapture()),
+};
+
+function onButtonAction(ev) {
+  const btn = ev.target.closest('button[data-action]');
+  if (!btn) return;
+  const action = BUTTON_ACTIONS[btn.dataset.action];
+  if (!action) throw new Error(`No action named ${btn.dataset.action}`);
+  action(btn);
+}
+
+function bindFormControls() {
+  $('restore-file-input').addEventListener('change', restoreKeymapFileChosen);
+  $('use-fn-layer').addEventListener('change', onUseFnLayerChange);
+  for (const mod of ['ctrl', 'shift', 'alt', 'gui']) {
+    $(`mod-${mod}`).addEventListener('change', updateShortcutPreview);
+    $(`step-mod-${mod}`).addEventListener('change', updateStepKeyPreview);
+  }
+  $('text-speed').addEventListener('input', onTextSpeedInput);
+  $('step-text-input').addEventListener('input', onStepTextInput);
+  $('step-pause-input').addEventListener('input', onStepPauseInput);
+  const sliders = { 'lighting-brightness': 'brightness', 'lighting-speed': 'speed',
+                    'lighting-hue': 'hue', 'lighting-saturation': 'sat' };
+  for (const [id, control] of Object.entries(sliders)) {
+    $(id).addEventListener('input', ev => onLightingSliderInput(ev, control));
+  }
 }
 
 // - Initialise -
@@ -14168,6 +14218,8 @@ function initStep3Listboxes() {
   bindDialogCancel('wt-dialog',          cancelWriteTargetDialog);
 
   document.addEventListener('click', busyButtonClickGuard, true);
+  document.addEventListener('click', onButtonAction);
+  bindFormControls();
 
   showAppVersion();
   goToSection('connect');

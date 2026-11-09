@@ -3,19 +3,12 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright-core';
+import { REPO_ROOT as ROOT, FAKE_KEYCHRON, useEdge } from './edge.mjs';
 
-const here    = path.dirname(fileURLToPath(import.meta.url));
-const ROOT    = path.resolve(here, '../..');
-const FAKE    = path.join(here, 'fake-keychron.js');
-const PROFILE = path.join(tmpdir(), 'keyable-tests-profile-probe');
-
+const newPage = useEdge('probe', { initScripts: [{ path: FAKE_KEYCHRON }] });
 let server;
-let context;
 
 before(async () => {
   // The probe fetches the app's source, which a file:// page cannot do.
@@ -31,19 +24,12 @@ before(async () => {
     }
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  await rm(PROFILE, { recursive: true, force: true });
-  context = await chromium.launchPersistentContext(PROFILE, { channel: 'msedge', headless: true });
-  await context.addInitScript({ path: FAKE });
 });
 
-after(async () => {
-  await context?.close();
-  server?.close();
-  await rm(PROFILE, { recursive: true, force: true });
-});
+after(() => server?.close());
 
 test('the probe runs all four checks and reports what the simulator does', async () => {
-  const page = await context.newPage();
+  const page = await newPage();
   await page.goto(`http://127.0.0.1:${server.address().port}/DevTools/via-probe.html`);
   // The simulator seeds itself from the app's tables, which the probe page lacks.
   await page.evaluate(async () => {

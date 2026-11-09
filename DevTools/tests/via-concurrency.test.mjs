@@ -1,20 +1,16 @@
 // Checks that KeyAble reads and saves the right keycodes when requests to the keyboard
-// overlap, and when it reads whole layers from the keymap buffer. Runs the real app in headless Edge against the simulated keyboard in
-// fake-keychron.js. Run with `npm test` in DevTools.
-import { test, before, after } from 'node:test';
+// overlap, and when it reads whole layers from the keymap buffer. Runs the real app in
+// headless Edge against the simulated keyboard in fake-keychron.js. Run with `npm test`
+// in DevTools.
+// The page's own names, used inside page.evaluate:
+/* global KEYBOARD_DB, KEYCHRON_LAYOUTS, CMD_GET_KEY, activeLayout, changedKeysScan,
+   currentKeymap, decodeAction, keymapBufferState, lightingState, sendVIA, stepKeys */
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { chromium } from 'playwright-core';
+import { readFileSync } from 'node:fs';
+import { APP_URL, FAKE_KEYCHRON, useEdge } from './edge.mjs';
 
-const here    = path.dirname(fileURLToPath(import.meta.url));
-const APP_URL = pathToFileURL(path.resolve(here, '../../Project/KeyAble.html')).href;
-const FAKE    = path.join(here, 'fake-keychron.js');
-// Owned by this run and deleted in after(); the runner script deletes it too, in case
-// the process is killed.
-const PROFILE = path.join(tmpdir(), 'keyable-tests-profile');
+const newPage = useEdge('via', { initScripts: [{ path: FAKE_KEYCHRON }], acceptDownloads: true });
 
 const WIN_BASE = 2;
 const WIN_FN   = 3;
@@ -27,25 +23,10 @@ const REMAPS = [
   [WIN_FN,   'K', 0x0005],   // B
 ];
 
-let context;
-
-before(async () => {
-  rmSync(PROFILE, { recursive: true, force: true });
-  context = await chromium.launchPersistentContext(PROFILE, {
-    channel: 'msedge', headless: true, acceptDownloads: true,
-  });
-  await context.addInitScript({ path: FAKE });
-});
-
-after(async () => {
-  await context?.close();
-  rmSync(PROFILE, { recursive: true, force: true });
-});
-
 // A fresh page with the remaps applied and the keyboard connected. `bufferMode` is
 // how the simulated keyboard answers the keymap buffer command.
 async function connectedPage(bufferMode = 'normal') {
-  const page = await context.newPage();
+  const page = await newPage();
   await page.goto(APP_URL);
   await page.evaluate(mode => window.__fakeKeychron.setBufferMode(mode), bufferMode);
   await page.evaluate(remaps => {

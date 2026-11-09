@@ -1,39 +1,23 @@
 // Checks that demo mode runs the real flows against the simulated DemoKeyboard: the
 // model list, the layer roles, Review Changes, backup, factory reset and lighting.
 // Runs the real app in headless Edge. Run with `npm test` in DevTools.
-import { test, before, after } from 'node:test';
+// The page's own names, used inside page.evaluate:
+/* global KEYBOARD_DB, KEYCHRON_LAYOUTS, FACTORY_KEYMAPS, BUTTON_ACTIONS, DemoKeyboard,
+   activeLayerRoles, activeLayout, deviceLayerCount, executeResetAll, hidDevice,
+   inDemoMode, scanChangedKeys, writeKeyCodeOnLayer */
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { chromium } from 'playwright-core';
-
-const here    = path.dirname(fileURLToPath(import.meta.url));
-const APP_URL = pathToFileURL(path.resolve(here, '../../Project/KeyAble.html')).href;
-// Owned by this run and deleted in after(); the runner script deletes it too.
-const PROFILE = path.join(tmpdir(), 'keyable-tests-profile-demo');
+import { readFileSync } from 'node:fs';
+import { APP_URL, useEdge } from './edge.mjs';
 
 const V2_MAX_ANSI = 0x0920;   // a five-layer model, so its own role map matters
 
-let context;
-
-before(async () => {
-  rmSync(PROFILE, { recursive: true, force: true });
-  context = await chromium.launchPersistentContext(PROFILE, {
-    channel: 'msedge', headless: true, acceptDownloads: true,
-  });
-  // No first-run welcome dialog: it would make the page inert.
-  await context.addInitScript(() => { try { localStorage.setItem('keyable-v1', '1'); } catch (_) { /* blocked */ } });
-});
-
-after(async () => {
-  await context?.close();
-  rmSync(PROFILE, { recursive: true, force: true });
-});
+// No first-run welcome dialog: it would make the page inert.
+const skipWelcome = () => { try { localStorage.setItem('keyable-v1', '1'); } catch { /* blocked */ } };
+const newPage = useEdge('demo', { initScripts: [skipWelcome], acceptDownloads: true });
 
 async function demoPage(pid = V2_MAX_ANSI) {
-  const page = await context.newPage();
+  const page = await newPage();
   await page.goto(APP_URL);
   await page.getByRole('button', { name: 'Try KeyAble Without a Keyboard (Demo)' }).click();
   await page.locator(`#model-listbox [role="option"][data-value="${pid}"]`).click();
@@ -44,7 +28,7 @@ async function demoPage(pid = V2_MAX_ANSI) {
 }
 
 test('the demo list offers every model that has a layout, once each', async () => {
-  const page = await context.newPage();
+  const page = await newPage();
   await page.goto(APP_URL);
   const { offered, expected } = await page.evaluate(() => ({
     offered: Array.from(document.querySelectorAll('#model-listbox [role="option"]'), o => Number(o.dataset.value)).sort(),
@@ -52,6 +36,31 @@ test('the demo list offers every model that has a layout, once each', async () =
       .filter(([, e]) => KEYCHRON_LAYOUTS[e.layoutId]).map(([pid]) => Number(pid)).sort(),
   }));
   assert.deepEqual(offered, expected);
+  await page.close();
+});
+
+// Buttons wired by addEventListener in their own init code rather than by data-action.
+const SCRIPT_WIRED_BUTTONS = ['theme-toggle', 'btn-add-step', 'at-single', 'at-shortcut',
+  'at-media', 'at-system', 'at-text', 'at-disable'];
+
+test('every button has an action, and no element has an inline handler', async () => {
+  const page = await newPage();
+  await page.goto(APP_URL);
+  const problems = await page.evaluate(wired => {
+    const out = [];
+    for (const el of document.querySelectorAll('*')) {
+      for (const attr of el.getAttributeNames()) {
+        if (attr.startsWith('on')) out.push(`${el.id || el.tagName} has inline ${attr}`);
+      }
+    }
+    for (const btn of document.querySelectorAll('button')) {
+      const name = btn.dataset.action;
+      if (name && !(name in BUTTON_ACTIONS)) out.push(`${btn.id || btn.textContent.trim()}: no action ${name}`);
+      if (!name && !wired.includes(btn.id)) out.push(`${btn.id || btn.textContent.trim()}: no data-action`);
+    }
+    return out;
+  }, SCRIPT_WIRED_BUTTONS);
+  assert.deepEqual(problems, []);
   await page.close();
 });
 
@@ -71,8 +80,8 @@ test('a demo model uses its own factory data and layer roles', async () => {
 
 test('Review Changes in demo finds base and Fn changes, and factory reset clears them', async () => {
   const page = await demoPage();
+  await page.keyboard.press('Alt+2');   // Review Changes scans the Step 2 key list
   const rows = () => page.evaluate(async () => {
-    stepKeys = getStepKeys(activeLayout());
     const scan = await scanChangedKeys();
     return scan.rows.map(r => `${r.kind} ${r.key.label}: ${r.action}`).sort();
   });
@@ -87,7 +96,6 @@ test('Review Changes in demo finds base and Fn changes, and factory reset clears
   assert.deepEqual(await rows(), ['base B: Mute', 'fn K: B']);
 
   await page.evaluate(() => executeResetAll());
-  await page.locator('#reset-progress', { hasText: /reset|Reset/ }).waitFor();
   await page.waitForFunction(() => hidDevice.keymap.every((c, i) => c === new DemoKeyboard(hidDevice.productId).keymap[i]));
   assert.deepEqual(await rows(), [], 'factory reset restored every key');
   await page.close();
