@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KeyAble switch matrix probe</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 50rem; margin: 2rem auto; line-height: 1.5; }
+  button { font-size: 1rem; padding: 0.4rem 0.9rem; margin-right: 0.5rem; }
+  textarea { width: 100%; height: 20rem; font-family: Consolas, monospace; }
+</style>
+</head>
+<body>
+<main>
+<h1>Switch matrix probe</h1>
+<p>
+  Read-only diagnostic. Asks a connected keyboard which physical switches are pressed,
+  using VIA's "switch matrix state" value, and never writes to the keyboard.
+  Close KeyAble first, so only this page talks to the keyboard.
+</p>
+<p>
+  After connecting, press keys one at a time. Each switch that goes down or up is spoken
+  by its row and column. Keys do not need to reach this page: the keyboard reports them
+  whichever window has focus.
+</p>
+<p>
+  <button id="connect" type="button">Connect keyboard</button>
+  <button id="stop" type="button" disabled>Stop</button>
+  <button id="save" type="button">Save log</button>
+</p>
+<div id="status" role="status" aria-live="polite"></div>
+<h2>Log</h2>
+<label for="log">Probe log</label>
+<textarea id="log" readonly></textarea>
+</main>
+<script>
+'use strict';
+
+// VIA protocol constants (QMK quantum/via.h; Keychron ZMK launcher.h uses the same values).
+const REPORT_LEN = 32;
+const CMD_GET_PROTOCOL = 0x01;
+const CMD_GET_KEYBOARD_VALUE = 0x02;
+const ID_SWITCH_MATRIX_STATE = 0x03;
+const VIA_UNHANDLED = 0xFF;
+const POLL_GAP_MS = 15;
+
+// Matrix size of the boards this probe was written for. The reply packs each row into
+// ceil(cols / 8) bytes, most significant first, starting at byte 3 of the report
+// (byte 2 echoes the row offset).
+const MATRIX = {
+  0x0762: { name: 'B6 Pro ISO', rows: 8, cols: 18 },
+  0x0951: { name: 'V5 Max ISO Knob', rows: 6, cols: 19 },
+  0x0961: { name: 'V6 Max ISO Knob', rows: 6, cols: 21 },
+};
+
+const $ = id => document.getElementById(id);
+let device = null;
+let running = false;
+
+function log(line) {
+  $('log').value += line + '\n';
+  $('log').scrollTop = $('log').scrollHeight;
+}
+function say(text) {
+  $('status').textContent = text;
+  log(text);
+}
+const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join(' ');
+
+// Sends one request and resolves with the first reply whose leading bytes match it,
+// VIA's "unhandled" reply, or null after the timeout.
+function request(bytes, echo, timeoutMs = 500) {
+  return new Promise(resolve => {
+    const buf = new Uint8Array(REPORT_LEN);
+    bytes.forEach((b, i) => { buf[i] = b; });
+    const finish = value => {
+      clearTimeout(timer);
+      device.removeEventListener('inputreport', onReport);
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    function onReport(ev) {
+      const reply = new Uint8Array(ev.data.buffer);
+      if (reply[0] === VIA_UNHANDLED || buf.subarray(0, echo).every((b, i) => reply[i] === b)) finish(reply);
+    }
+    device.addEventListener('inputreport', onReport);
+    device.sendReport(0x00, buf).catch(err => { log('Send failed: ' + err.message); finish(null); });
+  });
+}
+
+function pressedSwitches(reply, matrix) {
+  const bytesPerRow = Math.ceil(matrix.cols / 8);
+  const down = [];
+  for (let row = 0; row < matrix.rows; row++) {
+    let value = 0;
+    for (let b = 0; b < bytesPerRow; b++) value = value * 256 + reply[3 + row * bytesPerRow + b];
+    for (let col = 0; col < matrix.cols; col++) {
+      if (Math.floor(value / 2 ** col) % 2) down.push(`row ${row}, column ${col}`);
+    }
+  }
+  return down;
+}
+
+async function connect() {
+  const found = await navigator.hid.requestDevice({ filters: [{ usagePage: 0xff60, usage: 0x61 }] });
+  if (!found.length) { say('No keyboard chosen.'); return; }
+  device = found[0];
+  if (!device.opened) await device.open();
+  const pid = device.productId;
+  const matrix = MATRIX[pid];
+  log(`Device: ${device.productName}, vendor 0x${device.vendorId.toString(16)}, product 0x${pid.toString(16).padStart(4, '0')}`);
+
+  const proto = await request([CMD_GET_PROTOCOL], 1);
+  log(proto ? `Protocol reply: ${hex(proto.subarray(0, 4))}, version ${(proto[1] << 8) | proto[2]}` : 'Protocol: no reply');
+
+  const first = await request([CMD_GET_KEYBOARD_VALUE, ID_SWITCH_MATRIX_STATE, 0], 2);
+  if (!first) { say('No reply to the switch matrix request. The firmware does not answer it.'); return; }
+  log('First matrix reply: ' + hex(first));
+  if (first[0] === VIA_UNHANDLED) { say('The keyboard replied "unhandled": its firmware does not support switch matrix state.'); return; }
+  if (!matrix) { say(`Matrix size unknown for this product. Raw replies only.`); }
+  else say(`Connected to ${matrix.name}. Switch matrix state answered. Press keys one at a time.`);
+
+  running = true;
+  $('connect').disabled = true;
+  $('stop').disabled = false;
+  let previous = new Set(matrix ? pressedSwitches(first, matrix) : []);
+  let previousRaw = hex(first);
+  let polls = 0;
+  const started = performance.now();
+  while (running) {
+    const reply = await request([CMD_GET_KEYBOARD_VALUE, ID_SWITCH_MATRIX_STATE, 0], 2);
+    polls++;
+    if (!reply) { log('Poll timed out'); continue; }
+    const raw = hex(reply);
+    if (raw !== previousRaw) { log('Raw: ' + raw); previousRaw = raw; }
+    if (matrix) {
+      const now = new Set(pressedSwitches(reply, matrix));
+      for (const s of now) if (!previous.has(s)) say('Down: ' + s);
+      for (const s of previous) if (!now.has(s)) log('Up: ' + s);
+      previous = now;
+    }
+    await new Promise(r => setTimeout(r, POLL_GAP_MS));
+  }
+  const seconds = (performance.now() - started) / 1000;
+  log(`Stopped. ${polls} polls in ${seconds.toFixed(1)} seconds, ${(seconds * 1000 / polls).toFixed(1)} milliseconds each.`);
+}
+
+$('connect').addEventListener('click', () => connect().catch(err => say('Error: ' + err.message)));
+$('stop').addEventListener('click', () => {
+  running = false;
+  $('stop').disabled = true;
+  $('connect').disabled = false;
+  say('Stopped.');
+});
+$('save').addEventListener('click', () => {
+  const pid = device ? device.productId.toString(16).padStart(4, '0') : 'none';
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([$('log').value], { type: 'text/plain' }));
+  link.download = `matrix-probe-${pid}.txt`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  say(`Saved as matrix-probe-${pid}.txt in your Downloads folder.`);
+});
+window.addEventListener('pagehide', () => { running = false; if (device && device.opened) device.close(); });
+</script>
+</body>
+</html>
