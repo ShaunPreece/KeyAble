@@ -23,7 +23,7 @@
 // A board whose source cannot be read stops the build, and nothing is written.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { APP, appTables, firmwareSource } from './keyboard-sources.mjs';
+import { APP, appTables, firmwareSource, hex } from './keyboard-sources.mjs';
 import { shippedEntries } from './firmware-binaries.mjs';
 import { zmkEntries } from './zmk-firmware.mjs';
 
@@ -32,7 +32,6 @@ const { factoryKeymap } = require('./factory-keymap-source.js');
 
 const BEGIN = '// BEGIN GENERATED FACTORY_KEYMAPS\n';
 const END   = '// END GENERATED FACTORY_KEYMAPS\n';
-const hex = n => '0x' + n.toString(16).toUpperCase().padStart(4, '0');
 
 // Boards whose own source keymap has the wrong key positions, by product ID: the board
 // whose source gives the right ones. Their codes must come from their own binary, since

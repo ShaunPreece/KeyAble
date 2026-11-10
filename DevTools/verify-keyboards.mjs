@@ -13,7 +13,7 @@
 // Exit code 1 when any keyboard with a layout is not VERIFIED or FIRMWARE ONLY and is
 // not in KNOWN with the verdict it has, or when two matching boards name a key
 // differently.
-import { appTables, firmwareBoard, viaBoards, compareViaWithFirmware, keyNaming, unreadableFiles } from './keyboard-sources.mjs';
+import { appTables, firmwareBoard, viaBoards, compareViaWithFirmware, keyNaming, unreadableFiles, hex } from './keyboard-sources.mjs';
 
 // Boards whose verdict is understood and accepted, by product ID. A board here that
 // gets any other verdict fails the run, so the entry is revisited.
@@ -27,7 +27,6 @@ const DETAILS = process.argv.includes('--details');
 const tables = appTables();
 const { KEYCHRON_LAYOUTS, KEYBOARD_DB, FACTORY_KEYMAPS } = tables;
 const { nameOf, conflicts } = keyNaming(tables);
-const hex = n => '0x' + n.toString(16).toUpperCase().padStart(4, '0');
 
 function layoutProblems(layout, board) {
   const problems = [];

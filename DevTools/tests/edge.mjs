@@ -14,16 +14,22 @@ export const REPO_ROOT     = path.resolve(here, '../..');
 export const APP_URL       = pathToFileURL(path.join(REPO_ROOT, 'Project/KeyAble.html')).href;
 export const FAKE_KEYCHRON = path.join(here, 'fake-keychron.js');
 
+// The welcome dialog makes the rest of the page inert. The key is the app's
+// first-run setting.
+const skipWelcome = () => { try { localStorage.setItem('keyable-v1', '1'); } catch { /* storage blocked */ } };
+
 // Returns a function that opens a new page in this file's Edge, launching it on first
 // use. A launch in a before() hook is not enough: node:test does not wait for one
 // top-level before() hook to finish before running the next.
-// `initScripts` are Playwright init scripts, run in every page before the app loads.
+// `initScripts` are Playwright init scripts, run in every page before the app loads,
+// after the one that skips the first-run welcome dialog.
 export function useEdge(name, { initScripts = [], acceptDownloads = false } = {}) {
   const profile = path.join(tmpdir(), `keyable-tests-profile-${name}`);
   let launching = null;
   const launch = async () => {
     rmSync(profile, { recursive: true, force: true });
     const context = await chromium.launchPersistentContext(profile, { channel: 'msedge', headless: true, acceptDownloads });
+    await context.addInitScript(skipWelcome);
     for (const script of initScripts) await context.addInitScript(script);
     return context;
   };

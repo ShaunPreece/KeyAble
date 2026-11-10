@@ -12,14 +12,13 @@
 //   node DevTools/layout-from-firmware.mjs relabel <layoutId> <pid>
 //     prints, as JSON lines, the name changes for an existing entry whose positions are
 //     already right; it keeps the entry's key order, so backups made with it stay valid
-import { appTables, firmwareBoard, viaBoards, compareViaWithFirmware, keyNaming, unreadableFiles } from './keyboard-sources.mjs';
+import { appTables, firmwareBoard, viaBoards, compareViaWithFirmware, keyNaming, unreadableFiles, hex } from './keyboard-sources.mjs';
 
 const tables = appTables();
 const { KEYCHRON_LAYOUTS, KEYBOARD_DB } = tables;
 const { nameOf, conflicts } = keyNaming(tables);
 
 function die(msg) { console.error(`ERROR: ${msg}`); process.exit(1); }
-const hex = n => '0x' + n.toString(16).toUpperCase().padStart(4, '0');
 if (conflicts.length) die(`matching boards name a key differently: ${conflicts.join('; ')}`);
 
 // The skipped files, for a message about a board or VIA definition that was not found.

@@ -19,15 +19,14 @@
 //   node DevTools/firmware-binaries.mjs check [--details]
 //     compares FACTORY_KEYMAPS with the newest binary for each PID
 // build-factory-dataset.mjs lays the shipped codes over the source ones (shippedEntries).
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { ROOT, appTables, firmwareBoard } from './keyboard-sources.mjs';
+import { ROOT, appTables, firmwareBoard, hex } from './keyboard-sources.mjs';
+import { downloadLinkedFiles, versionNewer, runAsCommand } from './firmware-files.mjs';
 
 const BIN_DIR  = path.join(ROOT, 'ProjectAssets', 'keychron-firmware-bin');
 const MANIFEST = path.join(BIN_DIR, 'manifest.json');
 const KEYCHRON_VID = 0x3434;
-const hex = n => '0x' + n.toString(16).toUpperCase().padStart(4, '0');
 
 // The flash image an Intel HEX file describes, from its lowest address, with gaps 0xFF
 // (erased flash). Records are ":" length, address, type, data, checksum; type 00 is data,
@@ -78,31 +77,13 @@ function versionKey(file) {
   const m = /_v(\d+(?:\.\d+)*)(?:_(\d+))?\.(?:bin|hex)$/i.exec(file);
   return m ? [...m[1].split('.').map(Number), Number(m[2] || 0)] : [];
 }
-const newer = (a, b) => {
-  const x = versionKey(a), y = versionKey(b);
-  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
-  return false;
-};
+const newer = (a, b) => versionNewer(versionKey(a), versionKey(b));
 
 async function fetchPages(urls) {
-  mkdirSync(BIN_DIR, { recursive: true });
   const manifest = existsSync(MANIFEST) ? JSON.parse(readFileSync(MANIFEST, 'utf8')) : {};
-  for (const page of urls) {
-    const html = await (await fetch(page)).text();
-    const links = [...new Set(html.match(/https?:\/\/[^"'\s<>]+?\.(?:bin|hex)(?:\?[^"'\s<>]*)?/gi) || [])]
-      .map(u => u.replace(/&amp;/g, '&'));
-    console.log(`${page}: ${links.length} firmware files`);
-    for (const url of links) {
-      const file = decodeURIComponent(new URL(url).pathname.split('/').pop());
-      const dest = path.join(BIN_DIR, file);
-      if (!existsSync(dest)) {
-        const res = await fetch(url);
-        if (!res.ok) { console.log(`  FAILED ${res.status} ${file}`); continue; }
-        writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
-      }
-      manifest[file] = { url, page, pids: descriptorPids(readFirmware(file)).map(hex) };
-    }
-  }
+  await downloadLinkedFiles(urls, BIN_DIR, ['bin', 'hex'], (file, url, page) => {
+    manifest[file] = { url, page, pids: descriptorPids(readFirmware(file)).map(hex) };
+  });
   writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2) + '\n');
 }
 
@@ -144,8 +125,9 @@ function newestBinaries() {
 }
 
 // One board's factory keymap as shipped: { file, layers } with layers[l]["row,col"] for
-// every position in FACTORY_KEYMAPS, plus `diffs` against it and `extra`, the matrix
-// positions outside our layout that hold a key in the binary. Or { error }.
+// every position in FACTORY_KEYMAPS, plus `diffs` against it, `extra`, the matrix
+// positions outside our layout that hold a key in the binary, and `knobMatches`, whether
+// the binary holds our knob map. Or { error }.
 function shipped(pid, fk, file) {
   const board = firmwareBoard(pid);
   if (!board.matrixSize) return { error: 'NO MATRIX SIZE' };
@@ -175,12 +157,11 @@ function shipped(pid, fk, file) {
     return out;
   });
   const enc = fk.encoders.flatMap(e => e.flatMap(x => [x.cw, x.ccw]));
-  if (enc.length) {
-    const needle = Buffer.alloc(enc.length * 2);
-    enc.forEach((v, i) => needle.writeUInt16LE(v, i * 2));
-    if (bin.indexOf(needle) < 0) diffs.push('knob map not found as ours');
-  }
-  return { file, layers, diffs, extra };
+  const needle = Buffer.alloc(enc.length * 2);
+  enc.forEach((v, i) => needle.writeUInt16LE(v, i * 2));
+  const knobMatches = !enc.length || bin.indexOf(needle) >= 0;
+  if (!knobMatches) diffs.push('knob map not found as ours');
+  return { file, layers, diffs, extra, knobMatches };
 }
 
 // Calls each(pid, label, shipped) for every board in `factoryKeymaps` that has a layout.
@@ -211,12 +192,17 @@ function check(details) {
 // The shipped layers for each board in `factoryKeymaps` that has a binary, as a Map of
 // pid to { file, layers }. Positions, roles and knob maps stay as the source gives them,
 // so a board whose knob map differs, or whose binary holds keys outside our layout, is
-// left out and reported for a person to look at.
+// left out and reported for a person to look at. So is a board whose binary could not be
+// read: its codes then come from the source, which the binary exists to correct.
 export function shippedEntries(factoryKeymaps) {
   const out = new Map();
   boardsWithBinaries(factoryKeymaps, (pid, label, s) => {
-    if (s.error) return;
-    if (s.extra.length || s.diffs.includes('knob map not found as ours')) {
+    if (s.error === 'NO BINARY') return;
+    if (s.error) {
+      console.log(`NOT FROM BINARY ${label}: ${s.error}`);
+      return;
+    }
+    if (s.extra.length || !s.knobMatches) {
       console.log(`NOT FROM BINARY ${label}: needs a look (firmware-binaries.mjs check --details)`);
       return;
     }
@@ -226,8 +212,9 @@ export function shippedEntries(factoryKeymaps) {
 }
 
 // Run as a command only, so other scripts can import from it.
-const [mode, ...args] = process.argv.slice(2);
-if (!process.argv[1] || import.meta.url !== pathToFileURL(process.argv[1]).href) { /* imported */ }
-else if (mode === 'fetch' && args.length) await fetchPages(args);
-else if (mode === 'check') check(args.includes('--details'));
-else { console.error('usage: fetch <page url> [...] | check [--details]'); process.exit(1); }
+if (runAsCommand(import.meta.url)) {
+  const [mode, ...args] = process.argv.slice(2);
+  if (mode === 'fetch' && args.length) await fetchPages(args);
+  else if (mode === 'check') check(args.includes('--details'));
+  else { console.error('usage: fetch <page url> [...] | check [--details]'); process.exit(1); }
+}

@@ -31,6 +31,9 @@ export const ROOT = path.resolve(here, '..');
 export const FW   = path.join(ROOT, 'ProjectAssets', 'keychron-firmware-src');
 export const APP  = path.join(ROOT, 'Project', 'KeyAble.html');
 
+// A keycode or USB ID as 0x and four upper-case hex digits.
+export const hex = n => '0x' + n.toString(16).toUpperCase().padStart(4, '0');
+
 // ---- The app's tables, read from its source without running it ----
 export function appTables(html = readFileSync(APP, 'utf8')) {
   const grab = name => {

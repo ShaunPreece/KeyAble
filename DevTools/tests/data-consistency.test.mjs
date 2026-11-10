@@ -7,10 +7,10 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { APP_URL, useEdge } from './edge.mjs';
-import { ROOT, appTables } from '../keyboard-sources.mjs';
+import { ROOT, appTables, hex } from '../keyboard-sources.mjs';
+import { versionNewer } from '../firmware-files.mjs';
 
 const newPage = useEdge('data');
-const hex4 = n => '0x' + n.toString(16).toUpperCase().padStart(4, '0');
 
 // Every model with both a layout and factory data: its name, layoutId, layout keys and
 // Windows base layer, plus the app's label and keycode maps.
@@ -66,7 +66,7 @@ test('every standard key in a layout holds its own keycode in the factory data',
       // HID gives the ISO # key two codes, Backslash (0x31) and Non-US Hash (0x32), and the
       // K2 Pro and K6 Pro ISO firmware sends 0x31 from it.
       if (k.label === 'Non-US Hash' && actual === 0x0031) continue;
-      wrong.push(`${k.label} (${k.row},${k.col}) holds ${codeToLabel[actual] ?? hex4(actual)}`);
+      wrong.push(`${k.label} (${k.row},${k.col}) holds ${codeToLabel[actual] ?? hex(actual)}`);
     }
     if (wrong.length) problems.push(`${board.name}: ${wrong.join(', ')}`);
   }
@@ -84,14 +84,7 @@ test('every key moved since the last release is listed in keysMovedIn', () => {
   const released = appTables(execFileSync('git', ['show', `${tag}:Project/KeyAble.html`],
     { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })).KEYCHRON_LAYOUTS;
   const parts = v => v.replace(/^v/, '').split('.').map(Number);
-  const later = version => {
-    const a = parts(version);
-    const b = parts(tag);
-    for (let i = 0; i < Math.max(a.length, b.length); i++) {
-      if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0);
-    }
-    return false;
-  };
+  const later = version => versionNewer(parts(version), parts(tag));
   const current = appTables().KEYCHRON_LAYOUTS;
   const problems = [];
   for (const [id, layout] of Object.entries(current)) {

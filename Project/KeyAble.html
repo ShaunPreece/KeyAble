@@ -1777,9 +1777,10 @@
 
         <h4 style="margin-top:1rem">Which keyboards does KeyAble work with?</h4>
         <p>
-          19 Keychron models across the Q, V, K, and B series, in ANSI and ISO layouts (the S1
-          is ANSI only and the B6 Pro ISO only; JIS is not supported yet). Supported Keyboards has the full list. We have fully tested the V5 Max, V6 Max, Q6 Max, and B6 Pro on real
-          hardware; the others are built from Keychron's firmware data and should work.
+          Keychron keyboards in ANSI and ISO layouts; Japanese JIS layouts are not supported
+          yet. Supported Keyboards has the full list of models. We have fully tested the V5 Max,
+          V6 Max, Q6 Max, and B6 Pro on real hardware; the others are built from Keychron's
+          firmware data and should work.
         </p>
 
         <h4 style="margin-top:1.25rem">Does KeyAble work with HE or Ultra 8K keyboards?</h4>
@@ -8151,10 +8152,11 @@ const CMD_MACRO_SET_BUFFER      = 0x0F;   // args: [offset_hi, offset_lo, size, 
 // that is what tells Command and Option apart from Win and Alt on the same physical
 // keys. Each family's order is its firmware enum (protocol 12: keychron_common.h).
 // Keys past the last named one shift with build options, so they are not named.
+const VIA_PROTOCOL_9  = 0x0009;
 const VIA_PROTOCOL_11 = 0x000B;
 const VIA_PROTOCOL_12 = 0x000C;
 const KEYCODES_PROTOCOL_9 = {
-  macroBase: 0x5F12, macroSlots: 16,
+  macroBase: 0x5F12, macroKeycodeCount: 16,
   missionControl: 0x5F84, launchpad: 0x5F85,
   keychronNames: {
     0x5F80: 'Left Option', 0x5F81: 'Right Option', 0x5F82: 'Left Command', 0x5F83: 'Right Command',
@@ -8163,7 +8165,7 @@ const KEYCODES_PROTOCOL_9 = {
   },
 };
 const KEYCODES_PROTOCOL_11 = {
-  macroBase: 0x7700, macroSlots: 32,
+  macroBase: 0x7700, macroKeycodeCount: 32,
   missionControl: 0x7F00, launchpad: 0x7F01,
   keychronNames: {
     0x7F00: 'Mission Control', 0x7F01: 'Launchpad', 0x7F02: 'Left Option', 0x7F03: 'Right Option',
@@ -8172,7 +8174,7 @@ const KEYCODES_PROTOCOL_11 = {
   },
 };
 const KEYCODES_PROTOCOL_12 = {
-  macroBase: 0x7700, macroSlots: 32,
+  macroBase: 0x7700, macroKeycodeCount: 32,
   missionControl: 0x00C1, launchpad: 0x00C2,
   keychronNames: {
     0x7E00: 'Left Option', 0x7E01: 'Right Option', 0x7E02: 'Left Command', 0x7E03: 'Right Command',
@@ -8181,7 +8183,7 @@ const KEYCODES_PROTOCOL_12 = {
   },
 };
 const KEYCODES_ZMK = {
-  macroBase: 0x7700, macroSlots: 16,
+  macroBase: 0x7700, macroKeycodeCount: 16,
   missionControl: 0x00C1, launchpad: 0x00C2,
   keychronNames: {
     0x7E00: 'Bluetooth 1', 0x7E01: 'Bluetooth 2', 0x7E02: 'Bluetooth 3', 0x7E03: 'Bootloader',
@@ -11036,7 +11038,7 @@ function resetChoiceCancel() {
 // dataset-backed detection (decodeAction) and reset machinery (performKeyReset)
 // as the Step 2 key reset. Scope is the current OS view only (mac OR windows),
 // matching the rest of the app; flip the OS to audit the other layout.
-let changedKeysScan = null;   // { rows:[{idx,key,kind,action}], baseLayer, fnLayer, view }
+let changedKeysScan = null;   // { rows:[{idx,key,kind,action}], baseLayer, fnLayer, view, failed? }
 // Pause after opening the changed-keys dialog so its "Checking..." announcement
 // is heard before the scan result replaces it (screen readers have no
 // "speech finished" event to sequence against).
@@ -11077,7 +11079,8 @@ async function openChangedKeys() {
 }
 
 // Read the current view's base and Fn layers and collect every key that differs
-// from its factory default.
+// from its factory default. `failed` is set when either layer could not be read,
+// because an unread layer would otherwise list as having no changes.
 async function scanChangedKeys() {
   const view      = currentViewOS();               // 'mac' | 'windows'
   const R         = activeLayerRoles();
@@ -11087,15 +11090,16 @@ async function scanChangedKeys() {
 
   const keys      = stepKeys;
   const baseCodes = await readLayerKeys(baseLayer, keys);
-  const fnCodes   = await readLayerKeys(fnLayer, keys);
+  const fnCodes   = baseCodes && await readLayerKeys(fnLayer, keys);
+  if (!baseCodes || !fnCodes) return { failed: true, rows, baseLayer, fnLayer, view };
   keys.forEach((key, idx) => {
     if (key.label === 'Fn' || key.label === 'Fn2') return;
-    const baseCode = baseCodes ? baseCodes[idx] : null;
+    const baseCode = baseCodes[idx];
     if (baseCode !== null) {
       const a = decodeAction(baseCode, key, baseLayer, false);
       if (a !== 'Default') rows.push({ idx, key, kind: 'base', action: a });
     }
-    const fnCode = fnCodes ? fnCodes[idx] : null;
+    const fnCode = fnCodes[idx];
     if (fnCode !== null) {
       const a = decodeAction(fnCode, key, fnLayer, true);
       if (a !== 'Default') rows.push({ idx, key, kind: 'fn', action: a });
@@ -11123,6 +11127,12 @@ function renderChangedKeys(scan) {
 
   // The heading carries the result summary and is the dialog's autofocus target,
   // so on open the screen reader reads it exactly once.
+  if (scan.failed) {
+    heading.textContent = 'Could not read your keyboard. Check the cable and try again.';
+    btnAll.hidden       = true;
+    playChirp(false);
+    return;
+  }
   if (!scan.rows.length) {
     heading.textContent = `No changes on your ${viewName} layout. Every key is at its factory default action.`;
     btnAll.hidden       = true;
@@ -11660,7 +11670,7 @@ const DEMO_MACRO_BYTES = 1024;
 const DEMO_SWITCH_HOLD_MS = 50;
 // Each demo model answers the protocol whose Keychron keys its factory keymap holds,
 // so it uses the same keycode numbering and lighting commands as the real board.
-const DEMO_PROTOCOLS = [[0x0009, KEYCODES_PROTOCOL_9], [VIA_PROTOCOL_11, KEYCODES_PROTOCOL_11]];
+const DEMO_PROTOCOLS = [[VIA_PROTOCOL_9, KEYCODES_PROTOCOL_9], [VIA_PROTOCOL_11, KEYCODES_PROTOCOL_11]];
 function demoProtocolVersion(factory) {
   const codes = new Set(factory ? factory.layers.flatMap(Object.values) : []);
   for (const [version, numbering] of DEMO_PROTOCOLS) {
@@ -13349,8 +13359,8 @@ let macroSlots      = [];   // array of Uint8Array, one per slot, NOT including 
 let macroEditSlot   = -1;   // which slot we're editing (reuse or first free)
 
 function isMacroKeycode(code) {
-  const { macroBase, macroSlots } = deviceKeycodes;
-  return code >= macroBase && code < macroBase + macroSlots;
+  const { macroBase, macroKeycodeCount } = deviceKeycodes;
+  return code >= macroBase && code < macroBase + macroKeycodeCount;
 }
 
 function macroIndexFromKeycode(code) {
@@ -13364,7 +13374,7 @@ function macroKeycode(slot) {
 // Slots a key can run. The buffer can hold more macros than the keyboard has macro
 // keycodes for (older firmware has 16), and a slot with no keycode is unreachable.
 function usableMacroSlots() {
-  return Math.min(macroSlotCount, deviceKeycodes.macroSlots);
+  return Math.min(macroSlotCount, deviceKeycodes.macroKeycodeCount);
 }
 
 // The keyboard's macro slot count and buffer size in bytes, or null when the
@@ -14394,7 +14404,11 @@ async function loadTextPanel() {
   let slot = -1;
   if (selectedKey && selectedKey.row !== undefined && selectedKey.col !== undefined) {
     const code = await readKeyCodeOnLayer(writeTargetLayers()[0], selectedKey);
-    if (code !== null && isMacroKeycode(code)) slot = macroIndexFromKeycode(code);
+    // Macro keycodes can name more macros than the keyboard has slots; a key set to
+    // one past the last slot is treated as having no macro.
+    if (code !== null && isMacroKeycode(code) && macroIndexFromKeycode(code) < usableMacroSlots()) {
+      slot = macroIndexFromKeycode(code);
+    }
   }
   if (slot < 0) slot = findFirstEmptyMacroSlot();
   if (slot < 0) {
@@ -15247,7 +15261,7 @@ function onButtonAction(ev) {
 function bindFormControls() {
   $('restore-file-input').addEventListener('change', restoreKeymapFileChosen);
   $('use-fn-layer').addEventListener('change', onUseFnLayerChange);
-  for (const mod of ['ctrl', 'shift', 'alt', 'gui']) {
+  for (const mod of MOD_KINDS) {
     $(`mod-${mod}`).addEventListener('change', updateShortcutPreview);
     $(`step-mod-${mod}`).addEventListener('change', updateStepKeyPreview);
   }

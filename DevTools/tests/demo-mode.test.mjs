@@ -4,7 +4,7 @@
 // The page's own names, used inside page.evaluate:
 /* global KEYBOARD_DB, KEYCHRON_LAYOUTS, FACTORY_KEYMAPS, BUTTON_ACTIONS, DemoKeyboard,
    activeLayerRoles, activeLayout, deviceLayerCount, executeResetAll, hidDevice:writable,
-   sendVIA, CMD_GET_PROTOCOL,
+   sendVIA, CMD_GET_PROTOCOL, CMD_GET_KEY, CMD_KEYMAP_GET_BUFFER, VIA_UNHANDLED,
    inDemoMode, scanChangedKeys, captureSession, writeKeyCodeOnLayer, restoreKeymapFileChosen,
    macroKeycode, offeredSystemKeys, codeName, LIST_STEP_TYPES, writeTarget:writable */
 import { test } from 'node:test';
@@ -20,9 +20,7 @@ const V1_ANSI = 0x0310;       // protocol 11 firmware: Keychron keys from 0x7F00
 const Q1_V1_ANSI = 0x0100;    // AVR firmware, read from its .hex file: protocol 11 numbering
 const B6_PRO_ISO = 0x0762;    // ZMK firmware: protocol 12, but its own list of Keychron keys
 
-// No first-run welcome dialog: it would make the page inert.
-const skipWelcome = () => { try { localStorage.setItem('keyable-v1', '1'); } catch { /* blocked */ } };
-const newPage = useEdge('demo', { initScripts: [skipWelcome], acceptDownloads: true });
+const newPage = useEdge('demo', { acceptDownloads: true });
 
 async function demoPage(pid = V2_MAX_ANSI) {
   const page = await newPage();
@@ -149,6 +147,40 @@ test('Review Changes in demo finds base and Fn changes, and factory reset clears
   await page.evaluate(() => executeResetAll());
   await page.waitForFunction(() => hidDevice.keymap.every((c, i) => c === new DemoKeyboard(hidDevice.productId).keymap[i]));
   assert.deepEqual(await rows(), [], 'factory reset restored every key');
+  await page.close();
+});
+
+test('Review Changes says the keyboard could not be read when a layer read fails', async () => {
+  const page = await demoPage();
+  await page.evaluate(() => {
+    const answer = hidDevice.answer.bind(hidDevice);
+    hidDevice.answer = d => {   // every keymap read unhandled, as from firmware that stopped answering
+      if (d[0] === CMD_GET_KEY || d[0] === CMD_KEYMAP_GET_BUFFER) { d[0] = VIA_UNHANDLED; return d; }
+      return answer(d);
+    };
+  });
+  await page.locator('#btn-changed-keys').click();
+  await page.locator('#changed-keys-heading', { hasText: 'Could not read your keyboard.' }).waitFor({ timeout: 15000 });
+  assert.equal(await page.locator('#btn-changed-reset-all').isVisible(), false);
+  await page.close();
+});
+
+test('the Macro tab opens for a key set to a macro past the keyboard\'s slots', async () => {
+  const page = await demoPage();
+  const errors = [];
+  page.on('pageerror', err => errors.push(err.message));
+  await page.evaluate(async () => {
+    const key = activeLayout().keys.find(k => k.label === 'H');
+    const R = activeLayerRoles();
+    for (const layer of [R.win, R.mac]) await writeKeyCodeOnLayer(layer, key, macroKeycode(20));   // macro 21; the demo has 16 slots
+  });
+  await startCapture(page);
+  await page.keyboard.press('KeyH');
+  await page.locator('#h-key-selected', { hasText: 'H' }).waitFor();
+  await page.locator('#btn-remap-key').click();
+  await page.locator('#at-text').click();
+  await page.locator('#text-slot-info', { hasText: 'Using macro slot 1 of 16' }).waitFor();
+  assert.deepEqual(errors, []);
   await page.close();
 });
 

@@ -20,17 +20,16 @@
 //   node DevTools/zmk-firmware.mjs show <uf2 file>
 //     prints the decoded keymap, layer by layer, by matrix position
 // build-factory-dataset.mjs takes these boards' entries from zmkEntries.
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { ROOT, appTables } from './keyboard-sources.mjs';
+import { ROOT, appTables, hex } from './keyboard-sources.mjs';
+import { downloadLinkedFiles, versionNewer, runAsCommand } from './firmware-files.mjs';
 
 const BIN_DIR = path.join(ROOT, 'ProjectAssets', 'keychron-firmware-bin', 'zmk');
 const SRC     = path.join(ROOT, 'ProjectAssets', 'keychron-firmware-src', 'keychron-zmk', 'app');
 const LAUNCHER = path.join(SRC, 'src', 'launcher');
 const SHIELDS  = path.join(SRC, 'boards', 'shields', 'keychron');
 const KEYCHRON_VID = 0x3434;
-const hex = n => '0x' + n.toString(16).toUpperCase().padStart(4, '0');
 
 // The overlay holding each board's matrix transform, by USB product ID. The firmware file
 // names say which shield a build is (zmk_b6pro_uk_..., zmk_b6pro25_uk_... = b6n).
@@ -89,14 +88,18 @@ function enumValues(text, known = {}) {
 }
 
 // "case A: return B;" pairs in the named function of map_keycode.c, resolved to numbers.
-function returnTable(source, fnName, values) {
+// Throws when the function is missing or has no cases: an empty table would turn every
+// key it covers into "no action".
+export function returnTable(source, fnName, values) {
   const start = source.indexOf(`uint16_t ${fnName}(`);
+  if (start < 0) throw new Error(`${fnName} not found in map_keycode.c`);
   const body = source.slice(start, source.indexOf('\n}', start));
   const table = new Map();
   for (const m of body.matchAll(/case\s+(\w+):\s*return\s+(\w+);/g)) {
     if (!(m[1] in values) || !(m[2] in values)) throw new Error(`${fnName}: unknown name ${m[1]} or ${m[2]}`);
     table.set(values[m[1]], values[m[2]]);
   }
+  if (!table.size) throw new Error(`${fnName} in map_keycode.c has no "case A: return B;" entries`);
   return table;
 }
 
@@ -192,7 +195,9 @@ function viaCode(name, p1, p2, T) {
 // mod_to_via: ZMK's 8 modifier bits (left four, then right four) to QMK's 5-bit form.
 function modToVia(mods) {
   const left = mods & 0x0F, right = mods >> 4;
-  return left ? left : right ? 0x10 | right : mods;
+  if (left) return left;
+  if (right) return 0x10 | right;
+  return 0;
 }
 
 // ---- Finding the keymap in the image ----
@@ -277,28 +282,7 @@ export function decodeFirmware(file, T = keychronTables()) {
 
 // ---- Commands ----
 const versionKey = file => (/_v(\d+(?:\.\d+)*)_(\d+)\.uf2$/i.exec(file) || []).slice(1).join('.').split('.').map(Number);
-const newer = (a, b) => {
-  const x = versionKey(a), y = versionKey(b);
-  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
-  return false;
-};
-
-async function fetchPages(urls) {
-  mkdirSync(BIN_DIR, { recursive: true });
-  for (const page of urls) {
-    const html = await (await fetch(page)).text();
-    const links = [...new Set(html.match(/https?:\/\/[^"'\s<>]+?\.uf2(?:\?[^"'\s<>]*)?/gi) || [])];
-    console.log(`${page}: ${links.length} firmware files`);
-    for (const url of links) {
-      const file = decodeURIComponent(new URL(url.replace(/&amp;/g, '&')).pathname.split('/').pop());
-      const dest = path.join(BIN_DIR, file);
-      if (existsSync(dest)) continue;
-      const res = await fetch(url);
-      if (!res.ok) { console.log(`  FAILED ${res.status} ${file}`); continue; }
-      writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
-    }
-  }
-}
+const newer = (a, b) => versionNewer(versionKey(a), versionKey(b));
 
 function show(file) {
   const { pid, layers } = decodeFirmware(file);
@@ -340,8 +324,9 @@ export function zmkEntries() {
 }
 
 // Run as a command only, so build-factory-dataset.mjs can import from it.
-const [mode, ...args] = process.argv.slice(2);
-if (!process.argv[1] || import.meta.url !== pathToFileURL(process.argv[1]).href) { /* imported */ }
-else if (mode === 'fetch' && args.length) await fetchPages(args);
-else if (mode === 'show' && args.length) show(args[0]);
-else { console.error('usage: fetch <page url> [...] | show <uf2 file>'); process.exit(1); }
+if (runAsCommand(import.meta.url)) {
+  const [mode, ...args] = process.argv.slice(2);
+  if (mode === 'fetch' && args.length) await downloadLinkedFiles(args, BIN_DIR, ['uf2']);
+  else if (mode === 'show' && args.length) show(args[0]);
+  else { console.error('usage: fetch <page url> [...] | show <uf2 file>'); process.exit(1); }
+}
