@@ -1652,8 +1652,8 @@
       <p data-nav-keys>
         Welcome to the help section. KeyAble lets you customize your Keychron keyboard:
         remap any key, build macros, control the backlight, and back up your setup, all using
-        your keyboard and screen reader alone. This guide covers how to get started, which
-        keyboards are supported, what KeyAble cannot do yet, the emergency reset shortcut if
+        your keyboard and screen reader alone. This guide covers how to get started, what is
+        new in this version, which keyboards are supported, what KeyAble cannot do yet, the emergency reset shortcut if
         anything ever goes wrong, and answers to the questions we are asked most often. In
         KeyAble, Alt plus a number, 1 through 5, returns you to any step at any time.
       </p>
@@ -1683,6 +1683,40 @@
           Your changes are saved straight onto the keyboard, so they stay with it even on
           another computer.
         </p>
+      </div>
+
+      <!-- Each release adds its version above the previous one. -->
+      <div class="card">
+        <h3 style="border-left:none;padding-left:0;margin-bottom:.6rem">What's New.</h3>
+        <h4 style="margin-top:.5rem">Version 1.3, 10th November 2026</h4>
+        <ul style="margin:.3rem 0 0 1.25rem;padding:0;line-height:1.55">
+          <li>Three new models: the K3 Max, K5 Max and S1.</li>
+          <li>The B6 Pro has its full UK layout, including F13, Calculator, Task View and the two
+            desktop keys. Its factory settings now come from Keychron's own firmware, so Review
+            Changes and resets are right on its Fn layer too.</li>
+          <li>Capture Mode finds the key you press by where it is on the keyboard, not by what it
+            types. It now works on keys you have remapped, keys set to do nothing, and keys your
+            screen reader uses.</li>
+          <li>Mission Control and Launchpad now work on the wired Q and V keyboards and on the K2
+            Pro and K6 Pro. Macros and RGB lighting now work on the K2 Pro and K6 Pro.</li>
+          <li>Resetting a key restores what Keychron's released firmware actually ships. On many
+            keyboards this differed from Keychron's published source code.</li>
+          <li>Corrected key layouts for the Q1, Q1 Max, Q6, K2 Pro and K6 Pro, and for the V6 Max
+            ANSI's Right Shift and Numpad 0. The K2 Pro and K6 Pro gain their lighting key.</li>
+          <li>Reading your keyboard is faster: a whole layer is read at once instead of key by key.
+            Reads can no longer get mixed up, which could put the wrong keys in a backup or in
+            Review Changes.</li>
+          <li>A backup made on a layout that has since changed is refused rather than restored
+            onto the wrong keys. Restoring a backup from version 1.2 onto a V6 Max ANSI leaves
+            Right Shift and Numpad 0 as they are, and tells you to make a new backup.</li>
+          <li>Turning RGB lighting off now stays off. Going back to RGB Lighting no longer shows
+            it as on.</li>
+          <li>Each connection starts on the layout your keyboard's Mac or Windows switch is set
+            to, instead of the last one you chose.</li>
+          <li>Demo mode simulates the model you choose, with its real factory settings, so every
+            feature can be tried without a keyboard.</li>
+          <li>The key after Print Screen on the V3, V6 and Q6 is now called Voice Assistant.</li>
+        </ul>
       </div>
 
       <div class="card">
@@ -2023,7 +2057,8 @@
           KeyAble builds on open work by others, with thanks:
         </p>
         <ul>
-          <li><strong>QMK</strong>, the open keyboard firmware that Keychron boards run on.</li>
+          <li><strong>QMK</strong>, the open keyboard firmware that most Keychron boards run on.</li>
+          <li><strong>ZMK</strong>, the open firmware the B6 Pro runs on, with Keychron's VIA support added.</li>
           <li><strong>VIA</strong>, the open protocol used to read and write key assignments over USB.</li>
           <li><strong>Keychron</strong>, whose public firmware and layout files were the source of the
             keyboard data KeyAble relies on.</li>
@@ -12424,7 +12459,7 @@ async function executeResetAll() {
 // Backups record the version, and keysMovedIn is compared with it, so a change
 // that moves a key in a layout bumps it in the same commit.
 const KEYABLE_VERSION       = '1.3';
-const KEYABLE_RELEASE_DATE  = '2026-11-09';   // ISO yyyy-mm-dd
+const KEYABLE_RELEASE_DATE  = '2026-11-10';   // ISO yyyy-mm-dd
 
 // The human-friendly version string, e.g. "Version 1.2, released
 // 8 October 2026". Falls back to just the version if the date cannot be parsed.

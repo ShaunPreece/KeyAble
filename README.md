@@ -111,8 +111,8 @@ KeyAble is by Shaun Preece and Steven Scott, and stands on open work by others:
   VIA support added.
 - **VIA** - the open protocol (and configurator) used to read and write key
   assignments over USB.
-- **Keychron** - their public QMK firmware and VIA JSON files were the source
-  of the keyboard layout and factory-default data. The exact firmware versions
+- **Keychron** - their public firmware source, released firmware and VIA JSON
+  files were the source of the keyboard layout and factory-default data. The exact firmware versions
   used, from Keychron's QMK fork and from mainline QMK, are listed in
   `docs/KEYBOARD-DATA.txt`.
 

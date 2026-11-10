@@ -157,9 +157,9 @@ At a high level, adding a model is a data task, in this order:
        - lays the codes from the newest downloaded binary over the source's,
          marking the entry "Shipped firmware". It finds the keymap table in
          the binary from the shape the source predicts. A binary with a key
-         outside the layout, or a different knob map, is reported and left
-         for a person to look at: firmware-binaries.mjs check --details
-         lists every difference.
+         outside the layout, a different knob map, or no table that matches
+         is reported and left for a person to look at: firmware-binaries.mjs
+         check --details lists every difference.
        - for a ZMK board, takes the whole entry from its firmware, and lists
          any key the board has that the layout lacks.
      A board whose own source has the wrong key positions takes them from
