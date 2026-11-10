@@ -1840,7 +1840,8 @@
           switch on the back. Step 3 says which layout your changes go to, and KeyAble
           picks the one that matches the switch. If it cannot read the switch, it asks you to
           choose before your first change. To change it, use the "Choose Mac or Windows
-          Layout" button. If you move the one keyboard between a Mac and a Windows computer
+          Layout" button. Your choice lasts until the keyboard disconnects: each new
+          connection starts on the layout that matches the switch. If you move the one keyboard between a Mac and a Windows computer
           and want a change on both, make it once for each layout: shortcuts and System Keys
           use different keys on a Mac and on Windows.
           If a change seems to disappear, check that the slide switch matches the layout you
@@ -9695,8 +9696,6 @@ const SETTING_NAMES = {
   macroSpeed:        'keyable-macro-speed-v1',         // milliseconds between key presses
   macroLayout:       'keyable-macro-layout-v1',        // 'us' | 'uk'
   macroLayoutChosen: 'keyable-macro-layout-user-v1',   // 'true' once the user has chosen
-  writeTarget:       'keyable-write-target-v1',        // 'mac' | 'windows'
-  writeTargetChosen: 'keyable-write-target-user-v1',   // 'true' once the user has chosen
 };
 
 // A browser that blocks site storage throws on every access: settings then read as
@@ -10138,8 +10137,7 @@ function loadStep2() {
   // navigation, so also announce it once here (only when there is a real
   // mismatch, so this stays quiet the rest of the time).
   updateWriteTargetMessages();
-  const osMismatch = (writeTarget === 'mac' || writeTarget === 'windows')
-    ? writeTargetMismatchText() : '';
+  const osMismatch = writeTargetMismatchText();
   if (osMismatch) announce(osMismatch);
 
   // Read the device's current keymap in the background and refresh the option
@@ -11990,6 +11988,7 @@ async function identifyKeyboard(vid, pid) {
     keymapBufferState = 'untested';
     deviceLayerCount = await detectLayerCount();
     currentOSMode = await detectOSMode();
+    followSwitchForWriteTarget();
     const modeLabel = osModeLabel(currentOSMode);
     // setStatus + the kbd-os-mode live region already announce the success
     // and slide-switch state; focus moves into the identified section
@@ -12083,6 +12082,7 @@ async function disconnectKeyboard(
   }
   activeKbd     = null;
   currentOSMode = null;
+  writeTarget   = null;
   deviceLayerCount = null;
   viaProtocolVersion = null;
   deviceKeycodes = KEYCODES_PROTOCOL_12;
@@ -13071,16 +13071,16 @@ const SS_DELAY_CODE = 0x04;
 
 const MACRO_DEFAULT_SPEED_MS = 30;       // default pause between key presses; 0 = no delay bytes inserted
 
-// Write target = which OS layout the user is editing / writing to, saved as the
-// writeTarget setting.
+// Write target = which OS layout the user is editing / writing to. Each connection
+// starts on the switch position (followSwitchForWriteTarget); a choice lasts until
+// disconnect and is not saved, so one keyboard's choice never carries to another.
 let writeTarget = null;   // 'mac' | 'windows' | null (undetected, no choice yet)
 
 // Fn-layer mode. When true, a remap targets the Fn layer paired with the base
 // layer (fnLayerFor), so the action happens on "Fn + this key" instead of the key
 // on its own. writeTarget chooses the OS side (Mac or Windows), useFnLayer chooses
 // base or Fn within that side. Deliberately NOT a saved setting, and OFF on every
-// load, so a fresh session never silently writes to the Fn layer (unlike the
-// remembered write target).
+// load, so a fresh session never silently writes to the Fn layer.
 let useFnLayer = false;
 
 function currentMacroLayout() {
@@ -13579,7 +13579,7 @@ function loadStep3() {
 
   $('step3-selected-key').textContent = '';
 
-  initWriteTarget();   // sets the write-target summary, action list, and labels
+  applyWriteTargetView();   // sets the write-target summary, action list, and labels
   initUseFnLayer();    // sync the Fn checkbox from state; also sets the heading
 
   if (activeLayout()) {
@@ -13598,19 +13598,16 @@ function currentViewOS() {
 }
 
 // The base layer(s) a write goes to: the Mac or Windows base from the role map.
-// With no explicit choice yet (e.g. the Step 2 factory reset runs before Step 3),
-// follow the switch; an unknown switch resets both layers so a default-restore
-// is never silently skipped. Remaps never reach this case: stageRemap asks first.
+// With no layout set (the switch is undetected and nothing is chosen yet), a reset
+// goes to both layers so a default-restore is never silently skipped. Remaps
+// never reach this case: stageRemap asks first.
 function writeTargetLayers() {
   const R = activeLayerRoles();
   let base;
   switch (writeTarget) {
     case 'mac':     base = [R.mac];        break;
     case 'windows': base = [R.win];        break;
-    default:
-      if (currentOSMode === 'mac')          base = [R.mac];
-      else if (currentOSMode === 'windows') base = [R.win];
-      else                                  base = [R.mac, R.win];
+    default:        base = [R.mac, R.win];
   }
   // Fn mode maps each base layer to its paired Fn layer via the role map. On
   // canonical boards that is base + 1; on the 5-layer boards it is not.
@@ -13671,16 +13668,14 @@ function refreshSystemActionList() {
   populateStep3Listbox('system-listbox', offeredSystemKeys(currentViewOS()));
 }
 
-// The switch-vs-view mismatch text, or the undetected "please
-// choose" prompt, or '' when there is nothing to say. Shared by the Step 3 line,
-// the Step 2 line, and (via writeTargetLayerNote) the post-apply confirmations.
+// The Step 2 switch-vs-layout mismatch text, or '' when the layout being edited
+// matches the switch or the switch is undetected. The only control for the
+// layout is in Step 3, which needs a key chosen first, so the text says so.
 function writeTargetMismatchText() {
-  if (writeTarget === null)
-    return "We couldn't detect your keyboard's OS switch position, please choose where this change should apply.";
   if (currentOSMode === 'mac' && writeTarget === 'windows')
-    return "You are editing your Windows layout, but your keyboard's switch is set to Mac. These changes take effect when you flip the switch to Windows.";
+    return "You are editing your Windows layout, but your keyboard's switch is set to Mac. These changes take effect when you flip the switch to Windows. To edit your Mac layout instead, choose a key, then use Choose Mac or Windows Layout in Step 3.";
   if (currentOSMode === 'windows' && writeTarget === 'mac')
-    return "You are editing your Mac layout, but your keyboard's switch is set to Windows. These changes take effect when you flip the switch to Mac.";
+    return "You are editing your Mac layout, but your keyboard's switch is set to Windows. These changes take effect when you flip the switch to Mac. To edit your Windows layout instead, choose a key, then use Choose Mac or Windows Layout in Step 3.";
   return '';
 }
 
@@ -13723,9 +13718,8 @@ function updateWriteTargetMessages() {
   const mismatch = writeTargetMismatchText();
   const el2 = $('step2-os-mismatch');
   if (el2) {
-    const show = (writeTarget === 'mac' || writeTarget === 'windows') && !!mismatch;
-    el2.textContent = show ? mismatch : '';
-    el2.hidden = !show;
+    el2.textContent = mismatch;
+    el2.hidden = !mismatch;
   }
 }
 
@@ -13809,32 +13803,20 @@ function stagedAwaitingWriteTarget() {
   return step3PendingCode !== null && writeTarget === null;
 }
 
-// Commit a choice. Persist it, relabel the view, re-read the layer so the
-// Step 2 list and spoken current action follow, then announce.
+// Commit a choice for this connection. Relabel the view, re-read the layer so
+// the Step 2 list and spoken current action follow, then announce.
 function commitWriteTarget(value, speak = true) {
   writeTarget = (value === 'mac' || value === 'windows') ? value : null;
-  if (writeTarget) {
-    saveSetting('writeTarget', writeTarget);
-    saveSetting('writeTargetChosen', 'true');
-  }
   applyWriteTargetView();
   refreshCurrentKeymap();
   if (speak) announceCurrentActionForKey('Saved. ' + writeTargetSummary());
 }
 
-// Initial state when Step 3 loads: a remembered explicit choice wins; otherwise
-// follow the switch. With the switch undetected nothing is selected, and
-// stageRemap asks for a layout before the first change.
-function initWriteTarget() {
-  const saved  = readSetting('writeTargetChosen') === 'true' ? readSetting('writeTarget') : null;
-  const stored = (saved === 'mac' || saved === 'windows') ? saved : null;
-
-  if (stored)                           writeTarget = stored;
-  else if (currentOSMode === 'mac')     writeTarget = 'mac';
-  else if (currentOSMode === 'windows') writeTarget = 'windows';
-  else                                  writeTarget = null;
-
-  applyWriteTargetView();
+// The starting layout for a new connection: the one the switch is on. With the
+// switch undetected nothing is selected, and stageRemap asks for a layout before
+// the first change.
+function followSwitchForWriteTarget() {
+  writeTarget = (currentOSMode === 'mac' || currentOSMode === 'windows') ? currentOSMode : null;
 }
 
 // - Step 2 - Fn-layer toggle -
