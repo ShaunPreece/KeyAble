@@ -103,7 +103,9 @@ The app is organised as a short sequence:
                    that model's layout data. Without a keyboard, demo mode
                    connects to a simulated keyboard of any model, which
                    answers the same commands, so every step can be explored.
-  Choose a key   - from a list, or by pressing it in Capture Mode.
+  Choose a key   - from a list, or by pressing it in Capture Mode, which asks
+                   the keyboard which switch is held, so a remapped key is
+                   still found by where it is.
   Choose action  - choose what the key should do; a Ready to Apply dialog
                    reads the change back, and nothing is written to the
                    keyboard until it is confirmed.

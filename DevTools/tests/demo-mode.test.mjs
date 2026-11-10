@@ -298,3 +298,99 @@ test('Capture Mode starts without a script error', async () => {
   assert.deepEqual(errors, []);
   await page.close();
 });
+
+// Starts Capture Mode on a demo page.
+async function startCapture(page) {
+  await page.keyboard.press('Alt+2');
+  await page.locator('#btn-capture').click();
+  await page.locator('#capture-box:visible').waitFor();
+}
+
+// Presses and releases the demo keyboard's switches for the named layout keys,
+// together, with no keydown: as a key that types nothing would.
+async function tapSwitches(page, ...labels) {
+  await page.evaluate(names => {
+    const at = names.map(name => {
+      const key = activeLayout().keys.find(k => k.label === name);
+      return `${key.row},${key.col}`;
+    });
+    at.forEach(a => hidDevice.setSwitch(a, true));
+    at.forEach(a => hidDevice.setSwitch(a, false));
+  }, labels);
+}
+
+test('Capture Mode selects a key by its switch, whatever the key types', async () => {
+  const page = await demoPage(V6_MAX_ANSI);
+  await page.evaluate(async () => {
+    const key = activeLayout().keys.find(k => k.label === 'Right Win/Cmd');
+    await writeKeyCodeOnLayer(activeLayerRoles().win, key, 0x0005);   // types B
+  });
+  await startCapture(page);
+  await tapSwitches(page, 'Right Win/Cmd');
+  await page.locator('#h-key-selected', { hasText: 'Right Win' }).waitFor();
+  await page.close();
+});
+
+test('Capture Mode turns away Fn and two keys pressed together', async () => {
+  const page = await demoPage(V6_MAX_ANSI);
+  await startCapture(page);
+  await tapSwitches(page, 'Fn');
+  await page.locator('#sr-live', { hasText: 'Fn keys cannot be remapped.' }).waitFor();
+  await tapSwitches(page, 'A', 'S');
+  await page.locator('#sr-live', { hasText: 'More than one key was pressed.' }).waitFor();
+  await tapSwitches(page, 'Fn', 'A');
+  await page.locator('#sr-live', { hasText: 'Fn and another key were pressed together.' }).waitFor();
+  assert.equal(await page.locator('#capture-box').isVisible(), true);
+  await page.close();
+});
+
+test('Capture Mode finds a remapped knob turn by the code it now sends', async () => {
+  const page = await demoPage(V6_MAX_ANSI);
+  await page.evaluate(async () => {
+    const cw = { isRotation: true, encoderId: 0, clockwise: true };
+    await writeKeyCodeOnLayer(activeLayerRoles().win, cw, 0x004E);   // Page Down
+  });
+  await startCapture(page);
+  await page.keyboard.press('PageDown');
+  await page.locator('#h-key-selected', { hasText: /Turn Clockwise/ }).waitFor();
+  await page.close();
+});
+
+test('Capture Mode finds a knob turn on its factory volume code', async () => {
+  const page = await demoPage(V6_MAX_ANSI);
+  await startCapture(page);
+  await page.keyboard.press('AudioVolumeDown');
+  await page.locator('#h-key-selected', { hasText: /Turn Anti-clockwise/ }).waitFor();
+  await page.close();
+});
+
+test('one Escape in Capture Mode selects nothing, and a second ends it', async () => {
+  const page = await demoPage(V6_MAX_ANSI);
+  await startCapture(page);
+  await page.keyboard.press('Escape');
+  await page.locator('#sr-live', { hasText: 'Press Escape again quickly' }).waitFor();
+  await page.waitForTimeout(150);   // several matrix polls: the Escape switch is seen and released
+  assert.equal(await page.locator('#key-selected-section').isVisible(), false);
+  await page.keyboard.press('Escape');
+  await page.locator('#sr-live', { hasText: 'Capture mode ended. No key was selected.' }).waitFor();
+  await page.close();
+});
+
+test('Capture Mode says so when the keyboard does not report its switches', async () => {
+  const page = await demoPage(V6_MAX_ANSI);
+  await page.evaluate(() => { hidDevice.matrixAnswered = false; });
+  await startCapture(page).catch(() => {});   // the box may close before it is seen
+  await page.locator('#sr-live', { hasText: 'Capture Mode is not available' }).waitFor();
+  assert.equal(await page.locator('#capture-box').isVisible(), false);
+  await page.close();
+});
+
+test('Capture Mode reads the older switch matrix layout of protocol 9 and 11 boards', async () => {
+  for (const pid of [K2_PRO_ANSI, V1_ANSI]) {
+    const page = await demoPage(pid);
+    await startCapture(page);
+    await page.keyboard.press('KeyH');
+    await page.locator('#h-key-selected', { hasText: 'H' }).waitFor();
+    await page.close();
+  }
+});

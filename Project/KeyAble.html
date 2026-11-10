@@ -1187,7 +1187,7 @@
         <h3 id="h-capture-mode">Method 2. Use Capture Mode To Select Key.</h3>
 
         <p>
-          Capture mode listens for key presses directly on your keyboard. Press the
+          Capture mode asks your keyboard which key you pressed. Press the
           <strong>Start Capture Mode</strong> button, then press the key you want to select
           for customisation. Your selection is confirmed automatically and capture mode ends.
           To cancel without selecting a key, press Escape twice quickly or press the
@@ -1195,14 +1195,10 @@
         </p>
 
         <p>
-          <strong>Screen reader users:</strong> Some keys - such as arrow keys, Home, and End -
-          may be intercepted by your screen reader before reaching this page. If a key is not
-          captured, switch your screen reader to Forms or Application mode first, then press the
-          key. In NVDA press <kbd>NVDA Key + Space</kbd>; in Narrator press
-          <kbd>Caps Lock + Space</kbd>; in JAWS press <kbd>JAWS Key + Z</kbd>. Switch back to
-          normal mode when done. If you cannot capture the key using either method, use the
-          list above instead. Note: KeyAble has been tested with NVDA. Behaviour in JAWS,
-          Narrator, and VoiceOver may vary and has not been fully verified.
+          The keyboard reports where the key is, not what it types, so a key is found even if
+          it has been remapped or set to do nothing, and even if your screen reader uses it.
+          Press one key at a time: two keys together, such as Control and C, select neither.
+          For a knob, turn it or press it.
         </p>
 
         <p>
@@ -1212,12 +1208,6 @@
           to continue.
         </p>
 
-        <p>
-          <strong>If a key is not detected:</strong> if pressing a key produces no response at
-          all - no announcement and no error sound - the key may already have a remap on it
-          from a previous session that stops the keyboard from sending its signal. Go back to
-          Step 1 and reset the keyboard, then try capturing the key again.
-        </p>
 
         <div style="margin-top:1rem">
           <button id="btn-capture" data-action="toggleKeyCapture">Start Capture Mode</button>
@@ -1233,9 +1223,9 @@
           </p>
           <!--
             Visually-hidden text input that we focus when capture mode starts.
-            NVDA auto-switches to focus mode (forms mode) on an <input>, which
-            stops it intercepting arrow keys / letter keys for browse-mode
-            navigation and lets our captureHandler see every keystroke. The
+            NVDA auto-switches to focus mode (forms mode) on an <input>, so
+            keys go to the page instead of browse-mode navigation, and Escape
+            and knob turns reach captureHandler. The
             input is readonly and the captureHandler calls preventDefault on
             every keydown, so the visible value never changes.
           -->
@@ -1942,13 +1932,11 @@
           symbols will type correctly. It starts on UK for ISO keyboards and US for ANSI ones.
         </p>
 
-        <h4 style="margin-top:1.25rem">In Capture Mode my screen reader will not let me select certain keys.</h4>
+        <h4 style="margin-top:1.25rem">Capture Mode says it cannot tell which way the knob turned.</h4>
         <p>
-          Capture Mode switches NVDA into focus mode for you, so that key presses reach KeyAble,
-          and back to browse mode when it ends. Some keys, such as the arrows, Home, and End, can
-          still be taken by your screen reader first. If that happens, switch to focus or forms mode
-          yourself and try again: in NVDA press NVDA key plus Space. If a key still will not
-          capture, use the key list instead, which always works.
+          A knob is found by what it sends when turned. If both directions send the same thing,
+          for example after setting both to the same action, choose Knob - Turn Clockwise or
+          Knob - Turn Anti-clockwise from the key list instead.
         </p>
 
         <h4 style="margin-top:1.25rem">How do I turn the backlight off to save battery?</h4>
@@ -8113,6 +8101,8 @@ function playDialogCue() {
 // - VIA protocol constants -
 const VIA_VID          = 0x3434;
 const CMD_GET_PROTOCOL = 0x01;
+const CMD_GET_KEYBOARD_VALUE = 0x02;   // VIA id_get_keyboard_value  args: [value_id, ...]
+const KBD_VALUE_SWITCH_MATRIX = 0x03;  // id_switch_matrix_state: which switches are held now
 const CMD_GET_KEY      = 0x04;   // VIA id_dynamic_keymap_get_keycode
 const CMD_SET_KEY      = 0x05;
 const CMD_DYNAMIC_KEYMAP_RESET = 0x06;   // VIA id_dynamic_keymap_reset - rewrites every key in the dynamic keymap with firmware defaults; takes effect immediately (id_eeprom_reset 0x0A only invalidates EEPROM until next reboot)
@@ -9763,7 +9753,7 @@ let captureActive         = false;
 let captureBeatTimer      = null;   // setInterval id for the capture heartbeat tone
 let captureLastKey        = null;
 let lastEscTime           = 0;
-let pendingLCtrlTimer     = null;   // AltGr disambiguation: buffer ControlLeft briefly to see if AltRight follows
+let captureSession        = null;   // the running capture's matrix poll state (startKeyCapture)
 
 // - DOM helpers -
 const $ = id => document.getElementById(id);
@@ -11266,10 +11256,32 @@ function finalizeKeySelection() {
 }
 
 // - Step 2 - capture mode -
+// Capture finds the pressed key by its position: it polls the keyboard's switch matrix
+// (readSwitchMatrix), so a key is found whatever it types, including a remapped key, a
+// key that types nothing, and a key the screen reader takes first. Keydown events still
+// matter twice: Escape is the cancel gesture, and a knob turn is not a switch, so a
+// keydown that no switch accounts for is read as the knob (captureKnobTurn).
+//
+// A press is judged only when every switch is up again, so two keys pressed together
+// are seen as such rather than as the first of them. Switches already held when capture
+// starts (the Enter that pressed Start) are ignored until released.
+const CAPTURE_POLL_GAP_MS = 10;
+
 function startKeyCapture() {
+  const layout = activeLayout();
+  if (!layout || !hidDevice) return;
   captureActive         = true;
   captureLastKey        = null;
   lastEscTime           = 0;
+  const session = {
+    polls: 0,            // matrix reads started
+    held: new Set(),     // switches held at the last read
+    ignored: null,       // switches held when capture started, until each is released
+    gesture: null,       // { switches: Set of "row,col", codes: keydown codes } during a press
+    keydowns: [],        // { code, key, decideAfter }: keydowns not yet tied to a press
+    turnInFlight: false, // a knob turn is being matched; further detents are ignored
+  };
+  captureSession = session;
 
   $('capture-box').hidden = false;
   $('capture-status-text').textContent = 'Capture mode active. Press any key to select it.';
@@ -11283,96 +11295,12 @@ function startKeyCapture() {
   // (~80ms below). Announcing here too would race with that focus speech
   // and NVDA would only read the second one.
 
-  function processCapturedKey(code, keyVal) {
-    const layout = activeLayout();
-    let label = CODE_TO_LABEL[code];
-
-    // ISO/JIS-aware remapping: certain physical keys exist on non-ANSI boards
-    // that have no fixed DOM code -> label mapping. Disambiguate by checking
-    // which labels the active layout actually has, so capture works on every
-    // physical layout without per-PID branching.
-    const layoutHas = lbl => layout && layout.keys.some(k => k.label === lbl);
-    if (code === 'IntlBackslash' && layoutHas('Non-US Backslash')) {
-      label = 'Non-US Backslash';
-    } else if (code === 'Backslash' && layoutHas('Non-US Hash') && !layoutHas('Backslash')) {
-      // ISO board: the physical key the OS reports as "Backslash" is actually
-      // the # / ~ key (Non-US Hash). The ISO board has no real Backslash.
-      label = 'Non-US Hash';
-    }
-
-    // Knob / encoder detection. Turning the rotary knob while it's on its
-    // firmware default emits a HID Consumer Page volume event, which most
-    // browsers surface as a keydown with code = "AudioVolumeUp" / "Down"
-    // / "Mute" and matching key. Some Chromium builds and older browsers
-    // drop the "Audio" prefix ("VolumeUp"). A few dispatch with empty
-    // code and the value only in key. We accept any of these variants.
-    //
-    // NOTE: if the user has already remapped the knob, turning it sends
-    // that remap's event, not AudioVolumeUp/Down - so capture can't see it
-    // as the knob. The user then picks it from the Key List instead.
-    if (!label) {
-      const probe   = ((code || '') + '|' + (keyVal || '')).toLowerCase();
-      const stepHas = lbl => stepKeys.some(k => k.label === lbl);
-      if (/(audio)?volumeup/.test(probe) && stepHas('Knob - Turn Clockwise')) {
-        label = 'Knob - Turn Clockwise';
-      } else if (/(audio)?volumedown/.test(probe) && stepHas('Knob - Turn Anti-clockwise')) {
-        label = 'Knob - Turn Anti-clockwise';
-      } else if (/(audio)?volumemute/.test(probe) && stepHas('Knob (press)')) {
-        label = 'Knob (press)';
-      }
-    }
-
-    if (!label) {
-      playErrorBuzz();
-      announce('Key not recognised. It may already be remapped, so it no longer sends its original key. Use the Key List above to choose it by name.');
-      return;
-    }
-
-    if (label === 'Fn' || label === 'Fn2') {
-      playErrorBuzz();
-      announce('Fn keys cannot be remapped. Try a different key.');
-      return;
-    }
-
-    // stepKeys (not layout.keys) is the right collection to search here:
-    // matrix keys + encoder press are in layout.keys AND stepKeys, but the
-    // synthetic rotation entries only exist in stepKeys. Using stepKeys
-    // makes capture work for clockwise / anti-clockwise too.
-    const idx = stepKeys.findIndex(k => k.label === label);
-    if (idx === -1) {
-      playErrorBuzz();
-      const fallback = label.replace(/^Non-US /, '');
-      announce(`${fallback} captured, but this key is not on your keyboard's physical layout. The key you pressed may already be remapped - use the Key List dropdown above to select the original physical key by name.`);
-      return;
-    }
-
-    // Friendly name for screen reader output and status text. Use the real
-    // stepKeys entry so encoder press reads as "Knob - Press" and rotations
-    // keep their human-friendly direction labels. Internal `label` stays
-    // canonical (e.g. "Non-US Hash") for confirmKeySelection.
-    const displayLabel = fnDesc(stepKeys[idx]);
-
-    captureLastKey = { label, idx };
-    $('capture-status-text').textContent = `Captured: ${displayLabel}.`;
-
-    // Windows/Cmd key opens the Start menu at OS level - warn the user
-    const isWinKey = (code === 'MetaLeft' || code === 'MetaRight');
-
-    // Auto-confirm on first key press: end capture, commit selection, exit.
-    // This matches the Method 2 mental model ("press the key you want") and
-    // prevents two rapid presses from sounding like a chord.
-    if (isWinKey) {
-      announce(`${displayLabel} captured. The Start menu may have opened - close it and return here. Selection confirmed.`);
-    }
-    endKeyCapture();
-  }
-
   captureHandler = function(e) {
     e.preventDefault();
     e.stopPropagation();
+    if (e.repeat) return;
 
     if (e.code === 'Escape') {
-      if (pendingLCtrlTimer) { clearTimeout(pendingLCtrlTimer); pendingLCtrlTimer = null; }
       const now = Date.now();
       if (now - lastEscTime <= 1500) {
         endKeyCapture();
@@ -11380,36 +11308,10 @@ function startKeyCapture() {
       }
       lastEscTime = now;
       announce('Press Escape again quickly to cancel capture mode.');
-      return;
     }
-
-    // AltGr quirk: on UK / European layouts, pressing AltGr (Right Alt)
-    // emits a synthesized Left Control keydown ~5-10ms BEFORE the Right
-    // Alt keydown, as a legacy Windows compatibility behaviour. Without
-    // disambiguation we'd auto-confirm the LCtrl and the user would see
-    // "Left Ctrl selected" when they pressed Right Alt. Buffer ControlLeft
-    // for 80ms - long enough to catch the trailing AltRight, short enough
-    // to be unnoticeable for a genuine Left Ctrl press.
-    if (e.code === 'ControlLeft') {
-      if (pendingLCtrlTimer) clearTimeout(pendingLCtrlTimer);
-      pendingLCtrlTimer = setTimeout(() => {
-        pendingLCtrlTimer = null;
-        processCapturedKey('ControlLeft', 'Control');
-      }, 80);
-      return;
-    }
-
-    // Any non-LCtrl, non-Escape key cancels a pending LCtrl. If it's
-    // AltRight that's the AltGr case (drop LCtrl, commit AltRight). If
-    // it's anything else, the user pressed Ctrl-then-something so quickly
-    // that LCtrl was still buffered - commit this terminal key, since
-    // capture mode is single-key only.
-    if (pendingLCtrlTimer) {
-      clearTimeout(pendingLCtrlTimer);
-      pendingLCtrlTimer = null;
-    }
-
-    processCapturedKey(e.code, e.key);
+    // Recorded with Escape included, so the press that typed it is not captured.
+    if (session.gesture) session.gesture.codes.push(e.code);
+    else session.keydowns.push({ code: e.code, key: e.key, decideAfter: session.polls });
   };
 
   document.addEventListener('keydown', captureHandler, true);
@@ -11423,10 +11325,9 @@ function startKeyCapture() {
   document.addEventListener('keyup', captureKeyupHandler, true);
 
   // Focus the hidden capture input so NVDA auto-switches into forms /
-  // focus mode. While focus is on an <input>, NVDA stops intercepting
-  // letter keys and arrow keys for its browse-mode virtual cursor, so
-  // every keystroke reaches our captureHandler. The input is readonly +
-  // we preventDefault on every keydown, so the value never changes.
+  // focus mode, and Escape and knob turns reach captureHandler rather than
+  // the screen reader. The input is readonly + we preventDefault on every
+  // keydown, so the value never changes.
   // tabindex="-1" keeps it out of Tab order but allows programmatic focus.
   setTimeout(() => {
     const input = $('capture-input');
@@ -11438,6 +11339,159 @@ function startKeyCapture() {
   // dropped (e.g. by a focus loss or tab switch).
   if (captureBeatTimer) clearInterval(captureBeatTimer);
   captureBeatTimer = setInterval(playCapturePulse, 2500);
+
+  pollCaptureMatrix(session, layout);
+}
+
+async function pollCaptureMatrix(session, layout) {
+  while (session === captureSession) {
+    const poll = ++session.polls;
+    const held = await readSwitchMatrix(layout);
+    if (session !== captureSession) return;
+    if (!held) {
+      playErrorBuzz();
+      endKeyCapture(poll === 1
+        ? 'Capture Mode is not available: this keyboard does not report which key is pressed. Choose the key from the Key List instead.'
+        : 'Capture Mode stopped because the keyboard stopped answering. Choose the key from the Key List, or start Capture Mode again.');
+      return;
+    }
+    onCaptureMatrixRead(session, held, poll);
+    await new Promise(resolve => setTimeout(resolve, CAPTURE_POLL_GAP_MS));
+  }
+}
+
+function onCaptureMatrixRead(session, held, poll) {
+  if (!session.ignored) session.ignored = new Set(held);
+  for (const s of session.ignored) if (!held.has(s)) session.ignored.delete(s);
+  for (const s of held) {
+    if (session.held.has(s) || session.ignored.has(s)) continue;
+    if (!session.gesture) session.gesture = { switches: new Set(), codes: [] };
+    session.gesture.switches.add(s);
+  }
+  session.held = held;
+
+  // A switch is in the matrix before its keydown is sent, so a keydown with no press
+  // under way is decided by the first read that started after it: if that read shows
+  // no press either, no switch sent it.
+  let unswitched = null;
+  session.keydowns = session.keydowns.filter(k => {
+    if (session.gesture) { session.gesture.codes.push(k.code); return false; }
+    if (poll <= k.decideAfter) return true;
+    if (k.code !== 'Escape') unswitched = unswitched || k;
+    return false;
+  });
+
+  const pressed = [...held].some(s => !session.ignored.has(s));
+  if (session.gesture && !pressed) {
+    const gesture = session.gesture;
+    session.gesture = null;
+    finishCaptureGesture(gesture);
+  }
+  if (unswitched && session === captureSession) captureKnobTurn(session, unswitched.code, unswitched.key);
+}
+
+function finishCaptureGesture(gesture) {
+  if (gesture.codes.includes('Escape')) return;   // the cancel gesture, answered at keydown
+  const keys = [...gesture.switches].map(pos => stepKeys.findIndex(k => !k.isRotation && `${k.row},${k.col}` === pos));
+  const isFn = idx => idx !== -1 && (stepKeys[idx].label === 'Fn' || stepKeys[idx].label === 'Fn2');
+
+  if (keys.length > 1) {
+    playErrorBuzz();
+    announce(keys.some(isFn)
+      ? 'Fn and another key were pressed together. Press only the key on its own; to change what it does with Fn, tick "Use with the Fn key" once it is selected.'
+      : 'More than one key was pressed. Press only the key you want, on its own.');
+    return;
+  }
+  const idx = keys[0];
+  if (idx === -1) {
+    playErrorBuzz();
+    announce("That key is not in KeyAble's layout for this keyboard. Choose it from the Key List instead.");
+    return;
+  }
+  if (isFn(idx)) {
+    playErrorBuzz();
+    announce('Fn keys cannot be remapped. Try a different key.');
+    return;
+  }
+  commitCapturedKey(idx, gesture.codes.some(c => c === 'MetaLeft' || c === 'MetaRight'));
+}
+
+// Selects stepKeys[idx] and ends capture. The Windows key opens the Start menu, which
+// the page cannot prevent.
+function commitCapturedKey(idx, openedStartMenu = false) {
+  const displayLabel = fnDesc(stepKeys[idx]);
+  captureLastKey = { label: stepKeys[idx].label, idx };
+  $('capture-status-text').textContent = `Captured: ${displayLabel}.`;
+  if (openedStartMenu) {
+    announce(`${displayLabel} captured. The Start menu may have opened - close it and return here. Selection confirmed.`);
+  }
+  endKeyCapture();
+}
+
+// The keycodes a keydown can have come from. A keydown names a key, not the keycode
+// that sent it, so some have two: volume is either the KC_AUDIO_* or the KC_KB_* code,
+// and Windows reports both ISO # and \ as Backslash. Some browsers drop "Audio" from
+// the volume names, and a few give only the key value.
+const KEYDOWN_MEDIA_KEYCODES = [
+  [/volumeup/,           [0x0080, 0x00A9]],
+  [/volumedown/,         [0x0081, 0x00AA]],
+  [/volumemute/,         [0x007F, 0x00A8]],
+  [/mediaplaypause/,     [0x00AE]],
+  [/mediastop/,          [0x00AD]],
+  [/mediatracknext/,     [0x00AB]],
+  [/mediatrackprevious/, [0x00AC]],
+];
+
+function keycodesForKeydown(code, keyVal) {
+  const probe = `${code || ''}|${keyVal || ''}`.toLowerCase();
+  for (const [pattern, codes] of KEYDOWN_MEDIA_KEYCODES) if (pattern.test(probe)) return codes;
+  if (code === 'Backslash') return [LABEL_TO_KEYCODE['Backslash'], LABEL_TO_KEYCODE['Non-US Hash']];
+  if (code === 'IntlBackslash') return [LABEL_TO_KEYCODE['Non-US Backslash']];
+  const basic = LABEL_TO_KEYCODE[CODE_TO_LABEL[code]];
+  return basic === undefined ? [] : [basic];
+}
+
+// The base layer the keyboard is typing with: the one its Mac / Windows switch selects,
+// or both when the switch position is unknown.
+function typingBaseLayers() {
+  const R = activeLayerRoles();
+  if (currentOSMode === 'mac')     return [R.mac];
+  if (currentOSMode === 'windows') return [R.win];
+  return [R.mac, R.win];
+}
+
+// A keydown no switch accounts for: a knob turn, or a key on another keyboard. The
+// direction is found from the codes each turn holds now, since a remapped knob no
+// longer sends volume.
+async function captureKnobTurn(session, code, keyVal) {
+  const notSeen = () => {
+    playErrorBuzz();
+    announce('No key was seen on your keyboard. Press the key again, on its own.');
+  };
+  const turns = stepKeys.map((key, idx) => ({ key, idx })).filter(({ key }) => key.isRotation);
+  if (!turns.length) { notSeen(); return; }
+  if (session.turnInFlight) return;
+  session.turnInFlight = true;
+
+  const sent = keycodesForKeydown(code, keyVal);
+  const matches = [];
+  for (const turn of turns) {
+    for (const layer of typingBaseLayers()) {
+      const current = await readKeyCodeOnLayer(layer, turn.key);
+      if (session !== captureSession) return;
+      if (current !== null && sent.includes(current)) { matches.push(turn); break; }
+    }
+  }
+  session.turnInFlight = false;
+
+  if (matches.length === 1) {
+    commitCapturedKey(matches[0].idx);
+  } else if (matches.length > 1) {
+    playErrorBuzz();
+    announce('The knob sends the same thing in both directions, so KeyAble cannot tell which way it turned. Choose Knob - Turn Clockwise or Knob - Turn Anti-clockwise from the Key List.');
+  } else {
+    notSeen();
+  }
 }
 
 // Removes the capture listeners and timers without touching focus or the
@@ -11462,16 +11516,12 @@ function teardownKeyCapture() {
     clearInterval(captureBeatTimer);
     captureBeatTimer = null;
   }
-  // Cancel any AltGr-disambiguation timer so a stale ControlLeft buffered
-  // at the moment of cancellation doesn't fire later and overwrite state.
-  if (pendingLCtrlTimer) {
-    clearTimeout(pendingLCtrlTimer);
-    pendingLCtrlTimer = null;
-  }
+  captureSession = null;   // stops the matrix poll and any knob match in flight
   captureActive = false;
 }
 
-function endKeyCapture() {
+// `message` is announced when no key was selected.
+function endKeyCapture(message = 'Capture mode ended. No key was selected.') {
   resetCaptureButton();
   teardownKeyCapture();
 
@@ -11484,7 +11534,7 @@ function endKeyCapture() {
     $('capture-box').hidden = true;
   } else {
     $('capture-box').hidden = true;
-    announce('Capture mode ended. No key was selected.');
+    announce(message);
     moveFocus('btn-capture');
   }
 }
@@ -11553,6 +11603,48 @@ function sendVIAOnce(bytes, timeoutMs, echoLength) {
   });
 }
 
+// The switch matrix state: which physical switches are held now, whatever they are
+// mapped to. Each matrix row is ceil(cols / 8) bytes, most significant first. From
+// protocol 12 the request names a first row, the rows start at byte 3, and a reply
+// carries SWITCH_MATRIX_BYTES of them, so a tall matrix takes several requests. Before
+// protocol 12 there is no first row, the rows start at byte 2, and they all come in one
+// reply.
+const SWITCH_MATRIX_BYTES = 28;
+const SWITCH_MATRIX_TIMEOUT_MS = 500;
+
+function switchMatrixFormat(layout, protocolVersion) {
+  const bytesPerRow = Math.ceil(layout.cols / 8);
+  const paged = protocolVersion === null || protocolVersion >= VIA_PROTOCOL_12;
+  return {
+    bytesPerRow, paged,
+    dataAt: paged ? 3 : 2,
+    rowsPerReply: paged ? Math.floor(SWITCH_MATRIX_BYTES / bytesPerRow) : layout.rows,
+  };
+}
+
+// Resolves with the held switches as a Set of "row,col", or null when the keyboard
+// does not answer.
+async function readSwitchMatrix(layout) {
+  const f = switchMatrixFormat(layout, viaProtocolVersion);
+  if (f.dataAt + f.rowsPerReply * f.bytesPerRow > REPORT_LEN) return null;
+  const held = new Set();
+  for (let first = 0; first < layout.rows; first += f.rowsPerReply) {
+    const request = f.paged
+      ? [CMD_GET_KEYBOARD_VALUE, KBD_VALUE_SWITCH_MATRIX, first]
+      : [CMD_GET_KEYBOARD_VALUE, KBD_VALUE_SWITCH_MATRIX];
+    const reply = await sendVIA(request, SWITCH_MATRIX_TIMEOUT_MS, request.length);
+    if (!reply || reply[0] !== CMD_GET_KEYBOARD_VALUE) return null;
+    for (let r = 0; r < f.rowsPerReply && first + r < layout.rows; r++) {
+      let bits = 0;
+      for (let b = 0; b < f.bytesPerRow; b++) bits = bits * 256 + reply[f.dataAt + r * f.bytesPerRow + b];
+      for (let col = 0; col < layout.cols; col++) {
+        if ((bits >>> col) & 1) held.add(`${first + r},${col}`);
+      }
+    }
+  }
+  return held;
+}
+
 // - Demo keyboard -
 // Demo mode connects to this simulated keyboard, so every flow runs the same code
 // as with a real one. It has the parts of WebHID's HIDDevice that KeyAble uses, and
@@ -11588,11 +11680,69 @@ class DemoKeyboard extends EventTarget {
     this.lightingChannel = /\bWhite\b/.test(entry.name) ? LIGHTING_CH_BACKLIGHT : LIGHTING_CH_RGB_MATRIX;
     this.lighting = { 1: 128, 2: 1, 3: 128, 4: [0, 255] };   // brightness, effect, speed, [hue, sat]
     this.macros   = new Uint8Array(DEMO_MACRO_BYTES);
+    this.matrixAnswered = true;   // tests clear it to play firmware without the switch matrix value
     this.resetKeymap();
+
+    // Its switches are the computer keyboard's keys, so Capture Mode works in demo.
+    // A press stays in the matrix until a read reports it, because a scripted key
+    // press can be released before the next poll.
+    this.heldSwitches = new Set();
+    this.unreadPresses = new Set();
+    this.onKeyDown = e => { if (!e.repeat) this.pressSwitchFor(e.code, e.key, true); };
+    this.onKeyUp   = e => this.pressSwitchFor(e.code, e.key, false);
+    window.addEventListener('keydown', this.onKeyDown, true);
+    window.addEventListener('keyup', this.onKeyUp, true);
   }
 
   async open()   { this.opened = true; }
-  async close()  { this.opened = false; }
+  async close()  {
+    this.opened = false;
+    window.removeEventListener('keydown', this.onKeyDown, true);
+    window.removeEventListener('keyup', this.onKeyUp, true);
+  }
+
+  // The layout key a computer key stands for. ISO's extra keys have no DOM code of
+  // their own, and a knob press arrives as Mute.
+  switchFor(code, keyVal) {
+    const keys = this.layout.keys;
+    const has = label => keys.some(k => k.label === label);
+    let label = CODE_TO_LABEL[code];
+    if (code === 'IntlBackslash' && has('Non-US Backslash')) label = 'Non-US Backslash';
+    else if (code === 'Backslash' && has('Non-US Hash') && !has('Backslash')) label = 'Non-US Hash';
+    else if (/volumemute/.test(`${code}|${keyVal}`.toLowerCase())) label = 'Knob (press)';
+    const key = keys.find(k => k.label === label);
+    return key ? `${key.row},${key.col}` : null;
+  }
+
+  pressSwitchFor(code, keyVal, down) {
+    const at = this.switchFor(code, keyVal);
+    if (at) this.setSwitch(at, down);
+  }
+
+  // Also used by tests to press a switch directly: setSwitch('2,9', true).
+  setSwitch(at, down) {
+    if (down) { this.heldSwitches.add(at); this.unreadPresses.add(at); }
+    else this.heldSwitches.delete(at);
+  }
+
+  // The switch matrix value, in the layout of this board's protocol (switchMatrixFormat).
+  answerKeyboardValue(d) {
+    if (d[1] !== KBD_VALUE_SWITCH_MATRIX || !this.matrixAnswered) { d[0] = VIA_UNHANDLED; return; }
+    const f = switchMatrixFormat(this.layout, this.protocolVersion);
+    const first = f.paged ? d[2] : 0;
+    for (let r = 0; r < f.rowsPerReply && first + r < this.layout.rows; r++) {
+      let bits = 0;
+      for (let col = 0; col < this.layout.cols; col++) {
+        const at = `${first + r},${col}`;
+        if (this.heldSwitches.has(at) || this.unreadPresses.has(at)) bits += 2 ** col;
+        this.unreadPresses.delete(at);
+      }
+      for (let b = f.bytesPerRow - 1; b >= 0; b--) {
+        d[f.dataAt + r * f.bytesPerRow + b] = bits % 256;
+        bits = Math.floor(bits / 256);
+      }
+    }
+  }
 
   // The factory keymap as the firmware's flat buffer (layer, row, column), plus the
   // knob. A model without factory data gets each key's own keycode on the base
@@ -11681,6 +11831,7 @@ const put16At = (d, at, v) => { d[at] = (v >> 8) & 0xFF; d[at + 1] = v & 0xFF; }
 // How DemoKeyboard answers each VIA command; any other is unhandled.
 const DEMO_COMMANDS = {
   [CMD_GET_PROTOCOL]: (kb, d) => put16At(d, 1, kb.protocolVersion),
+  [CMD_GET_KEYBOARD_VALUE]: (kb, d) => kb.answerKeyboardValue(d),
   [CMD_GET_KEY]: (kb, d) => {
     const c = kb.cell(d[1], d[2], d[3]);
     put16At(d, 4, c < 0 ? 0 : kb.keymap[c]);
