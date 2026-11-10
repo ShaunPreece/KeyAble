@@ -1,112 +1,38 @@
-// A simulated Keychron keyboard, installed as navigator.hid before KeyAble loads.
+// A simulated Keychron V6 Max, installed as navigator.hid before KeyAble loads.
 //
-// It answers the VIA raw HID commands KeyAble sends, from an in-memory keymap seeded with
-// the app's own FACTORY_KEYMAPS for the chosen PID. Replies follow the firmware's
-// behaviour: one at a time, in the order the requests arrived, each after a short delay,
-// and each written over the request buffer, so a reply repeats its request's leading
-// bytes (QMK quantum/via.c answers in place).
+// Its VIA answers come from the app's own DemoKeyboard, so the browser tests and demo
+// mode run the same firmware model. This file adds what tests need on top: replies one
+// at a time, in the order the requests arrived, each after a short delay, like the
+// firmware's single USB endpoint; a log of every request; and faults in the keymap
+// buffer command. It wraps a DemoKeyboard rather than being one, because the app treats
+// a DemoKeyboard as demo mode.
 //
-// Tests reach it through window.__fakeKeychron. The page's `const` tables are global
-// lexical bindings, visible here by name once the page's scripts have run.
+// Tests reach it through window.__fakeKeychron. The page's top-level `const` and `class`
+// declarations are global lexical bindings, visible here by name once the page's
+// scripts have run, so the keyboard is built on first use, not when this file runs.
+/* global DemoKeyboard, CMD_KEYMAP_GET_BUFFER, VIA_UNHANDLED */
 (() => {
-  const PID           = 0x0960;   // Keychron V6 Max ANSI Knob: 4 layers, one encoder
-  const LAYER_COUNT   = 4;
-  const DEFAULT_LAYER = 2;        // Windows base, so the OS switch reads as Windows
-  const MACRO_SLOTS   = 16;
-  const MACRO_BYTES   = 1024;
+  const PID = 0x0960;   // Keychron V6 Max ANSI Knob: 4 layers, one knob, protocol 12
   const REPLY_DELAY_MS = 4;
 
-  const keymap   = new Map();     // "layer,row,col" -> 16-bit keycode
-  const encoders = new Map();     // "layer,id,cw"   -> 16-bit keycode
-  const macroBuf = new Uint8Array(MACRO_BYTES);
-  const lighting = { 1: 128, 2: 1, 3: 128, 4: [0, 255] };   // RGB matrix value ids
-  let seeded = false;
-  // How the keymap buffer command (0x12) is answered: 'normal'; 'unhandled', as by
-  // firmware without it; or 'shifted', laid out one column wider than the app's
-  // layout says, as a wrong matrix size would read.
+  // How the keymap buffer command is answered: 'normal'; 'unhandled', as by firmware
+  // without it; or 'shifted', laid out one column wider than the app's layout says, as
+  // a wrong matrix size would read.
   let bufferMode = 'normal';
 
-  // Seeding waits for the first command, by which time the page's tables exist.
-  function seed() {
-    if (seeded) return;
-    seeded = true;
-    // eslint-disable-next-line no-undef
-    const model = FACTORY_KEYMAPS[PID];
-    model.layers.forEach((layer, l) => {
-      for (const [pos, code] of Object.entries(layer)) keymap.set(`${l},${pos}`, code);
-    });
-    // A layout key at a position the factory data lacks gets its label's keycode on the
-    // base layers and KC_TRNS on the Fn layers, so such a data mismatch fails only
-    // data-consistency.test.mjs, which reports it, and not these tests as well.
-    // eslint-disable-next-line no-undef
-    const layout = KEYCHRON_LAYOUTS[KEYBOARD_DB[PID].layoutId];
-    // eslint-disable-next-line no-undef
-    const roles = model.roles || DEFAULT_LAYER_ROLES;
-    for (const key of layout.keys) {
-      for (const l of [roles.mac, roles.win, roles.macFn, roles.winFn]) {
-        const id = `${l},${key.row},${key.col}`;
-        const isFn = l === roles.macFn || l === roles.winFn;
-        // eslint-disable-next-line no-undef
-        if (!keymap.has(id)) keymap.set(id, isFn ? 0x0001 : (LABEL_TO_KEYCODE[key.label] ?? 0));
-      }
+  // The keymap buffer read as if each row had one more column than the layout.
+  function readShiftedBuffer(kb, d) {
+    const { rows, cols } = kb.layout;
+    const wide = cols + 1;
+    const at = (d[1] << 8) | d[2];
+    for (let i = 0; i < d[3]; i++) {
+      const cell = (at + i) >> 1;
+      const l = Math.floor(cell / (rows * wide));
+      const r = Math.floor((cell % (rows * wide)) / wide);
+      const index = kb.cell(l, r, cell % wide);
+      const code = index < 0 ? 0 : kb.keymap[index];
+      d[4 + i] = (at + i) % 2 === 0 ? (code >> 8) & 0xFF : code & 0xFF;
     }
-    (model.encoders || []).forEach((list, l) => {
-      (list || []).forEach((enc, id) => {
-        if (!enc) return;
-        encoders.set(`${l},${id},0`, enc.ccw);
-        encoders.set(`${l},${id},1`, enc.cw);
-      });
-    });
-  }
-
-  const getKey = (l, r, c) => keymap.get(`${l},${r},${c}`) ?? 0;
-
-  // The keymap as the firmware's flat buffer: big-endian keycodes, layer, row, column.
-  function keymapBufferByte(offset) {
-    // eslint-disable-next-line no-undef
-    const layout = KEYCHRON_LAYOUTS[KEYBOARD_DB[PID].layoutId];
-    const cell   = Math.floor(offset / 2);
-    const cols = layout.cols + (bufferMode === 'shifted' ? 1 : 0);
-    const perLayer = layout.rows * cols;
-    const l = Math.floor(cell / perLayer);
-    const r = Math.floor((cell % perLayer) / cols);
-    const c = cell % cols;
-    const code = getKey(l, r, c);
-    return offset % 2 === 0 ? (code >> 8) & 0xFF : code & 0xFF;
-  }
-
-  // Turn a request buffer into its reply, in place, as via.c does.
-  function answer(d) {
-    seed();
-    const u16 = (hi, lo) => (hi << 8) | lo;
-    switch (d[0]) {
-      case 0x01: d[1] = 0x00; d[2] = 0x0C; break;                     // protocol version 12
-      case 0x04: { const k = getKey(d[1], d[2], d[3]); d[4] = k >> 8; d[5] = k & 0xFF; break; }
-      case 0x05: keymap.set(`${d[1]},${d[2]},${d[3]}`, u16(d[4], d[5])); break;
-      case 0x06: keymap.clear(); encoders.clear(); seeded = false; seed(); break;
-      case 0x07:
-        if (d[1] !== 3) { d[0] = 0xFF; break; }
-        if (d[2] === 4) lighting[4] = [d[3], d[4]]; else lighting[d[2]] = d[3];
-        break;
-      case 0x08:
-        if (d[1] !== 3) { d[0] = 0xFF; break; }
-        if (d[2] === 4) { d[3] = lighting[4][0]; d[4] = lighting[4][1]; }
-        else d[3] = lighting[d[2]];
-        break;
-      case 0x09: if (d[1] !== 3) d[0] = 0xFF; break;
-      case 0x0C: d[1] = MACRO_SLOTS; break;
-      case 0x0D: d[1] = MACRO_BYTES >> 8; d[2] = MACRO_BYTES & 0xFF; break;
-      case 0x0E: { const o = u16(d[1], d[2]); for (let i = 0; i < d[3]; i++) d[4 + i] = macroBuf[o + i] ?? 0; break; }
-      case 0x0F: { const o = u16(d[1], d[2]); for (let i = 0; i < d[3]; i++) macroBuf[o + i] = d[4 + i]; break; }
-      case 0x11: d[1] = LAYER_COUNT; break;
-      case 0x12: if (bufferMode === 'unhandled') { d[0] = 0xFF; break; } {
-        const o = u16(d[1], d[2]); for (let i = 0; i < d[3]; i++) d[4 + i] = keymapBufferByte(o + i); break; }
-      case 0x14: { const k = encoders.get(`${d[1]},${d[2]},${d[3]}`) ?? 0; d[4] = k >> 8; d[5] = k & 0xFF; break; }
-      case 0x15: encoders.set(`${d[1]},${d[2]},${d[3]}`, u16(d[4], d[5])); break;
-      case 0xA3: d[1] = DEFAULT_LAYER; break;                          // Keychron: default layer
-      default:   d[0] = 0xFF;                                           // id_unhandled
-    }
-    return d;
   }
 
   const log = [];          // every request, in arrival order, as plain arrays
@@ -116,25 +42,34 @@
   class FakeKeychron extends EventTarget {
     constructor() {
       super();
-      this.vendorId    = 0x3434;
+      // Never opened, so it does not take the computer keyboard's keys as switches.
+      this.keyboard    = new DemoKeyboard(PID);
+      this.vendorId    = this.keyboard.vendorId;
       this.productId   = PID;
-      this.productName = 'Keychron V6 Max';
+      this.productName = this.keyboard.productName;
       this.opened      = false;
       this.collections = [{ usagePage: 0xFF60, usage: 0x61 }];
     }
     async open()   { this.opened = true; }
     async close()  { this.opened = false; }
     async forget() { this.opened = false; }
+
+    answer(d) {
+      if (d[0] !== CMD_KEYMAP_GET_BUFFER || bufferMode === 'normal') return this.keyboard.answer(d);
+      if (bufferMode === 'unhandled') d[0] = VIA_UNHANDLED;
+      else readShiftedBuffer(this.keyboard, d);
+      return d;
+    }
+
     async sendReport(_reportId, data) {
       const bytes = new Uint8Array(32);
       bytes.set(new Uint8Array(data.buffer || data, data.byteOffset || 0, Math.min(32, data.byteLength)));
       log.push(Array.from(bytes.slice(0, 6)));
       pending++;
-      // One reply at a time, in arrival order, like the firmware's single USB endpoint.
       const now = performance.now();
       replyChainEnds = Math.max(now, replyChainEnds) + REPLY_DELAY_MS;
       setTimeout(() => {
-        const reply = answer(bytes);
+        const reply = this.answer(bytes);
         const ev = new Event('inputreport');
         Object.defineProperties(ev, {
           data:     { value: new DataView(reply.buffer) },
@@ -147,10 +82,13 @@
     }
   }
 
-  const device = new FakeKeychron();
+  let device = null;
+  const theDevice = () => (device ??= new FakeKeychron());
+  const keyboard = () => theDevice().keyboard;
+
   const hid = new EventTarget();
-  hid.getDevices    = async () => [device];
-  hid.requestDevice = async () => [device];
+  hid.getDevices    = async () => [theDevice()];
+  hid.requestDevice = async () => [theDevice()];
   Object.defineProperty(Navigator.prototype, 'hid', { get: () => hid, configurable: true });
 
   // Every announcement, in order, so tests can check what a screen reader was told.
@@ -166,13 +104,19 @@
 
   window.__fakeKeychron = {
     PID,
-    device,
     log,
     spoken,
-    getKey: (l, r, c) => { seed(); return getKey(l, r, c); },
-    setKey: (l, r, c, code) => { seed(); keymap.set(`${l},${r},${c}`, code); },
-    getEncoder: (l, id, cw) => { seed(); return encoders.get(`${l},${id},${cw}`) ?? 0; },
-    lighting,
+    getKey(l, r, c) {
+      const kb = keyboard();
+      const index = kb.cell(l, r, c);
+      return index < 0 ? 0 : kb.keymap[index];
+    },
+    setKey(l, r, c, code) {
+      const kb = keyboard();
+      const index = kb.cell(l, r, c);
+      if (index >= 0) kb.keymap[index] = code;
+    },
+    getEncoder: (l, id, cw) => keyboard().encoders.get(`${l},${id},${cw}`) ?? 0,
     setBufferMode: mode => { bufferMode = mode; },
     // Resolves once no request has been outstanding for `quietMs`.
     whenIdle(quietMs = 100) {

@@ -11677,7 +11677,7 @@ class DemoKeyboard extends EventTarget {
     this.vendorId    = VIA_VID;
     this.productId   = pid;
     this.productName = entry.name;
-    this.opened      = true;
+    this.opened      = false;
     this.layout  = KEYCHRON_LAYOUTS[entry.layoutId];
     this.factory = FACTORY_KEYMAPS[pid];
     this.protocolVersion = demoProtocolVersion(this.factory);
@@ -11690,18 +11690,22 @@ class DemoKeyboard extends EventTarget {
     this.matrixAnswered = true;   // tests clear it to play firmware without the switch matrix value
     this.resetKeymap();
 
-    // Its switches are the computer keyboard's keys, so Capture Mode works in demo.
-    // A switch is released DEMO_SWITCH_HOLD_MS after its key, because a scripted key
-    // press is released at once, before any poll could see it.
+    // While open, its switches are the computer keyboard's keys, so Capture Mode works
+    // in demo. A switch is released DEMO_SWITCH_HOLD_MS after its key, because a
+    // scripted key press is released at once, before any poll could see it. The
+    // browser tests' simulated keyboard answers through a DemoKeyboard it never opens,
+    // so their key presses do not reach it.
     this.heldSwitches = new Set();
     this.releaseTimers = new Map();   // "row,col" -> timer releasing that switch
     this.onKeyDown = e => { if (!e.repeat) this.pressSwitchFor(e.code, e.key, true); };
     this.onKeyUp   = e => this.pressSwitchFor(e.code, e.key, false);
+  }
+
+  async open()   {
+    this.opened = true;
     window.addEventListener('keydown', this.onKeyDown, true);
     window.addEventListener('keyup', this.onKeyUp, true);
   }
-
-  async open()   { this.opened = true; }
   async close()  {
     this.opened = false;
     window.removeEventListener('keydown', this.onKeyDown, true);
@@ -11755,28 +11759,29 @@ class DemoKeyboard extends EventTarget {
     }
   }
 
-  // The factory keymap as the firmware's flat buffer (layer, row, column), plus the
-  // knob. A model without factory data gets each key's own keycode on the base
-  // layers and KC_TRNS elsewhere.
+  // The factory keymap as the firmware's flat buffer (layer, row, column), plus every
+  // knob. A key or knob the factory data lacks gets its own keycode on the base
+  // layers and KC_TRNS elsewhere, so a gap in the data shows up in
+  // data-consistency.test.mjs alone and not as a remap in every other test.
   resetKeymap() {
     const { rows, cols } = this.layout;
     this.keymap   = new Uint16Array(this.layerCount * rows * cols);
     this.encoders = new Map();   // "layer,id,clockwise" -> keycode
-    const bases = [this.roles.mac, this.roles.win];
+    const setKnob = (l, id, knob) => {
+      this.encoders.set(`${l},${id},0`, knob.ccw);
+      this.encoders.set(`${l},${id},1`, knob.cw);
+    };
+    const hasKnob = this.layout.keys.some(k => k.isEncoder);
     for (let l = 0; l < this.layerCount; l++) {
+      const isBase = [this.roles.mac, this.roles.win].includes(l);
       const factoryLayer = this.factory && this.factory.layers[l];
       for (const key of this.layout.keys) {
-        const code = factoryLayer
-          ? factoryLayer[`${key.row},${key.col}`]
-          : (bases.includes(l) ? LABEL_TO_KEYCODE[key.label] : 0x0001);
-        this.keymap[this.cell(l, key.row, key.col)] = code ?? 0;
+        const code = factoryLayer && factoryLayer[`${key.row},${key.col}`];
+        this.keymap[this.cell(l, key.row, key.col)] = code ?? (isBase ? (LABEL_TO_KEYCODE[key.label] ?? 0) : 0x0001);
       }
-      const factoryKnob = this.factory && this.factory.encoders[l] && this.factory.encoders[l][0];
-      if (this.layout.keys.some(k => k.isEncoder)) {
-        const knob = factoryKnob || (bases.includes(l) ? { ccw: 0x0081, cw: 0x0080 } : { ccw: 0x0001, cw: 0x0001 });
-        this.encoders.set(`${l},0,0`, knob.ccw);
-        this.encoders.set(`${l},0,1`, knob.cw);
-      }
+      const knobs = (this.factory && this.factory.encoders && this.factory.encoders[l]) || [];
+      knobs.forEach((knob, id) => { if (knob) setKnob(l, id, knob); });
+      if (hasKnob && !knobs[0]) setKnob(l, 0, isBase ? { ccw: 0x0081, cw: 0x0080 } : { ccw: 0x0001, cw: 0x0001 });
     }
   }
 
@@ -12241,6 +12246,7 @@ async function startDemoKeyboard() {
   }
   $('sec-manual').hidden = true;
   hidDevice = new DemoKeyboard(pid);
+  await hidDevice.open();
   const version = viaProtocolFromReply(await sendVIA([CMD_GET_PROTOCOL]));
   await identifyKeyboard(hidDevice.vendorId, hidDevice.productId, version);
 }

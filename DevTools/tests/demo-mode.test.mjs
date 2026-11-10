@@ -182,11 +182,14 @@ test('a request queued for one keyboard is not sent to the next one connected', 
   const page = await demoPage();
   const replies = await page.evaluate(async () => {
     const first = hidDevice;
+    const second = new DemoKeyboard(first.productId);
+    await second.open();
     const queued = sendVIA([CMD_GET_PROTOCOL]);
-    hidDevice = new DemoKeyboard(first.productId);   // swapped before the request is sent
+    hidDevice = second;   // swapped before the request is sent
     const next = sendVIA([CMD_GET_PROTOCOL]);
     const out = [await queued, await next].map(r => r !== null);
     hidDevice = first;
+    await second.close();
     return out;
   });
   assert.deepEqual(replies, [false, true]);
