@@ -14,12 +14,14 @@
 // not in KNOWN with the verdict it has, or when two matching boards name a key
 // differently.
 import { appTables, firmwareBoard, viaBoards, compareViaWithFirmware, keyNaming, unreadableFiles, hex } from './keyboard-sources.mjs';
+import { ultraBoards, ultraLayout, launcherViaDefinitions } from './zmk-source.mjs';
 
 // Boards whose verdict is understood and accepted, by product ID. A board here that
 // gets any other verdict fails the run, so the entry is revisited.
 const KNOWN = {
   0x0960: { verdict: 'SOURCES DISAGREE', reason: 'Keychron\'s VIA JSON has Right Shift and Numpad 0 one column right of the firmware' },
   0x0762: { verdict: 'NO FIRMWARE SOURCE', reason: 'the B6 Pro runs ZMK, which this script does not read; zmk-firmware.mjs builds its data from the firmware' },
+  0x0C10: { verdict: 'SOURCES DISAGREE', reason: 'Keychron\'s app/src/launcher/v1_ultra.json holds the ISO layout under the ANSI ID; its other two V1 Ultra ANSI files agree with the source' },
   0x0A54: { verdict: 'LAYOUT WRONG', reason: 'the source keymap is a copy of the ANSI one; the released binary holds the ISO layout, which the app uses' },
 };
 
@@ -66,6 +68,50 @@ function datasetNote(pid, board) {
   return extra || missing || codes ? `factory dataset differs: ${extra} extra, ${missing} missing, ${codes} codes` : null;
 }
 
+// An Ultra 8K board (ZMK): its layout and factory dataset against what zmk-source.mjs reads
+// from Keychron's ZMK source, and the source against Keychron's VIA definitions, which
+// leave out the knob press.
+const ultra = new Map(ultraBoards().map(b => [b.pid, b]));
+const launcherVia = launcherViaDefinitions();
+function checkUltra(r, pid, layout) {
+  const b = ultra.get(pid);
+  if (!b || b.error) { r.verdict = b ? b.error : 'NOT IN THE ZMK SOURCE'; return; }
+  r.source = `Keychron/zmk rtl8762g app/boards/shields/${b.shield}`;
+  const want = ultraLayout(b, tables);
+  if (layout.rows !== want.rows || layout.cols !== want.cols) {
+    r.problems.push(`matrix is ${layout.rows}x${layout.cols} in the app, ${want.rows}x${want.cols} in the firmware`);
+  }
+  const wantAt = new Map(want.keys.map(k => [`${k.row},${k.col}`, k]));
+  const appAt = new Set(layout.keys.map(k => `${k.row},${k.col}`));
+  for (const k of layout.keys) {
+    const pos = `${k.row},${k.col}`, w = wantAt.get(pos);
+    if (!w) r.problems.push(`${k.label} at (${pos}): the firmware has no key there`);
+    else if (w.label !== k.label) r.problems.push(`${k.label} at (${pos}): the firmware key there is ${w.label}`);
+    else if (!!w.isEncoder !== !!k.isEncoder) r.problems.push(`${k.label} at (${pos}): knob flag differs from the firmware`);
+  }
+  for (const [pos, w] of wantAt) if (!appAt.has(pos)) r.problems.push(`(${pos}) is ${w.label} in the firmware, but no key in the app's layout uses it`);
+  const model = FACTORY_KEYMAPS[pid];
+  if (!model) r.notes.push('no factory dataset');
+  else if (JSON.stringify(model.layers) !== JSON.stringify(b.layers) || JSON.stringify(model.encoders) !== JSON.stringify(b.encoders)) {
+    r.notes.push('factory dataset differs from the source');
+  }
+  const vias = launcherVia.get(pid) || [];
+  const fw = new Set(want.keys.filter(k => !k.isEncoder).map(k => `${k.row},${k.col}`));
+  let viaAgrees = vias.length > 0;
+  for (const v of vias) {
+    const viaOnly = [...v.keys].filter(p => !fw.has(p)), fwOnly = [...fw].filter(p => !v.keys.has(p));
+    if (viaOnly.length || fwOnly.length || v.knobs !== (b.knob ? 1 : 0)) {
+      viaAgrees = false;
+      r.notes.push(`VIA ${v.source} disagrees with the firmware: VIA-only ${viaOnly.join(' ') || 'none'}, ` +
+        `firmware-only ${fwOnly.join(' ') || 'none'}, knobs ${v.knobs} in VIA, ${b.knob ? 1 : 0} in the firmware`);
+    }
+  }
+  if (!vias.length) r.notes.push('no VIA definition');
+  if (r.problems.length) r.verdict = 'LAYOUT WRONG';
+  else if (!vias.length) r.verdict = 'FIRMWARE ONLY';
+  else r.verdict = viaAgrees ? 'VERIFIED' : 'SOURCES DISAGREE';
+}
+
 const results = [];
 for (const [pidText, entry] of Object.entries(KEYBOARD_DB)) {
   const pid = Number(pidText);
@@ -73,6 +119,7 @@ for (const [pidText, entry] of Object.entries(KEYBOARD_DB)) {
   const r = { pid, name: entry.name, layoutId: entry.layoutId, problems: [], notes: [] };
   results.push(r);
   if (!layout) { r.verdict = 'NO LAYOUT IN APP'; continue; }
+  if (entry.firmware === 'zmk-ultra') { checkUltra(r, pid, layout); continue; }
   const board = firmwareBoard(pid);
   r.source = board.source;
   if (board.error) { r.verdict = board.error; continue; }

@@ -71,7 +71,7 @@ function imagePids(image) {
 // ---- Keychron's source ----
 // "NAME = 0x1234," entries of an enum, and the names that follow a "NAME = OTHER," start
 // one by one, as C numbers them.
-function enumValues(text, known = {}) {
+export function enumValues(text, known = {}) {
   const values = { ...known };
   let next = null;
   for (const line of text.split(/\r?\n/)) {
