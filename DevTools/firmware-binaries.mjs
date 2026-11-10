@@ -16,13 +16,11 @@
 //     skipping files already there, and records each one's PIDs in manifest.json
 //   node DevTools/firmware-binaries.mjs check [--details]
 //     compares FACTORY_KEYMAPS with the newest binary for each PID
-//   node DevTools/firmware-binaries.mjs apply
-//     rewrites FACTORY_KEYMAPS in KeyAble.html with the shipped codes, so run it after
-//     pasting entries from build-factory-dataset.js
+// build-factory-dataset.mjs lays the shipped codes over the source ones (shippedEntries).
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { ROOT, APP, appTables, firmwareBoard } from './keyboard-sources.mjs';
+import { ROOT, appTables, firmwareBoard } from './keyboard-sources.mjs';
 
 const BIN_DIR  = path.join(ROOT, 'ProjectAssets', 'keychron-firmware-bin');
 const MANIFEST = path.join(BIN_DIR, 'manifest.json');
@@ -151,11 +149,12 @@ function shipped(pid, fk, file) {
   return { file, layers, diffs, extra };
 }
 
-function boardsWithBinaries(each) {
+// Calls each(pid, label, shipped) for every board in `factoryKeymaps` that has a layout.
+function boardsWithBinaries(factoryKeymaps, each) {
   const newestFor = newestBinaries();
-  const { KEYBOARD_DB, KEYCHRON_LAYOUTS, FACTORY_KEYMAPS } = appTables();
+  const { KEYBOARD_DB, KEYCHRON_LAYOUTS } = appTables();
   for (const pidText of Object.keys(KEYBOARD_DB).sort((a, b) => a - b)) {
-    const pid = Number(pidText), entry = KEYBOARD_DB[pid], fk = FACTORY_KEYMAPS[pid];
+    const pid = Number(pidText), entry = KEYBOARD_DB[pid], fk = factoryKeymaps[pid];
     if (!fk || !KEYCHRON_LAYOUTS[entry.layoutId]) continue;
     const file = newestFor.get(pid);
     each(pid, `${hex(pid)} ${entry.name}`, file ? shipped(pid, fk, file) : { error: 'NO BINARY' });
@@ -164,7 +163,7 @@ function boardsWithBinaries(each) {
 
 function check(details) {
   const counts = {};
-  boardsWithBinaries((pid, label, s) => {
+  boardsWithBinaries(appTables().FACTORY_KEYMAPS, (pid, label, s) => {
     const verdict = s.error ? s.error.split(' (')[0] : s.extra.length ? 'KEYS OUTSIDE LAYOUT' : s.diffs.length ? 'DIFFERS' : 'MATCHES';
     counts[verdict] = (counts[verdict] || 0) + 1;
     const note = s.error ? s.error.slice(verdict.length).trim() : `${s.file}${s.diffs.length ? `; ${s.diffs.length} differences` : ''}${s.extra.length ? `; ${s.extra.length} keys outside the layout` : ''}`;
@@ -175,44 +174,26 @@ function check(details) {
   for (const [v, n] of Object.entries(counts)) console.log(`${v}: ${n}`);
 }
 
-// Rewrites each FACTORY_KEYMAPS entry that has a binary with the shipped codes, marked with
-// the file they came from. Positions, roles and knob maps are left as they are: a board
-// whose knob map differs, or whose binary holds keys outside our layout, is not touched.
-function apply() {
-  let html = readFileSync(APP, 'utf8');
-  const start = html.indexOf('const FACTORY_KEYMAPS = {\n');
-  const end = html.indexOf('\n};', start);
-  let table = html.slice(start, end);
-  let changed = 0;
-  boardsWithBinaries((pid, label, s) => {
+// The shipped layers for each board in `factoryKeymaps` that has a binary, as a Map of
+// pid to { file, layers }. Positions, roles and knob maps stay as the source gives them,
+// so a board whose knob map differs, or whose binary holds keys outside our layout, is
+// left out and reported for a person to look at.
+export function shippedEntries(factoryKeymaps) {
+  const out = new Map();
+  boardsWithBinaries(factoryKeymaps, (pid, label, s) => {
     if (s.error) return;
-    if (s.extra.length || s.diffs.includes('knob map not found as ours')) { console.log(`SKIPPED ${label}: needs a look (check --details)`); return; }
-    // An entry is "  0xPPPP: {", an optional roles line, "    layers: [", one line per layer.
-    const opening = `  ${hex(pid)}: {\n`;
-    let from = table.indexOf(opening);
-    if (from < 0) throw new Error(`${label}: entry not found in FACTORY_KEYMAPS`);
-    let to = from + opening.length;
-    if (table.startsWith('    roles:', to)) to = table.indexOf('\n', to) + 1;
-    if (!table.startsWith('    layers: [\n', to)) throw new Error(`${label}: unexpected entry layout`);
-    const kept = table.slice(from, to + '    layers: [\n'.length);
-    to += '    layers: [\n'.length;
-    while (table.startsWith('      {', to)) to = table.indexOf('\n', to) + 1;
-    const note = /\n {2}\/\/ Shipped firmware: [^\n]*\n$/.exec(table.slice(0, from));
-    if (note) from -= note[0].length - 1;
-    const layerLines = s.layers.map(l => `      ${JSON.stringify(l)},\n`).join('');
-    const replacement = `  // Shipped firmware: ${s.file}\n${kept}${layerLines}`;
-    if (table.slice(from, to) !== replacement) changed++;
-    table = table.slice(0, from) + replacement + table.slice(to);
+    if (s.extra.length || s.diffs.includes('knob map not found as ours')) {
+      console.log(`NOT FROM BINARY ${label}: needs a look (firmware-binaries.mjs check --details)`);
+      return;
+    }
+    out.set(pid, { file: s.file, layers: s.layers });
   });
-  html = html.slice(0, start) + table + html.slice(end);
-  writeFileSync(APP, html);
-  console.log(`${changed} entries rewritten from shipped firmware`);
+  return out;
 }
 
-// Run as a command only, so other scripts can import findTable and descriptorPids.
+// Run as a command only, so other scripts can import from it.
 const [mode, ...args] = process.argv.slice(2);
 if (!process.argv[1] || import.meta.url !== pathToFileURL(process.argv[1]).href) { /* imported */ }
 else if (mode === 'fetch' && args.length) await fetchPages(args);
 else if (mode === 'check') check(args.includes('--details'));
-else if (mode === 'apply') apply();
-else { console.error('usage: fetch <page url> [...] | check [--details] | apply'); process.exit(1); }
+else { console.error('usage: fetch <page url> [...] | check [--details]'); process.exit(1); }

@@ -134,18 +134,24 @@ function indexFirmware() {
         }
         matrixSize = configMatrixSize(d) || matrixSize;
       }
+      // Keychron's lock-screen keys, when a board enables them, shift its custom keycodes.
+      const lockFlag = name => chain.some(d => {
+        const file = path.join(d, 'config.h');
+        return existsSync(file) && new RegExp(`^\\s*#define\\s+${name}\\b`, 'm').test(readFileSync(file, 'utf8'));
+      });
+      const lockOpts = { winLock: lockFlag('WIN_LOCK_SCREEN_ENABLE'), macLock: lockFlag('MAC_LOCK_SCREEN_ENABLE') };
       const pid = parseInt(pidText, 16);
       if (!firmwareIndex.has(pid)) firmwareIndex.set(pid, []);
-      firmwareIndex.get(pid).push({ repo, dir, layouts, matrixSize, source: `${repo}/${path.relative(path.join(FW, repo), dir).replace(/\\/g, '/')}` });
+      firmwareIndex.get(pid).push({ repo, dir, layouts, matrixSize, lockOpts, source: `${repo}/${path.relative(path.join(FW, repo), dir).replace(/\\/g, '/')}` });
     }
   }
   return firmwareIndex;
 }
 
-// The board's keys in LAYOUT order: { pos, row, col, token, code, x, y, w, h }, or
-// { error } naming what is missing. Wired boards are read from mainline QMK and Max and
-// Pro boards from Keychron's fork, as the factory dataset was built.
-export function firmwareBoard(pid) {
+// The source a board's factory data is read from: { source, layouts, matrixSize,
+// lockOpts, keymapFile }, or { error }. Wired boards are read from mainline QMK, with its
+// default keymap, and Max and Pro boards from Keychron's fork, with its via keymap.
+export function firmwareSource(pid) {
   const sources = indexFirmware().get(pid) || [];
   if (!sources.length) return { error: 'NO FIRMWARE SOURCE' };
   const wireless = /_max|_pro/.test(sources.map(s => s.source).join(' '));
@@ -153,6 +159,15 @@ export function firmwareBoard(pid) {
   const keymapFile = (src.repo === 'keychron-fork' ? ['via', 'default'] : ['default', 'via'])
     .map(k => path.join(src.dir, 'keymaps', k, 'keymap.c')).find(f => existsSync(f));
   if (!keymapFile) return { error: 'NO FIRMWARE KEYMAP', source: src.source };
+  return { ...src, keymapFile };
+}
+
+// The board's keys in LAYOUT order: { pos, row, col, token, code, x, y, w, h }, or
+// { error } naming what is missing.
+export function firmwareBoard(pid) {
+  const src = firmwareSource(pid);
+  if (src.error) return src;
+  const { keymapFile } = src;
   const code    = stripComments(readFileSync(keymapFile, 'utf8'));
   const blocks  = layerBlocks(code);
   const defs    = defines(code);

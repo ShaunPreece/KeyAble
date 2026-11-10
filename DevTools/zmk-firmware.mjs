@@ -19,12 +19,11 @@
 //     downloads every .uf2 linked from the pages, skipping files already there
 //   node DevTools/zmk-firmware.mjs show <uf2 file>
 //     prints the decoded keymap, layer by layer, by matrix position
-//   node DevTools/zmk-firmware.mjs apply
-//     writes the FACTORY_KEYMAPS entry of every board in ZMK_BOARDS that KeyAble knows,
-//     from the newest firmware for it
+// build-factory-dataset.mjs takes these boards' entries from zmkEntries.
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import { ROOT, APP, appTables } from './keyboard-sources.mjs';
+import { pathToFileURL } from 'node:url';
+import { ROOT, appTables } from './keyboard-sources.mjs';
 
 const BIN_DIR = path.join(ROOT, 'ProjectAssets', 'keychron-firmware-bin', 'zmk');
 const SRC     = path.join(ROOT, 'ProjectAssets', 'keychron-firmware-src', 'keychron-zmk', 'app');
@@ -322,35 +321,27 @@ function newestDecoded() {
   return newest;
 }
 
-// Writes or replaces "  // Shipped firmware: <file>\n  0xPPPP: { layers: [...], encoders: [...] }"
-// for each decoded board KeyAble knows, and lists the keys the board has that its
-// KeyAble layout lacks, and any layout key the firmware does not place. These boards
-// have no knob.
-function apply() {
+// The factory layers of each ZMK board KeyAble knows, from its newest firmware, as a Map
+// of pid to { file, layers }. Reports the keys the board has that its KeyAble layout
+// lacks, and any layout key the firmware does not place. These boards have no knob.
+export function zmkEntries() {
   const { KEYBOARD_DB, KEYCHRON_LAYOUTS } = appTables();
-  let html = readFileSync(APP, 'utf8');
-  const start = html.indexOf('const FACTORY_KEYMAPS = {\n');
-  const end = html.indexOf('\n};', start);
-  let table = html.slice(start, end);
+  const out = new Map();
   for (const { pid, file, layers } of newestDecoded().values()) {
     if (!KEYBOARD_DB[pid]) continue;
-    const entry = `  // Shipped firmware: ${file}\n  ${hex(pid)}: {\n    layers: [\n` +
-      layers.map(l => `      ${JSON.stringify(l)},\n`).join('') +
-      `    ],\n    encoders: [\n${layers.map(() => '      [],\n').join('')}    ],\n  },`;
-    const opening = new RegExp(`\\n(?:  // Shipped firmware: [^\\n]*\\n)?  ${hex(pid)}: \\{\\n[\\s\\S]*?\\n  \\},`);
-    table = opening.test(table) ? table.replace(opening, '\n' + entry) : table + '\n' + entry;
-    console.log(`${hex(pid)} ${KEYBOARD_DB[pid].name}: ${file}`);
+    out.set(pid, { file, layers });
     const inLayout = new Set((KEYCHRON_LAYOUTS[KEYBOARD_DB[pid].layoutId]?.keys || []).map(k => `${k.row},${k.col}`));
     const unplaced = [...inLayout].filter(pos => !(pos in layers[0]));
     const extra = Object.keys(layers[0]).filter(pos => !inLayout.has(pos) && layers.some(l => l[pos] > 1));
-    if (unplaced.length) console.log(`    layout keys the firmware does not place: ${unplaced.join(' ')}`);
-    if (extra.length) console.log(`    keys missing from the layout: ${extra.join(' ')}`);
+    if (unplaced.length) console.log(`${hex(pid)}: layout keys the firmware does not place: ${unplaced.join(' ')}`);
+    if (extra.length) console.log(`${hex(pid)}: keys missing from the layout: ${extra.join(' ')}`);
   }
-  writeFileSync(APP, html.slice(0, start) + table + html.slice(end));
+  return out;
 }
 
+// Run as a command only, so build-factory-dataset.mjs can import from it.
 const [mode, ...args] = process.argv.slice(2);
-if (mode === 'fetch' && args.length) await fetchPages(args);
+if (!process.argv[1] || import.meta.url !== pathToFileURL(process.argv[1]).href) { /* imported */ }
+else if (mode === 'fetch' && args.length) await fetchPages(args);
 else if (mode === 'show' && args.length) show(args[0]);
-else if (mode === 'apply') apply();
-else { console.error('usage: fetch <page url> [...] | show <uf2 file> | apply'); process.exit(1); }
+else { console.error('usage: fetch <page url> [...] | show <uf2 file>'); process.exit(1); }

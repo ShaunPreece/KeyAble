@@ -72,7 +72,7 @@ Both datasets were derived from Keychron's own public, open sources:
     (app/src/launcher/map_keycode.c), with each key placed by the board's
     overlay, for example:
       app/boards/shields/keychron/b6/uk/keychron_b6_uk.overlay
-    DevTools/zmk-firmware.mjs does this; see step 5 of section 4.
+    DevTools/zmk-firmware.mjs does this; see step 4 of section 4.
 
   - Keychron's VIA JSON files (the same files the Keychron Launcher and VIA
     configurator load), from Keychron's fork (each board's via_json folder) and
@@ -136,46 +136,42 @@ At a high level, adding a model is a data task, in this order:
      disagrees with its firmware. Reuse an existing layoutId only if the
      generated keys are identical.
 
-  3. Get the factory keymap. Parse the model's keymap.c with its info.json:
-       node DevTools/parse_factory_keymap.js <info.json> <keymap.c> [--winlock] [--maclock]
-     It reads every layer block (usually Mac base, Mac Fn, Windows base,
-     Windows Fn; a few boards have a fifth, in a different order) plus the
-     encoder map, converts each key to its numeric keycode, and writes
-     parsed.json beside keymap.c. It stops on any token it cannot convert.
-     The two flags are the model's lock-screen build options, which shift
-     Keychron's own keycodes.
-
-  4. Build the FACTORY_KEYMAPS entries from the parsed files:
-       node DevTools/build-factory-dataset.js <parsed.json> [<parsed.json> ...]
-     It writes DevTools/factory-dataset.generated.js, keyed by PID, with each
-     layer at its real index on the device as a "row,col" to keycode map,
-     plus the encoder assignments, and a roles entry for a board whose layer
-     order differs from the usual four. Copy the new entries into
-     FACTORY_KEYMAPS in KeyAble.html.
-
-  5. Replace the factory codes with the shipped ones, where Keychron publishes
-     a binary for the model:
+  3. Download Keychron's released firmware for the model, where there is one:
        node DevTools/firmware-binaries.mjs fetch <Keychron firmware page URL>
-       node DevTools/firmware-binaries.mjs check --details
-       node DevTools/firmware-binaries.mjs apply
-     It finds the board's keymap table in the binary from the shape the source
-     predicts, lists every key where the two differ, and writes the shipped
-     codes into FACTORY_KEYMAPS. A binary with a key outside the layout, or a
-     different knob map, is reported and left for a person to look at.
-     The ZMK B6 Pro has its own script, which writes its whole entry from
-     the firmware and lists any key the board has that the layout lacks:
+     For a ZMK board (the B Pro series), the .uf2 files instead:
        node DevTools/zmk-firmware.mjs fetch <Keychron B Pro firmware page URL>
-       node DevTools/zmk-firmware.mjs apply
-     Run it after copying in a rebuilt FACTORY_KEYMAPS, since step 4 does not
-     produce the B6 Pro entry.
 
-  6. Check every keyboard against its firmware and VIA JSON:
+  4. Build the factory keymaps of every keyboard and write them into the app:
+       node DevTools/build-factory-dataset.mjs check
+       node DevTools/build-factory-dataset.mjs write
+     check lists every entry that would change and writes nothing; write
+     replaces the whole FACTORY_KEYMAPS table between its two GENERATED
+     markers. For each keyboard with a layout, the build:
+       - reads every layer block of its keymap.c (usually Mac base, Mac Fn,
+         Windows base, Windows Fn; a few boards have a fifth, in a different
+         order) and the knob map, places each key by the LAYOUT matrix order,
+         and converts it to its numeric keycode. It stops on any token it
+         cannot convert, and writes nothing.
+       - lays the codes from the newest downloaded binary over the source's,
+         marking the entry "Shipped firmware". It finds the keymap table in
+         the binary from the shape the source predicts. A binary with a key
+         outside the layout, or a different knob map, is reported and left
+         for a person to look at: firmware-binaries.mjs check --details
+         lists every difference.
+       - for a ZMK board, takes the whole entry from its firmware, and lists
+         any key the board has that the layout lacks.
+     A board whose own source has the wrong key positions takes them from
+     another board's source (POSITIONS_FROM in the build), and must then
+     have its own binary.
+
+  5. Check every keyboard against its firmware and VIA JSON:
        node DevTools/verify-keyboards.mjs --details
-     Both scripts read the firmware from sparse clones of the commits above,
-     plus the-via/keyboards, in ProjectAssets/keychron-firmware-src (see the
-     comment at the top of DevTools/keyboard-sources.mjs).
+     It and the build read the firmware source from sparse clones of the
+     commits above, plus the-via/keyboards, in
+     ProjectAssets/keychron-firmware-src (see the comment at the top of
+     DevTools/keyboard-sources.mjs).
 
-  7. Verify against hardware: connect the real board, confirm keys are named
+  6. Verify against hardware: connect the real board, confirm keys are named
      correctly, remap one key and reset it, and confirm a full factory reset
      restores the true original values on both the Mac and Windows sides.
 

@@ -1,5 +1,5 @@
 // Reads a Keychron keymap.c: its layer blocks and its object-like #defines.
-// Shared by parse_factory_keymap.js and keyboard-sources.mjs.
+// Shared by factory-keymap-source.js and keyboard-sources.mjs.
 'use strict';
 
 function stripComments(src) {

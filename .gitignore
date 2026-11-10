@@ -35,5 +35,3 @@ ProjectAssets/keychron-firmware-src/
 # Keychron's released firmware binaries, downloaded by DevTools/firmware-binaries.mjs.
 ProjectAssets/keychron-firmware-bin/
 
-# Build output of DevTools/build-factory-dataset.js; its content is inlined into the app.
-DevTools/factory-dataset.generated.js
