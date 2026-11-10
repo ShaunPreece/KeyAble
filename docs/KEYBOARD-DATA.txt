@@ -62,10 +62,17 @@ Both datasets were derived from Keychron's own public, open sources:
     factory dataset. The firmware source itself is not included in this
     repository; fetch the commits above to reproduce or check the data.
 
-  - The B6 Pro runs Keychron's ZMK firmware (github.com/Keychron/zmk), whose
-    keymap format the parser does not read. It has no factory dataset, and
-    uses the best-effort reset described in section 3, which has been checked
-    on real hardware.
+  - The B6 Pro runs Keychron's ZMK firmware instead:
+      repo:   https://github.com/Keychron/zmk
+      branch: keychron_bpro
+      commit: c284513085c005edf5f9a52b28c8090cc6ed01d2
+    A ZMK keymap holds a behavior per key rather than a keycode. Its factory
+    dataset is read from Keychron's released firmware (the .uf2 file), and
+    translated the way the keyboard's own VIA support does it
+    (app/src/launcher/map_keycode.c), with each key placed by the board's
+    overlay, for example:
+      app/boards/shields/keychron/b6/uk/keychron_b6_uk.overlay
+    DevTools/zmk-firmware.mjs does this; see step 5 of section 4.
 
   - Keychron's VIA JSON files (the same files the Keychron Launcher and VIA
     configurator load), from Keychron's fork (each board's via_json folder) and
@@ -155,6 +162,12 @@ At a high level, adding a model is a data task, in this order:
      predicts, lists every key where the two differ, and writes the shipped
      codes into FACTORY_KEYMAPS. A binary with a key outside the layout, or a
      different knob map, is reported and left for a person to look at.
+     The ZMK B6 Pro has its own script, which writes its whole entry from
+     the firmware and lists any key the board has that the layout lacks:
+       node DevTools/zmk-firmware.mjs fetch <Keychron B Pro firmware page URL>
+       node DevTools/zmk-firmware.mjs apply
+     Run it after copying in a rebuilt FACTORY_KEYMAPS, since step 4 does not
+     produce the B6 Pro entry.
 
   6. Check every keyboard against its firmware and VIA JSON:
        node DevTools/verify-keyboards.mjs --details

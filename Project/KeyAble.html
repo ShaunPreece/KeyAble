@@ -1720,7 +1720,7 @@
         </ul>
         <h4 style="margin-top:1rem">B series</h4>
         <ul style="margin:.3rem 0 0 1.25rem;padding:0;line-height:1.55">
-          <li>B6 Pro</li>
+          <li>B6 Pro (ISO only)</li>
         </ul>
         <p style="margin-top:.85rem">
           We have tested the V5 Max, V6 Max, Q6 Max, and B6 Pro on real hardware. The rest are
@@ -1786,8 +1786,8 @@
 
         <h4 style="margin-top:1rem">Which keyboards does KeyAble work with?</h4>
         <p>
-          19 Keychron models across the Q, V, K, and B series, in ANSI and, for every model but
-          the ANSI-only B6 Pro, ISO layouts (JIS is not supported yet). Supported Keyboards has the full list. We have fully tested the V5 Max, V6 Max, Q6 Max, and B6 Pro on real
+          19 Keychron models across the Q, V, K, and B series, in ANSI and ISO layouts (the S1
+          is ANSI only and the B6 Pro ISO only; JIS is not supported yet). Supported Keyboards has the full list. We have fully tested the V5 Max, V6 Max, Q6 Max, and B6 Pro on real
           hardware; the others are built from Keychron's firmware data and should work.
         </p>
 
@@ -6551,126 +6551,126 @@ const KEYCHRON_LAYOUTS = {
     ],
   },
 
-  // ============================================================
-  // B6 Pro ANSI  (100% full-size + numpad, ZMK wireless)
-  // Source: ZMK overlay RC() positions + layer_two (WIN) keymap bindings
-  //   github.com/Keychron/zmk branch keychron_bpro
-  //   overlay: app/boards/shields/keychron/b6/us/keychron_b6_us.overlay
-  //   keymap:  app/boards/shields/keychron/b6/us/keychron_b6_us.keymap
-  // PID: 0x0762  matrix: rows=8, cols=18
-  // ZMK places keys at scattered RC() positions, unlike QMK's sequential layout.
-  //   These coordinates are the overlay's RC(row,col) scan positions, which the
-  //   VIA protocol in Keychron's ZMK uses too. verify-keyboards.mjs has no source
-  //   for this board, so the layout rests on the overlay and on hardware testing.
-  // ============================================================
-  'b6_ansi': {
+  // B6 Pro ISO (UK). Keychron's ZMK firmware: each key's matrix position is the RC(row,col)
+  // the board's overlay gives it (Keychron/zmk keychron_bpro,
+  // app/boards/shields/keychron/b6/uk/keychron_b6_uk.overlay), which Keychron's VIA support
+  // uses too. Keys in the overlay's row 8 (the OS and wireless switches) are outside the
+  // 8 by 18 matrix and unreachable over VIA. verify-keyboards.mjs cannot read ZMK, and
+  // zmk-firmware.mjs apply reports any key the firmware has that this list lacks.
+  'b6_iso': {
     rows: 8,
     cols: 18,
     keys: [
-      { label: 'Escape',        row: 3, col: 1  },
-      { label: 'F1',            row: 6, col: 2  },
-      { label: 'F2',            row: 6, col: 3  },
-      { label: 'F3',            row: 1, col: 3  },
-      { label: 'F4',            row: 3, col: 3  },
-      { label: 'F5',            row: 7, col: 0  },
-      { label: 'F6',            row: 3, col: 6  },
-      { label: 'F7',            row: 1, col: 7  },
-      { label: 'F8',            row: 6, col: 7  },
-      { label: 'F9',            row: 6, col: 10 },
-      { label: 'F10',           row: 7, col: 10 },
-      { label: 'F11',           row: 3, col: 10 },
-      { label: 'F12',           row: 5, col: 10 },
-      { label: 'Print Screen',  row: 7, col: 9  },
-      { label: 'Scroll Lock',   row: 0, col: 9  },
-      { label: 'Pause/Break',   row: 0, col: 0  },
-      { label: 'Grave/Tilde',   row: 6, col: 1  },
-      { label: '1',             row: 7, col: 1  },
-      { label: '2',             row: 7, col: 2  },
-      { label: '3',             row: 7, col: 3  },
-      { label: '4',             row: 7, col: 4  },
-      { label: '5',             row: 6, col: 4  },
-      { label: '6',             row: 6, col: 5  },
-      { label: '7',             row: 7, col: 5  },
-      { label: '8',             row: 7, col: 6  },
-      { label: '9',             row: 7, col: 7  },
-      { label: '0',             row: 7, col: 8  },
-      { label: 'Minus',         row: 6, col: 8  },
-      { label: 'Equals',        row: 6, col: 6  },
-      { label: 'Backspace',     row: 1, col: 10 },
-      { label: 'Insert',        row: 6, col: 12 },
-      { label: 'Home',          row: 6, col: 14 },
-      { label: 'Page Up',       row: 6, col: 13 },
-      { label: 'Num Lock',      row: 4, col: 11 },
-      { label: 'Numpad /',      row: 4, col: 12 },
-      { label: 'Numpad *',      row: 4, col: 13 },
-      { label: 'Numpad -',      row: 5, col: 13 },
-      { label: 'Tab',           row: 1, col: 1  },
-      { label: 'Q',             row: 0, col: 1  },
-      { label: 'W',             row: 0, col: 2  },
-      { label: 'E',             row: 0, col: 3  },
-      { label: 'R',             row: 0, col: 4  },
-      { label: 'T',             row: 1, col: 4  },
-      { label: 'Y',             row: 1, col: 5  },
-      { label: 'U',             row: 0, col: 5  },
-      { label: 'I',             row: 0, col: 6  },
-      { label: 'O',             row: 0, col: 7  },
-      { label: 'P',             row: 0, col: 8  },
-      { label: 'Left Bracket',  row: 1, col: 8  },
-      { label: 'Right Bracket', row: 1, col: 6  },
-      { label: 'Backslash',     row: 2, col: 10 },
-      { label: 'Delete',        row: 6, col: 11 },
-      { label: 'End',           row: 7, col: 14 },
-      { label: 'Page Down',     row: 7, col: 13 },
-      { label: 'Numpad 7',      row: 0, col: 11 },
-      { label: 'Numpad 8',      row: 0, col: 12 },
-      { label: 'Numpad 9',      row: 0, col: 13 },
-      { label: 'Numpad +',      row: 0, col: 14 },
-      { label: 'Caps Lock',     row: 1, col: 2  },
-      { label: 'A',             row: 2, col: 1  },
-      { label: 'S',             row: 2, col: 2  },
-      { label: 'D',             row: 2, col: 3  },
-      { label: 'F',             row: 2, col: 4  },
-      { label: 'G',             row: 3, col: 4  },
-      { label: 'H',             row: 3, col: 5  },
-      { label: 'J',             row: 2, col: 5  },
-      { label: 'K',             row: 2, col: 6  },
-      { label: 'L',             row: 2, col: 7  },
-      { label: 'Semicolon',     row: 2, col: 8  },
-      { label: 'Quote',         row: 3, col: 8  },
-      { label: 'Enter',         row: 4, col: 10 },
-      { label: 'Numpad 4',      row: 1, col: 11 },
-      { label: 'Numpad 5',      row: 1, col: 12 },
-      { label: 'Numpad 6',      row: 1, col: 13 },
-      { label: 'Left Shift',    row: 1, col: 15 },
-      { label: 'Z',             row: 4, col: 1  },
-      { label: 'X',             row: 4, col: 2  },
-      { label: 'C',             row: 4, col: 3  },
-      { label: 'V',             row: 4, col: 4  },
-      { label: 'B',             row: 5, col: 4  },
-      { label: 'N',             row: 5, col: 5  },
-      { label: 'M',             row: 4, col: 5  },
-      { label: 'Comma',         row: 4, col: 6  },
-      { label: 'Period',        row: 4, col: 7  },
-      { label: 'Slash',         row: 5, col: 8  },
-      { label: 'Right Shift',   row: 2, col: 15 },
-      { label: 'Up Arrow',      row: 3, col: 14 },
-      { label: 'Numpad 1',      row: 2, col: 11 },
-      { label: 'Numpad 2',      row: 2, col: 12 },
-      { label: 'Numpad 3',      row: 2, col: 13 },
-      { label: 'Left Control',  row: 6, col: 0  },
-      { label: 'Left Win/Cmd',  row: 1, col: 16 },
-      { label: 'Left Alt',      row: 3, col: 9  },
-      { label: 'Space',         row: 3, col: 11 },
-      { label: 'Right Alt',     row: 5, col: 9  },
-      { label: 'Right Win/Cmd', row: 2, col: 9  },
-      { label: 'Fn',            row: 5, col: 7  },
-      { label: 'Right Control', row: 4, col: 0  },
-      { label: 'Left Arrow',    row: 5, col: 14 },
-      { label: 'Down Arrow',    row: 5, col: 11 },
-      { label: 'Right Arrow',   row: 5, col: 12 },
-      { label: 'Numpad 0',      row: 3, col: 12 },
-      { label: 'Numpad .',      row: 3, col: 13 },
-      { label: 'Numpad Enter',  row: 2, col: 14 },
+      { label: 'Escape',            row: 3, col: 1  },
+      { label: 'F1',                row: 6, col: 2  },
+      { label: 'F2',                row: 6, col: 3  },
+      { label: 'F3',                row: 1, col: 3  },
+      { label: 'F4',                row: 3, col: 3  },
+      { label: 'F5',                row: 7, col: 0  },
+      { label: 'F6',                row: 3, col: 6  },
+      { label: 'F7',                row: 1, col: 7  },
+      { label: 'F8',                row: 6, col: 7  },
+      { label: 'F9',                row: 6, col: 10 },
+      { label: 'F10',               row: 7, col: 10 },
+      { label: 'F11',               row: 3, col: 10 },
+      { label: 'F12',               row: 5, col: 10 },
+      { label: 'F13',               row: 5, col: 17 },
+      { label: 'Print Screen',      row: 7, col: 9  },
+      { label: 'Scroll Lock',       row: 0, col: 9  },
+      { label: 'Pause/Break',       row: 0, col: 0  },
+      { label: 'Calculator',        row: 7, col: 16 },
+      { label: 'Task View',         row: 4, col: 16 },
+      { label: 'Previous Desktop',  row: 2, col: 16 },
+      { label: 'Next Desktop',      row: 5, col: 16 },
+      { label: 'Grave/Tilde',       row: 6, col: 1  },
+      { label: '1',                 row: 7, col: 1  },
+      { label: '2',                 row: 7, col: 2  },
+      { label: '3',                 row: 7, col: 3  },
+      { label: '4',                 row: 7, col: 4  },
+      { label: '5',                 row: 6, col: 4  },
+      { label: '6',                 row: 6, col: 5  },
+      { label: '7',                 row: 7, col: 5  },
+      { label: '8',                 row: 7, col: 6  },
+      { label: '9',                 row: 7, col: 7  },
+      { label: '0',                 row: 7, col: 8  },
+      { label: 'Minus',             row: 6, col: 8  },
+      { label: 'Equals',            row: 6, col: 6  },
+      { label: 'Backspace',         row: 1, col: 10 },
+      { label: 'Insert',            row: 6, col: 12 },
+      { label: 'Home',              row: 6, col: 14 },
+      { label: 'Page Up',           row: 6, col: 13 },
+      { label: 'Num Lock',          row: 4, col: 11 },
+      { label: 'Numpad /',          row: 4, col: 12 },
+      { label: 'Numpad *',          row: 4, col: 13 },
+      { label: 'Numpad -',          row: 5, col: 13 },
+      { label: 'Tab',               row: 1, col: 1  },
+      { label: 'Q',                 row: 0, col: 1  },
+      { label: 'W',                 row: 0, col: 2  },
+      { label: 'E',                 row: 0, col: 3  },
+      { label: 'R',                 row: 0, col: 4  },
+      { label: 'T',                 row: 1, col: 4  },
+      { label: 'Y',                 row: 1, col: 5  },
+      { label: 'U',                 row: 0, col: 5  },
+      { label: 'I',                 row: 0, col: 6  },
+      { label: 'O',                 row: 0, col: 7  },
+      { label: 'P',                 row: 0, col: 8  },
+      { label: 'Left Bracket',      row: 1, col: 8  },
+      { label: 'Right Bracket',     row: 1, col: 6  },
+      { label: 'Delete',            row: 6, col: 11 },
+      { label: 'End',               row: 7, col: 14 },
+      { label: 'Page Down',         row: 7, col: 13 },
+      { label: 'Numpad 7',          row: 0, col: 11 },
+      { label: 'Numpad 8',          row: 0, col: 12 },
+      { label: 'Numpad 9',          row: 0, col: 13 },
+      { label: 'Numpad +',          row: 0, col: 14 },
+      { label: 'Caps Lock',         row: 1, col: 2  },
+      { label: 'A',                 row: 2, col: 1  },
+      { label: 'S',                 row: 2, col: 2  },
+      { label: 'D',                 row: 2, col: 3  },
+      { label: 'F',                 row: 2, col: 4  },
+      { label: 'G',                 row: 3, col: 4  },
+      { label: 'H',                 row: 3, col: 5  },
+      { label: 'J',                 row: 2, col: 5  },
+      { label: 'K',                 row: 2, col: 6  },
+      { label: 'L',                 row: 2, col: 7  },
+      { label: 'Semicolon',         row: 2, col: 8  },
+      { label: 'Quote',             row: 3, col: 8  },
+      { label: 'Non-US Hash',       row: 2, col: 10 },
+      { label: 'Enter',             row: 4, col: 10 },
+      { label: 'Numpad 4',          row: 1, col: 11 },
+      { label: 'Numpad 5',          row: 1, col: 12 },
+      { label: 'Numpad 6',          row: 1, col: 13 },
+      { label: 'Left Shift',        row: 1, col: 15 },
+      { label: 'Non-US Backslash',  row: 3, col: 2  },
+      { label: 'Z',                 row: 4, col: 1  },
+      { label: 'X',                 row: 4, col: 2  },
+      { label: 'C',                 row: 4, col: 3  },
+      { label: 'V',                 row: 4, col: 4  },
+      { label: 'B',                 row: 5, col: 4  },
+      { label: 'N',                 row: 5, col: 5  },
+      { label: 'M',                 row: 4, col: 5  },
+      { label: 'Comma',             row: 4, col: 6  },
+      { label: 'Period',            row: 4, col: 7  },
+      { label: 'Slash',             row: 5, col: 8  },
+      { label: 'Right Shift',       row: 2, col: 15 },
+      { label: 'Up Arrow',          row: 3, col: 14 },
+      { label: 'Numpad 1',          row: 2, col: 11 },
+      { label: 'Numpad 2',          row: 2, col: 12 },
+      { label: 'Numpad 3',          row: 2, col: 13 },
+      { label: 'Left Control',      row: 6, col: 0  },
+      { label: 'Left Win/Cmd',      row: 1, col: 16 },
+      { label: 'Left Alt',          row: 3, col: 9  },
+      { label: 'Space',             row: 3, col: 11 },
+      { label: 'Right Alt',         row: 5, col: 9  },
+      { label: 'Right Win/Cmd',     row: 2, col: 9  },
+      { label: 'Fn',                row: 5, col: 7  },
+      { label: 'Right Control',     row: 4, col: 0  },
+      { label: 'Left Arrow',        row: 5, col: 14 },
+      { label: 'Down Arrow',        row: 5, col: 11 },
+      { label: 'Right Arrow',       row: 5, col: 12 },
+      { label: 'Numpad 0',          row: 3, col: 12 },
+      { label: 'Numpad .',          row: 3, col: 13 },
+      { label: 'Numpad Enter',      row: 2, col: 14 },
     ],
   },
 
@@ -8152,6 +8152,10 @@ const CMD_MACRO_SET_BUFFER      = 0x0F;   // args: [offset_hi, offset_lo, size, 
 //   Protocol 12 (the Max boards, S1 White): Keychron keys from 0x7E00, and the
 //     firmware's own Mission Control key presses QMK's 0x00C1 (keychron_common.c), so
 //     the app writes 0x00C1/0x00C2, which can also go in a macro.
+//   Keychron's ZMK firmware (B6 Pro) also reports protocol 12 and numbers macros and
+//     Mission Control the same way, but its own keys from 0x7E00 are a different list
+//     (launcher.h in Keychron/zmk), so the board's KEYBOARD_DB entry picks this family
+//     (firmware: 'zmk'), not the protocol.
 // keychronNames names Keychron's keys for spoken confirmations and Review Changes;
 // that is what tells Command and Option apart from Win and Alt on the same physical
 // keys. Each family's order is its firmware enum (protocol 12: keychron_common.h),
@@ -8186,6 +8190,21 @@ const KEYCODES_PROTOCOL_12 = {
     0x7E08: 'Screenshot', 0x7E09: 'Cortana',
   },
 };
+const KEYCODES_ZMK = {
+  macroBase: 0x7700, macroSlots: 16,
+  missionControl: 0x00C1, launchpad: 0x00C2,
+  keychronNames: {
+    0x7E00: 'Bluetooth 1', 0x7E01: 'Bluetooth 2', 0x7E02: 'Bluetooth 3', 0x7E03: 'Bootloader',
+    0x7E04: '2.4 GHz Wireless', 0x7E05: 'Lock Screen', 0x7E06: 'App Settings (Cmd+Comma)',
+    0x7E07: 'Left Option', 0x7E08: 'Right Option', 0x7E09: 'Left Command', 0x7E0A: 'Right Command',
+    0x7E0B: 'Previous Desktop (Ctrl+Left)', 0x7E0C: 'Next Desktop (Ctrl+Right)',
+    0x7E0D: 'Emoji (Ctrl+Cmd+Space)', 0x7E0E: 'Task View',
+    0x7E0F: 'Previous Desktop (Win+Ctrl+Left)', 0x7E10: 'Next Desktop (Win+Ctrl+Right)',
+    0x7E11: 'File Explorer', 0x7E12: 'Lock Screen (Win+L)', 0x7E13: 'Settings (Win+I)',
+    0x7E14: 'Emoji (Win+Period)', 0x7E15: 'Screenshot (Win+Shift+S)',
+    0x7E16: 'Screenshot (Cmd+Shift+4)', 0x7E17: 'Battery Level', 0x7E18: 'Keychron',
+  },
+};
 // The connected board's VIA protocol version (null = not read), and its keycode
 // numbering, which is the newest when the version could not be read. Both are set
 // on connect.
@@ -8202,7 +8221,8 @@ async function readViaProtocolVersion() {
   } catch { return null; }
 }
 
-function keycodesForProtocol(version) {
+function keycodesForBoard(entry, version) {
+  if (entry.firmware === 'zmk') return KEYCODES_ZMK;
   if (version === null || version >= VIA_PROTOCOL_12) return KEYCODES_PROTOCOL_12;
   return version >= VIA_PROTOCOL_11 ? KEYCODES_PROTOCOL_11 : KEYCODES_PROTOCOL_9;
 }
@@ -8439,7 +8459,7 @@ function buildCodeToLabel(list) {
 }
 const SYSTEM_KEY_SET_WIN = { keys: SYSTEM_KEYS_WIN, names: buildCodeToLabel(SYSTEM_KEYS_WIN) };
 const SYSTEM_KEY_SETS_MAC = new Map(
-  [KEYCODES_PROTOCOL_9, KEYCODES_PROTOCOL_11, KEYCODES_PROTOCOL_12].map(numbering => {
+  [KEYCODES_PROTOCOL_9, KEYCODES_PROTOCOL_11, KEYCODES_PROTOCOL_12, KEYCODES_ZMK].map(numbering => {
     const keys = SYSTEM_KEYS_MAC.map(k =>
       k.keycodeOf ? { label: k.label, code: numbering[k.keycodeOf] } : k);
     return [numbering, { keys, names: buildCodeToLabel(keys) }];
@@ -8576,13 +8596,14 @@ const KEYBOARD_DB = {
   0x0323: { name:'Keychron V2 ISO Knob',         series:'V', size:'65%',  layoutId:'v2_iso_knob'  },
   0x0920: { name:'Keychron V2 Max ANSI Knob',    series:'V', size:'65%',  layoutId:'v2_max_ansi_knob' },
   0x0921: { name:'Keychron V2 Max ISO Knob',     series:'V', size:'65%',  layoutId:'v2_max_iso_knob' },
-  0x0762: { name:'Keychron B6 Pro',              series:'B', size:'100%', layoutId:'b6_ansi'      },
+  0x0762: { name:'Keychron B6 Pro ISO',          series:'B', size:'100%', layoutId:'b6_iso', firmware:'zmk' },
 };
 
 // - Factory keymaps (per-model reset dataset) -
 // GENERATED by DevTools/build-factory-dataset.js - do not hand-edit. An entry marked
 // "Shipped firmware" holds the codes from that Keychron binary, written by
-// DevTools/firmware-binaries.mjs apply; the others come from the firmware source.
+// DevTools/firmware-binaries.mjs apply, or for the ZMK B6 Pro by
+// DevTools/zmk-firmware.mjs apply; the others come from the firmware source.
 // Per-model factory keymaps. Keyed by numeric USB PID.
 // layers[layerNum]["row,col"] = 16-bit factory code, indexed by the DEVICE
 // layer number. Canonical 4-layer boards: Mac=0, MacFn=1, Win=2, WinFn=3.
@@ -9635,6 +9656,21 @@ const FACTORY_KEYMAPS = {
       [],
     ],
   },
+  // Shipped firmware: zmk_b6pro_uk_v1.33_2508211148.uf2
+  0x0762: {
+    layers: [
+      {"3,1":41,"6,2":190,"6,3":189,"1,3":193,"3,3":194,"7,0":180,"3,6":32261,"1,7":172,"6,7":174,"6,10":171,"7,10":168,"3,10":170,"5,10":169,"5,17":32262,"7,9":32278,"0,9":0,"0,0":0,"7,16":180,"4,16":193,"2,16":32267,"5,16":32268,"6,1":53,"7,1":30,"7,2":31,"7,3":32,"7,4":33,"6,4":34,"6,5":35,"7,5":36,"7,6":37,"7,7":38,"7,8":39,"6,8":45,"6,6":46,"1,10":42,"6,12":73,"6,14":74,"6,13":75,"4,11":83,"4,12":84,"4,13":85,"5,13":86,"1,1":43,"0,1":20,"0,2":26,"0,3":8,"0,4":21,"1,4":23,"1,5":28,"0,5":24,"0,6":12,"0,7":18,"0,8":19,"1,8":47,"1,6":48,"6,11":76,"7,14":77,"7,13":78,"0,11":95,"0,12":96,"0,13":97,"0,14":87,"1,2":57,"2,1":4,"2,2":22,"2,3":7,"2,4":9,"3,4":10,"3,5":11,"2,5":13,"2,6":14,"2,7":15,"2,8":51,"3,8":52,"2,10":50,"4,10":40,"1,11":92,"1,12":93,"1,13":94,"1,15":225,"3,2":100,"4,1":29,"4,2":27,"4,3":6,"4,4":25,"5,4":5,"5,5":17,"4,5":16,"4,6":54,"4,7":55,"5,8":56,"2,15":229,"3,14":82,"2,11":89,"2,12":90,"2,13":91,"6,0":224,"1,16":32263,"3,9":32265,"3,11":44,"5,9":32266,"2,9":32264,"5,7":21025,"4,0":228,"5,14":80,"5,11":81,"5,12":79,"3,12":98,"3,13":99,"2,14":88},
+      {"3,1":1,"6,2":58,"6,3":59,"1,3":60,"3,3":61,"7,0":62,"3,6":63,"1,7":64,"6,7":65,"6,10":66,"7,10":67,"3,10":68,"5,10":69,"5,17":104,"7,9":1,"0,9":1,"0,0":1,"7,16":1,"4,16":1,"2,16":1,"5,16":1,"6,1":1,"7,1":32256,"7,2":32257,"7,3":32258,"7,4":32260,"6,4":1,"6,5":1,"7,5":1,"7,6":1,"7,7":1,"7,8":1,"6,8":1,"6,6":180,"1,10":1,"6,12":1,"6,14":1,"6,13":1,"4,11":1,"4,12":1,"4,13":1,"5,13":1,"1,1":1,"0,1":1,"0,2":1,"0,3":1,"0,4":1,"1,4":1,"1,5":1,"0,5":1,"0,6":73,"0,7":1,"0,8":1,"1,8":1,"1,6":1,"6,11":1,"7,14":1,"7,13":1,"0,11":1,"0,12":1,"0,13":1,"0,14":1,"1,2":1,"2,1":1,"2,2":1,"2,3":1,"2,4":1,"3,4":1,"3,5":1,"2,5":1,"2,6":1,"2,7":1,"2,8":1,"3,8":1,"2,10":1,"4,10":1,"1,11":1,"1,12":1,"1,13":1,"1,15":1,"3,2":1,"4,1":1,"4,2":1,"4,3":1,"4,4":1,"5,4":1,"5,5":1,"4,5":1,"4,6":1,"4,7":1,"5,8":1,"2,15":32269,"3,14":75,"2,11":1,"2,12":1,"2,13":1,"6,0":1,"1,16":1,"3,9":1,"3,11":1,"5,9":1,"2,9":1,"5,7":1,"4,0":1,"5,14":74,"5,11":78,"5,12":77,"3,12":1,"3,13":1,"2,14":1},
+      {"3,1":41,"6,2":58,"6,3":59,"1,3":60,"3,3":61,"7,0":62,"3,6":63,"1,7":64,"6,7":65,"6,10":66,"7,10":67,"3,10":68,"5,10":69,"5,17":104,"7,9":70,"0,9":71,"0,0":72,"7,16":178,"4,16":32270,"2,16":32271,"5,16":32272,"6,1":53,"7,1":30,"7,2":31,"7,3":32,"7,4":33,"6,4":34,"6,5":35,"7,5":36,"7,6":37,"7,7":38,"7,8":39,"6,8":45,"6,6":46,"1,10":42,"6,12":73,"6,14":74,"6,13":75,"4,11":83,"4,12":84,"4,13":85,"5,13":86,"1,1":43,"0,1":20,"0,2":26,"0,3":8,"0,4":21,"1,4":23,"1,5":28,"0,5":24,"0,6":12,"0,7":18,"0,8":19,"1,8":47,"1,6":48,"6,11":76,"7,14":77,"7,13":78,"0,11":95,"0,12":96,"0,13":97,"0,14":87,"1,2":57,"2,1":4,"2,2":22,"2,3":7,"2,4":9,"3,4":10,"3,5":11,"2,5":13,"2,6":14,"2,7":15,"2,8":51,"3,8":52,"2,10":50,"4,10":40,"1,11":92,"1,12":93,"1,13":94,"1,15":225,"3,2":100,"4,1":29,"4,2":27,"4,3":6,"4,4":25,"5,4":5,"5,5":17,"4,5":16,"4,6":54,"4,7":55,"5,8":56,"2,15":229,"3,14":82,"2,11":89,"2,12":90,"2,13":91,"6,0":224,"1,16":227,"3,9":226,"3,11":44,"5,9":230,"2,9":231,"5,7":21027,"4,0":228,"5,14":80,"5,11":81,"5,12":79,"3,12":98,"3,13":99,"2,14":88},
+      {"3,1":1,"6,2":190,"6,3":189,"1,3":32270,"3,3":32273,"7,0":180,"3,6":32274,"1,7":172,"6,7":174,"6,10":171,"7,10":168,"3,10":170,"5,10":169,"5,17":32275,"7,9":1,"0,9":1,"0,0":1,"7,16":1,"4,16":1,"2,16":1,"5,16":1,"6,1":1,"7,1":32256,"7,2":32257,"7,3":32258,"7,4":32260,"6,4":1,"6,5":1,"7,5":1,"7,6":1,"7,7":1,"7,8":1,"6,8":1,"6,6":178,"1,10":1,"6,12":1,"6,14":1,"6,13":1,"4,11":1,"4,12":1,"4,13":1,"5,13":1,"1,1":1,"0,1":1,"0,2":1,"0,3":1,"0,4":1,"1,4":1,"1,5":1,"0,5":1,"0,6":73,"0,7":1,"0,8":1,"1,8":1,"1,6":1,"6,11":1,"7,14":1,"7,13":1,"0,11":1,"0,12":1,"0,13":1,"0,14":1,"1,2":1,"2,1":1,"2,2":1,"2,3":1,"2,4":1,"3,4":1,"3,5":1,"2,5":1,"2,6":1,"2,7":1,"2,8":1,"3,8":1,"2,10":1,"4,10":1,"1,11":1,"1,12":1,"1,13":1,"1,15":1,"3,2":1,"4,1":1,"4,2":1,"4,3":1,"4,4":1,"5,4":1,"5,5":1,"4,5":1,"4,6":1,"4,7":1,"5,8":1,"2,15":32276,"3,14":75,"2,11":1,"2,12":1,"2,13":1,"6,0":1,"1,16":1,"3,9":1,"3,11":1,"5,9":1,"2,9":1,"5,7":1,"4,0":1,"5,14":74,"5,11":78,"5,12":77,"3,12":1,"3,13":1,"2,14":1},
+    ],
+    encoders: [
+      [],
+      [],
+      [],
+      [],
+    ],
+  },
 };
 
 // - ZMK / non-VIA boards -
@@ -9912,6 +9948,7 @@ const MODIFIER_SPECIAL_LABELS = new Set([
   'Left Alt', 'Right Alt', 'Left Win/Cmd', 'Right Win/Cmd',
   'Fn', 'Fn2', 'Escape', 'Caps Lock',
   'Voice Assistant', 'RGB Mode', 'Print Screen', 'Scroll Lock', 'Pause/Break',
+  'Calculator', 'Task View', 'Previous Desktop', 'Next Desktop',
 ]);
 const NAVIGATION_LABELS = new Set([
   'Up Arrow', 'Down Arrow', 'Left Arrow', 'Right Arrow',
@@ -11970,7 +12007,7 @@ async function identifyKeyboard(vid, pid) {
   if (entry) {
     activeKbd = { ...entry, vid, pid };
     viaProtocolVersion = await readViaProtocolVersion();
-    deviceKeycodes = keycodesForProtocol(viaProtocolVersion);
+    deviceKeycodes = keycodesForBoard(entry, viaProtocolVersion);
     playChirp(true);
     if (inDemoMode()) {
       setStatus(`Demo mode. ${displayKbdName(entry.name)}. No keyboard is connected, so nothing is written to a keyboard.`, 'ok');

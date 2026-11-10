@@ -19,7 +19,7 @@ import { appTables, firmwareBoard, viaBoards, compareViaWithFirmware, keyNaming,
 // gets any other verdict fails the run, so the entry is revisited.
 const KNOWN = {
   0x0960: { verdict: 'SOURCES DISAGREE', reason: 'Keychron\'s VIA JSON has Right Shift and Numpad 0 one column right of the firmware' },
-  0x0762: { verdict: 'NO FIRMWARE SOURCE', reason: 'the B6 Pro is in neither pinned firmware source' },
+  0x0762: { verdict: 'NO FIRMWARE SOURCE', reason: 'the B6 Pro runs ZMK, which this script does not read; zmk-firmware.mjs builds its data from the firmware' },
   0x0A54: { verdict: 'LAYOUT WRONG', reason: 'the source keymap is a copy of the ANSI one; the released binary holds the ISO layout, which the app uses' },
 };
 

@@ -16,6 +16,7 @@ const V6_MAX_ANSI = 0x0960;   // Right Shift and Numpad 0 moved in 1.3 (keysMove
 const K2_PRO_ANSI = 0x0220;   // protocol 9 firmware: the oldest keycode numbering and lighting commands
 const K2_PRO_ANSI_WHITE = 0x0223;
 const V1_ANSI = 0x0310;       // protocol 11 firmware: Keychron keys from 0x7F00
+const B6_PRO_ISO = 0x0762;    // ZMK firmware: protocol 12, but its own list of Keychron keys
 
 // No first-run welcome dialog: it would make the page inert.
 const skipWelcome = () => { try { localStorage.setItem('keyable-v1', '1'); } catch { /* blocked */ } };
@@ -146,6 +147,19 @@ test('Review Changes in demo finds base and Fn changes, and factory reset clears
   await page.evaluate(() => executeResetAll());
   await page.waitForFunction(() => hidDevice.keymap.every((c, i) => c === new DemoKeyboard(hidDevice.productId).keymap[i]));
   assert.deepEqual(await rows(), [], 'factory reset restored every key');
+  await page.close();
+});
+
+test('the ZMK B6 Pro names its own Keychron keys and starts with no changes', async () => {
+  const page = await demoPage(B6_PRO_ISO);
+  await page.keyboard.press('Alt+2');   // Review Changes scans the Step 2 key list
+  const out = await page.evaluate(async () => {
+    const winFn = activeLayerRoles().winFn;
+    const fn1 = FACTORY_KEYMAPS[hidDevice.productId].layers[winFn]['7,1'];   // Fn+1
+    const scan = await scanChangedKeys();
+    return { fn1: codeName(fn1), changes: scan.rows.length };
+  });
+  assert.deepEqual(out, { fn1: 'Bluetooth 1', changes: 0 });
   await page.close();
 });
 
