@@ -4,7 +4,7 @@
 // The page's own names, used inside page.evaluate:
 /* global KEYBOARD_DB, KEYCHRON_LAYOUTS, FACTORY_KEYMAPS, BUTTON_ACTIONS, DemoKeyboard,
    activeLayerRoles, activeLayout, deviceLayerCount, executeResetAll, hidDevice,
-   inDemoMode, scanChangedKeys, writeKeyCodeOnLayer, restoreKeymapFileChosen,
+   inDemoMode, scanChangedKeys, captureSession, writeKeyCodeOnLayer, restoreKeymapFileChosen,
    macroKeycode, offeredSystemKeys, codeName, LIST_STEP_TYPES, writeTarget:writable */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -234,9 +234,7 @@ test('the Reset button shows for a key chosen by Capture Mode', async () => {
     const key = activeLayout().keys.find(k => k.label === 'H');
     await writeKeyCodeOnLayer(activeLayerRoles().winFn, key, 0x0005);   // Fn+H types B
   });
-  await page.keyboard.press('Alt+2');
-  await page.locator('#btn-capture').click();
-  await page.locator('#capture-box:visible').waitFor();
+  await startCapture(page);
   await page.keyboard.press('KeyH');
   await page.locator('#h-key-selected', { hasText: 'H' }).waitFor();
   assert.equal(await page.locator('#btn-reset-key').isVisible(), true);
@@ -299,11 +297,13 @@ test('Capture Mode starts without a script error', async () => {
   await page.close();
 });
 
-// Starts Capture Mode on a demo page.
+// Starts Capture Mode on a demo page and waits for its first matrix reads, so the
+// keys that started it are released and a test's press is not taken as one of them.
 async function startCapture(page) {
   await page.keyboard.press('Alt+2');
   await page.locator('#btn-capture').click();
   await page.locator('#capture-box:visible').waitFor();
+  await page.waitForFunction(() => captureSession && captureSession.polls > 2 && captureSession.ignored.size === 0);
 }
 
 // Presses and releases the demo keyboard's switches for the named layout keys,
@@ -348,10 +348,10 @@ test('Capture Mode finds a remapped knob turn by the code it now sends', async (
   const page = await demoPage(V6_MAX_ANSI);
   await page.evaluate(async () => {
     const cw = { isRotation: true, encoderId: 0, clockwise: true };
-    await writeKeyCodeOnLayer(activeLayerRoles().win, cw, 0x004E);   // Page Down
+    await writeKeyCodeOnLayer(activeLayerRoles().win, cw, 0x00AB);   // Next Track, a key the board does not have
   });
   await startCapture(page);
-  await page.keyboard.press('PageDown');
+  await page.keyboard.press('MediaTrackNext');
   await page.locator('#h-key-selected', { hasText: /Turn Clockwise/ }).waitFor();
   await page.close();
 });
@@ -379,7 +379,8 @@ test('one Escape in Capture Mode selects nothing, and a second ends it', async (
 test('Capture Mode says so when the keyboard does not report its switches', async () => {
   const page = await demoPage(V6_MAX_ANSI);
   await page.evaluate(() => { hidDevice.matrixAnswered = false; });
-  await startCapture(page).catch(() => {});   // the box may close before it is seen
+  await page.keyboard.press('Alt+2');
+  await page.locator('#btn-capture').click();
   await page.locator('#sr-live', { hasText: 'Capture Mode is not available' }).waitFor();
   assert.equal(await page.locator('#capture-box').isVisible(), false);
   await page.close();

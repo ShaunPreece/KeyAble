@@ -1198,7 +1198,8 @@
           The keyboard reports where the key is, not what it types, so a key is found even if
           it has been remapped or set to do nothing, and even if your screen reader uses it.
           Press one key at a time: two keys together, such as Control and C, select neither.
-          For a knob, turn it or press it.
+          For a knob, turn it or press it. Pressing the knob also mutes your sound as usual,
+          so press it again afterwards to unmute.
         </p>
 
         <p>
@@ -1234,7 +1235,7 @@
                  type="text"
                  readonly
                  tabindex="-1"
-                 aria-label="Capture mode is active. Press the key you want to select - your selection will be confirmed automatically. You will hear a quiet repeating tone while capture mode is active. Press Escape twice quickly to cancel without selecting.">
+                 aria-label="Capture Mode. Press a key.">
         </div>
 
         <!-- - Key selected confirmation - -->
@@ -11290,8 +11291,8 @@ function startKeyCapture() {
   btn.textContent = 'Stop Capture Mode';
 
   playBeep();
-  // No live-region announce here - the hidden capture-input's aria-label
-  // carries the full intro and is read by NVDA when focus arrives there
+  // No live-region announce here - the hidden capture-input's short aria-label
+  // is the intro, read by NVDA when focus arrives there
   // (~80ms below). Announcing here too would race with that focus speech
   // and NVDA would only read the second one.
 
@@ -11361,7 +11362,10 @@ async function pollCaptureMatrix(session, layout) {
 }
 
 function onCaptureMatrixRead(session, held, poll) {
-  if (!session.ignored) session.ignored = new Set(held);
+  // The first read can wait behind other requests (the Step 2 keymap read), so a key
+  // pressed since capture started may already be held. A keydown since then means it
+  // was; with none, what is held predates capture.
+  if (!session.ignored) session.ignored = session.keydowns.length ? new Set() : new Set(held);
   for (const s of session.ignored) if (!held.has(s)) session.ignored.delete(s);
   for (const s of held) {
     if (session.held.has(s) || session.ignored.has(s)) continue;
@@ -11652,6 +11656,7 @@ async function readSwitchMatrix(layout) {
 // the answer written over it. The keymap starts as the model's factory keymap.
 const DEMO_MACRO_SLOTS = 16;
 const DEMO_MACRO_BYTES = 1024;
+const DEMO_SWITCH_HOLD_MS = 50;
 // Each demo model answers the protocol whose Keychron keys its factory keymap holds,
 // so it uses the same keycode numbering and lighting commands as the real board.
 const DEMO_PROTOCOLS = [[0x0009, KEYCODES_PROTOCOL_9], [VIA_PROTOCOL_11, KEYCODES_PROTOCOL_11]];
@@ -11684,10 +11689,10 @@ class DemoKeyboard extends EventTarget {
     this.resetKeymap();
 
     // Its switches are the computer keyboard's keys, so Capture Mode works in demo.
-    // A press stays in the matrix until a read reports it, because a scripted key
-    // press can be released before the next poll.
+    // A switch is released DEMO_SWITCH_HOLD_MS after its key, because a scripted key
+    // press is released at once, before any poll could see it.
     this.heldSwitches = new Set();
-    this.unreadPresses = new Set();
+    this.releaseTimers = new Map();   // "row,col" -> timer releasing that switch
     this.onKeyDown = e => { if (!e.repeat) this.pressSwitchFor(e.code, e.key, true); };
     this.onKeyUp   = e => this.pressSwitchFor(e.code, e.key, false);
     window.addEventListener('keydown', this.onKeyDown, true);
@@ -11721,8 +11726,13 @@ class DemoKeyboard extends EventTarget {
 
   // Also used by tests to press a switch directly: setSwitch('2,9', true).
   setSwitch(at, down) {
-    if (down) { this.heldSwitches.add(at); this.unreadPresses.add(at); }
-    else this.heldSwitches.delete(at);
+    clearTimeout(this.releaseTimers.get(at));
+    this.releaseTimers.delete(at);
+    if (down) this.heldSwitches.add(at);
+    else this.releaseTimers.set(at, setTimeout(() => {
+      this.releaseTimers.delete(at);
+      this.heldSwitches.delete(at);
+    }, DEMO_SWITCH_HOLD_MS));
   }
 
   // The switch matrix value, in the layout of this board's protocol (switchMatrixFormat).
@@ -11734,8 +11744,7 @@ class DemoKeyboard extends EventTarget {
       let bits = 0;
       for (let col = 0; col < this.layout.cols; col++) {
         const at = `${first + r},${col}`;
-        if (this.heldSwitches.has(at) || this.unreadPresses.has(at)) bits += 2 ** col;
-        this.unreadPresses.delete(at);
+        if (this.heldSwitches.has(at)) bits += 2 ** col;
       }
       for (let b = f.bytesPerRow - 1; b >= 0; b--) {
         d[f.dataAt + r * f.bytesPerRow + b] = bits % 256;
