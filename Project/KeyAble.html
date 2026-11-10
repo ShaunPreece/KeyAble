@@ -1235,7 +1235,7 @@
                  type="text"
                  readonly
                  tabindex="-1"
-                 aria-label="Capture Mode. Press a key.">
+                 aria-label="Capture Mode. Press a key, or Escape twice to stop.">
         </div>
 
         <!-- - Key selected confirmation - -->
@@ -11285,7 +11285,7 @@ function startKeyCapture() {
   captureSession = session;
 
   $('capture-box').hidden = false;
-  $('capture-status-text').textContent = 'Capture mode active. Press any key to select it.';
+  $('capture-status-text').textContent = 'Capture mode active. Press any key to select it, or Escape twice to stop.';
 
   const btn       = $('btn-capture');
   btn.textContent = 'Stop Capture Mode';
