@@ -9,10 +9,12 @@
 // symbol, so each is found by searching for the shape our data predicts and scoring every
 // offset; a table that does not match well is reported as not found, never guessed.
 // The binary's USB device descriptor (vendor 0x3434) gives the product ID it is for.
+// Boards on an AVR chip (the Q1 version 1) are published as Intel HEX, the same bytes as
+// text records, which readFirmware turns back into the flash image.
 //
 // Usage:
 //   node DevTools/firmware-binaries.mjs fetch <keychron firmware page url> [...]
-//     downloads every .bin linked from the pages into ProjectAssets/keychron-firmware-bin,
+//     downloads every .bin and .hex linked from the pages into ProjectAssets/keychron-firmware-bin,
 //     skipping files already there, and records each one's PIDs in manifest.json
 //   node DevTools/firmware-binaries.mjs check [--details]
 //     compares FACTORY_KEYMAPS with the newest binary for each PID
@@ -26,6 +28,37 @@ const BIN_DIR  = path.join(ROOT, 'ProjectAssets', 'keychron-firmware-bin');
 const MANIFEST = path.join(BIN_DIR, 'manifest.json');
 const KEYCHRON_VID = 0x3434;
 const hex = n => '0x' + n.toString(16).toUpperCase().padStart(4, '0');
+
+// The flash image an Intel HEX file describes, from its lowest address, with gaps 0xFF
+// (erased flash). Records are ":" length, address, type, data, checksum; type 00 is data,
+// 01 end of file, 02 and 04 set the segment or upper address of the data that follows.
+export function hexImage(text) {
+  const chunks = [];
+  let upper = 0;
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.startsWith(':')) continue;
+    const bytes = Buffer.from(line.slice(1).trim(), 'hex');
+    const sum = bytes.reduce((a, b) => (a + b) & 0xFF, 0);
+    if (bytes.length < 5 || bytes.length !== bytes[0] + 5 || sum !== 0) throw new Error(`bad Intel HEX record: ${line}`);
+    const type = bytes[3], data = bytes.subarray(4, 4 + bytes[0]);
+    if (type === 0x00) chunks.push([upper + bytes.readUInt16BE(1), data]);
+    else if (type === 0x01) break;
+    else if (type === 0x02) upper = data.readUInt16BE(0) << 4;
+    else if (type === 0x04) upper = data.readUInt16BE(0) << 16;
+  }
+  if (!chunks.length) throw new Error('Intel HEX file holds no data');
+  const start = Math.min(...chunks.map(([a]) => a));
+  const end = Math.max(...chunks.map(([a, d]) => a + d.length));
+  const image = Buffer.alloc(end - start, 0xFF);
+  for (const [a, d] of chunks) d.copy(image, a - start);
+  return image;
+}
+
+// A downloaded firmware file's flash image.
+function readFirmware(file) {
+  const data = readFileSync(path.join(BIN_DIR, file));
+  return /\.hex$/i.test(file) ? hexImage(data.toString('latin1')) : data;
+}
 
 // Every product ID in the binary's USB device descriptors: bLength 0x12, type 0x01,
 // then idVendor and idProduct at offsets 8 and 10.
@@ -42,7 +75,7 @@ export function descriptorPids(bin) {
 // The firmware version in a Keychron file name ("v5_max_ansi_encoder_v1.1.1_2504221451.bin"),
 // as numbers for sorting, then the build stamp; files without one sort first.
 function versionKey(file) {
-  const m = /_v(\d+(?:\.\d+)*)(?:_(\d+))?\.bin$/i.exec(file);
+  const m = /_v(\d+(?:\.\d+)*)(?:_(\d+))?\.(?:bin|hex)$/i.exec(file);
   return m ? [...m[1].split('.').map(Number), Number(m[2] || 0)] : [];
 }
 const newer = (a, b) => {
@@ -56,9 +89,9 @@ async function fetchPages(urls) {
   const manifest = existsSync(MANIFEST) ? JSON.parse(readFileSync(MANIFEST, 'utf8')) : {};
   for (const page of urls) {
     const html = await (await fetch(page)).text();
-    const links = [...new Set(html.match(/https?:\/\/[^"'\s<>]+?\.bin(?:\?[^"'\s<>]*)?/gi) || [])]
+    const links = [...new Set(html.match(/https?:\/\/[^"'\s<>]+?\.(?:bin|hex)(?:\?[^"'\s<>]*)?/gi) || [])]
       .map(u => u.replace(/&amp;/g, '&'));
-    console.log(`${page}: ${links.length} binaries`);
+    console.log(`${page}: ${links.length} firmware files`);
     for (const url of links) {
       const file = decodeURIComponent(new URL(url).pathname.split('/').pop());
       const dest = path.join(BIN_DIR, file);
@@ -67,7 +100,7 @@ async function fetchPages(urls) {
         if (!res.ok) { console.log(`  FAILED ${res.status} ${file}`); continue; }
         writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
       }
-      manifest[file] = { url, page, pids: descriptorPids(readFileSync(dest)).map(hex) };
+      manifest[file] = { url, page, pids: descriptorPids(readFirmware(file)).map(hex) };
     }
   }
   writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2) + '\n');
@@ -77,8 +110,9 @@ async function fetchPages(urls) {
 // of cells words), as { offset, plainMatched, plainTotal }. Only plain HID keys
 // (0x04 to 0xE7) are scored: lighting and Keychron keys are what binaries renumber, and
 // letters, digits and modifiers are what identify the table. Layer 0 is scored at every
-// even offset, then the full table at the best few.
-export function findTable(bin, expected) {
+// `step` bytes, then the full table at the best few. ARM compilers align the table to 2
+// bytes; AVR ones (Intel HEX files) do not, so those are searched at every byte.
+export function findTable(bin, expected, step = 2) {
   const cells = expected[0].length;
   const words = expected.length * cells;
   const plain = [];
@@ -86,7 +120,7 @@ export function findTable(bin, expected) {
   const plain0 = plain.filter(([i]) => i < cells);
   const scoreAt = (off, list) => list.reduce((s, [i, v]) => s + (bin.readUInt16LE(off + i * 2) === v ? 1 : 0), 0);
   const candidates = [];
-  for (let off = 0; off + words * 2 <= bin.length; off += 2) {
+  for (let off = 0; off + words * 2 <= bin.length; off += step) {
     const s = scoreAt(off, plain0);
     if (s >= plain0.length * 0.6) candidates.push([s, off]);
   }
@@ -116,13 +150,13 @@ function shipped(pid, fk, file) {
   const board = firmwareBoard(pid);
   if (!board.matrixSize) return { error: 'NO MATRIX SIZE' };
   const { rows, cols } = board.matrixSize;
-  const bin = readFileSync(path.join(BIN_DIR, file));
+  const bin = readFirmware(file);
   const expected = fk.layers.map(layer => {
     const a = new Array(rows * cols).fill(0);
     for (const [pos, code] of Object.entries(layer)) { const [r, c] = pos.split(',').map(Number); a[r * cols + c] = code; }
     return a;
   });
-  const found = findTable(bin, expected);
+  const found = findTable(bin, expected, /\.hex$/i.test(file) ? 1 : 2);
   if (found.plainMatched < found.plainTotal * 0.95) {
     return { error: `TABLE NOT FOUND (best ${found.plainMatched}/${found.plainTotal} plain keys)` };
   }

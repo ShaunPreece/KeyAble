@@ -138,6 +138,8 @@ At a high level, adding a model is a data task, in this order:
 
   3. Download Keychron's released firmware for the model, where there is one:
        node DevTools/firmware-binaries.mjs fetch <Keychron firmware page URL>
+     It takes .bin files and the .hex files of older AVR boards such as the
+     Q1 Version 1.
      For a ZMK board (the B Pro series), the .uf2 files instead:
        node DevTools/zmk-firmware.mjs fetch <Keychron B Pro firmware page URL>
 
