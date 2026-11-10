@@ -8133,7 +8133,7 @@ const CMD_MACRO_SET_BUFFER      = 0x0F;   // args: [offset_hi, offset_lo, size, 
 // Keychron firmware comes in three keycode numberings, told apart by the VIA protocol
 // version the board reports. Every code the app writes above the modifier
 // combinations (0x1FFF) comes from the connected board's set; basic keys and
-// modifier combinations are the same in all three. Read from the released binaries:
+// modifier combinations are the same in all three:
 //   Protocol 9 (K2 Pro, K6 Pro): QMK before 0.19. Macros are VIA's MACRO00..15 from
 //     0x5F12, and Keychron's own keys run from 0x5F80.
 //   Protocol 11 (wired Q1 both versions, Q6, V1 to V6, S1 RGB): QMK 0.19 numbering, macros
@@ -8149,9 +8149,8 @@ const CMD_MACRO_SET_BUFFER      = 0x0F;   // args: [offset_hi, offset_lo, size, 
 //     (firmware: 'zmk'), not the protocol.
 // keychronNames names Keychron's keys for spoken confirmations and Review Changes;
 // that is what tells Command and Option apart from Win and Alt on the same physical
-// keys. Each family's order is its firmware enum (protocol 12: keychron_common.h),
-// confirmed by where the keys sit in the factory keymaps. Keys past the last named
-// one shift with build options, so they are not named.
+// keys. Each family's order is its firmware enum (protocol 12: keychron_common.h).
+// Keys past the last named one shift with build options, so they are not named.
 const VIA_PROTOCOL_11 = 0x000B;
 const VIA_PROTOCOL_12 = 0x000C;
 const KEYCODES_PROTOCOL_9 = {
