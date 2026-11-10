@@ -19,6 +19,8 @@ const K2_PRO_ANSI_WHITE = 0x0223;
 const V1_ANSI = 0x0310;       // protocol 11 firmware: Keychron keys from 0x7F00
 const Q1_V1_ANSI = 0x0100;    // AVR firmware, read from its .hex file: protocol 11 numbering
 const B6_PRO_ISO = 0x0762;    // ZMK firmware: protocol 12, but its own list of Keychron keys
+const V6_ULTRA_ANSI = 0x0C60; // Ultra 8K ZMK: 0x7E18 is Siri here, where the B6 Pro has its Keychron key
+const V6_ULTRA_ISO = 0x0C61;  // its Win+H voice key reads back as 0 (FACTORY_KEYMAPS reportsNone)
 
 const newPage = useEdge('demo', { acceptDownloads: true });
 
@@ -194,6 +196,42 @@ test('the ZMK B6 Pro names its own Keychron keys and starts with no changes', as
     return { fn1: codeName(fn1), changes: scan.rows.length };
   });
   assert.deepEqual(out, { fn1: 'Bluetooth 1', changes: 0 });
+  await page.close();
+});
+
+test('the V6 Ultra names its own Keychron keys, has its knob, and starts with no changes', async () => {
+  const page = await demoPage(V6_ULTRA_ANSI);
+  await page.keyboard.press('Alt+2');   // Review Changes scans the Step 2 key list
+  const out = await page.evaluate(async () => {
+    const { mac } = activeLayerRoles();
+    const model = FACTORY_KEYMAPS[hidDevice.productId];
+    const scan = await scanChangedKeys();
+    return {
+      siri: codeName(model.layers[mac]['0,15']),
+      knob: model.encoders[mac][0],
+      changes: scan.rows.length,
+    };
+  });
+  assert.deepEqual(out, { siri: 'Siri', knob: { ccw: 0x00AA, cw: 0x00A9 }, changes: 0 });
+  await page.close();
+});
+
+test('the V6 Ultra ISO voice key reads as 0 but is factory, and resets to Win+H', async () => {
+  const page = await demoPage(V6_ULTRA_ISO);
+  await page.keyboard.press('Alt+2');
+  const out = await page.evaluate(async () => {
+    const { win } = activeLayerRoles();
+    const key = activeLayout().keys.find(k => k.row === 0 && k.col === 15);
+    const scan = await scanChangedKeys();
+    return {
+      read: await readKeyCodeOnLayer(win, key),
+      shown: decodeAction(0, key, win),
+      changed: await layerActionChanged(win, key),
+      reset: codeName(resetValueForLayer(win, key)),
+      changes: scan.rows.length,
+    };
+  });
+  assert.deepEqual(out, { read: 0, shown: 'Default', changed: false, reset: 'Voice Typing (Win+H)', changes: 0 });
   await page.close();
 });
 

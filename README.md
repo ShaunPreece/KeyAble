@@ -56,14 +56,16 @@ browser; nothing is sent anywhere over the internet.
 
 ## Supported keyboards
 
-22 Keychron models across the Q, V, K, S, and B series (69 variants once you count
+39 Keychron models across the Q, V, K, S, and B series (98 variants once you count
 each ANSI, ISO, knob, and non-knob version separately). The full list is inside
 the app under Help, "Supported Keyboards".
 
 - Tested on real hardware: V5 Max, V6 Max, Q6 Max, and B6 Pro. The others are
   built from Keychron's own firmware data.
-- Not supported: JIS (Japanese) layouts, HE (Hall Effect) models, and the
-  Ultra 8K models, which run ZMK firmware that may not include VIA.
+- The Ultra 8K models are built from Keychron's ZMK firmware source and have
+  not yet been tested on a real keyboard.
+- Not supported: JIS (Japanese) layouts, HE (Hall Effect) models, and a few
+  Ultra 8K models, such as the V2 Ultra 8K.
 
 ## Reporting a problem
 

@@ -31,7 +31,8 @@ in a browser.
 - Keychron's wireless and battery keys (section 8).
 - Japanese and Korean input keys, and Japanese (JIS) keyboard layouts.
 - Keyboard-wide settings such as debounce and polling rate.
-- HE (Hall Effect) and Ultra 8K keyboards.
+- HE (Hall Effect) keyboards, and the Ultra 8K keyboards not in Supported
+  Keyboards, such as the V2 Ultra 8K.
 
 Left out on purpose:
 - The audio and music mode keys. They need a speaker in the keyboard, which

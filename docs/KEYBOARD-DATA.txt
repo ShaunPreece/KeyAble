@@ -74,6 +74,26 @@ Both datasets were derived from Keychron's own public, open sources:
       app/boards/shields/keychron/b6/uk/keychron_b6_uk.overlay
     DevTools/zmk-firmware.mjs does this; see step 4 of section 4.
 
+  - The Ultra 8K boards run Keychron's ZMK firmware from another branch:
+      repo:   https://github.com/Keychron/zmk
+      branch: rtl8762g
+      commit: 7f8d16732a3782e237915bff30a1f67de09268b7
+    Keychron publishes no firmware files for them, so both their layouts and
+    their factory dataset come from the source. Each board is a shield
+    folder, for example:
+      app/boards/shields/keychron_v6_ultra_ansi/
+    whose .conf gives the product ID, .overlay the key positions, and
+    .keymap the factory layers. DevTools/zmk-source.mjs reads them and
+    translates each key the way the keyboard does for VIA on first boot
+    (generate_launcher_keymaps in app/src/launcher/map_keycode.c). Keychron's
+    VIA definitions for some of the boards, in app/src/launcher, are the
+    cross-check.
+    That translation has no code for Win+H, the Windows voice typing key on
+    11 of these boards, so the keyboard reports it as 0 until the key is
+    written, while the key still types Win+H. The dataset holds Win+H there
+    and lists the key in the entry's reportsNone, so the app counts both 0
+    and Win+H as the factory setting and a reset writes Win+H.
+
   - Keychron's VIA JSON files (the same files the Keychron Launcher and VIA
     configurator load), from Keychron's fork (each board's via_json folder) and
     from https://github.com/the-via/keyboards (v3/keychron). These describe each
@@ -142,6 +162,10 @@ At a high level, adding a model is a data task, in this order:
      Q1 Version 1.
      For a ZMK board (the B Pro series), the .uf2 files instead:
        node DevTools/zmk-firmware.mjs fetch <Keychron B Pro firmware page URL>
+     An Ultra 8K board has no firmware file to download. Its layout comes
+     from the source instead of step 2:
+       node DevTools/zmk-source.mjs entry <pid> <layoutId>
+     and its KEYBOARD_DB entry carries firmware:'zmk-ultra'.
 
   4. Build the factory keymaps of every keyboard and write them into the app:
        node DevTools/build-factory-dataset.mjs check
@@ -162,6 +186,7 @@ At a high level, adding a model is a data task, in this order:
          check --details lists every difference.
        - for a ZMK board, takes the whole entry from its firmware, and lists
          any key the board has that the layout lacks.
+       - for an Ultra 8K board, takes the whole entry from its ZMK source.
      A board whose own source has the wrong key positions takes them from
      another board's source (POSITIONS_FROM in the build), and must then
      have its own binary.
