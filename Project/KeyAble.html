@@ -12083,6 +12083,8 @@ async function disconnectKeyboard(
   activeKbd     = null;
   currentOSMode = null;
   writeTarget   = null;
+  lightingLastOnLevel = LIGHTING_DEFAULT_ON_LEVEL;
+  lightingLastEffect  = LIGHTING_DEFAULT_ON_EFFECT;
   deviceLayerCount = null;
   viaProtocolVersion = null;
   deviceKeycodes = KEYCODES_PROTOCOL_12;
@@ -12771,7 +12773,13 @@ const BACKLIGHT_EFFECT_NAMES = [
 
 let lightingChannel       = null;     // null = not yet detected / unsupported
 let lightingState         = null;     // { brightness, effect, speed, hue, sat }
-let lightingLastOnLevel   = 128;      // remembered brightness for "Turn On" restore
+// What "Turn On" puts back: the last brightness above 0 and, on RGB boards, the last
+// effect other than Off, seen on this connection. Reset on disconnect, since another
+// board may not have the same effects.
+const LIGHTING_DEFAULT_ON_LEVEL  = 128;
+const LIGHTING_DEFAULT_ON_EFFECT = 1;   // Solid colour, which every RGB Matrix build has
+let lightingLastOnLevel   = LIGHTING_DEFAULT_ON_LEVEL;
+let lightingLastEffect    = LIGHTING_DEFAULT_ON_EFFECT;
 let lightingSavePending   = null;     // debounce handle for CMD_CUSTOM_SAVE
 
 function lightingChannelLabel() {
@@ -12919,9 +12927,10 @@ async function loadLighting() {
     sat:        colourB ? colourB[1] : 255,
   };
   if (lightingState.brightness > 0) lightingLastOnLevel = lightingState.brightness;
+  const isRgb = lightingChannel === LIGHTING_CH_RGB_MATRIX;
+  if (isRgb && lightingState.effect > 0) lightingLastEffect = lightingState.effect;
 
   // Populate effect listbox
-  const isRgb = lightingChannel === LIGHTING_CH_RGB_MATRIX;
   const effectNames = isRgb ? RGB_MATRIX_EFFECT_NAMES : BACKLIGHT_EFFECT_NAMES;
 
   if (isRgb) {
@@ -12960,11 +12969,20 @@ async function loadLighting() {
   updateLightingToggleButton();
 }
 
+// Whether the lights are dark. On RGB boards the firmware's own off is a disabled
+// matrix, which VIA reads and writes as effect 0; Keychron firmware also replaces a
+// brightness of 0 with that, setting a brightness of its own. So either means off.
+// On backlight boards effect 0 only stops breathing, and only brightness 0 is off.
+function lightingIsOff() {
+  return lightingState.brightness === 0 ||
+    (lightingChannel === LIGHTING_CH_RGB_MATRIX && lightingState.effect === 0);
+}
+
 function updateLightingStatusText() {
   if (!lightingState) return;
   const title = lightingChannelTitle();
   const pct   = percentFromByte(lightingState.brightness);
-  const txt   = lightingState.brightness === 0
+  const txt   = lightingIsOff()
     ? `${title} is currently off.`
     : `${title} is currently on at ${pct} percent. ` +
       `Effect: ${lightingEffectName(lightingState.effect)}.`;
@@ -12974,31 +12992,45 @@ function updateLightingStatusText() {
 function updateLightingToggleButton() {
   if (!lightingState) return;
   $('btn-lighting-toggle').textContent =
-    `Turn ${lightingChannelTitle()} ${lightingState.brightness === 0 ? 'On' : 'Off'}`;
+    `Turn ${lightingChannelTitle()} ${lightingIsOff() ? 'On' : 'Off'}`;
+}
+
+// The lightingState fields Turn On or Turn Off writes. RGB boards turn off with
+// effect 0, the firmware's own off, which keeps brightness and the stored effect;
+// Turn On restores whichever of effect and brightness is off.
+function lightingToggleChanges(turningOff) {
+  const isRgb = lightingChannel === LIGHTING_CH_RGB_MATRIX;
+  if (turningOff) return isRgb ? { effect: 0 } : { brightness: 0 };
+  const changes = {};
+  if (isRgb && lightingState.effect === 0) changes.effect = lightingLastEffect;
+  if (lightingState.brightness === 0)      changes.brightness = lightingLastOnLevel;
+  return changes;
 }
 
 async function toggleLighting() {
   if (!lightingState || lightingChannel === null) return;
-  const turningOff = lightingState.brightness > 0;
-  const newByte    = turningOff ? 0 : (lightingLastOnLevel || 128);
+  const turningOff = !lightingIsOff();
 
-  if (turningOff) lightingLastOnLevel = lightingState.brightness;
-
-  const ok = await lightingSet(lightingChannel, 1, [newByte]);
-  if (!ok) {
-    announce(`Could not change ${lightingChannelLabel()}. The keyboard did not respond.`);
-    return;
+  let ok = true;
+  for (const [field, byte] of Object.entries(lightingToggleChanges(turningOff))) {
+    ok = await lightingSet(lightingChannel, field === 'effect' ? 2 : 1, [byte]);
+    if (!ok) break;
+    lightingState[field] = byte;
   }
-  lightingState.brightness = newByte;
   showLightingSlider('brightness');
-
+  setSelectListboxValue('lighting-effect-listbox', String(lightingState.effect));
   updateLightingStatusText();
   updateLightingToggleButton();
   scheduleLightingSave();
 
-  announce(turningOff
-    ? `${lightingChannelLabel()} turned off.`
-    : `${lightingChannelLabel()} turned on at ${percentFromByte(newByte)} percent.`);
+  if (!ok)
+    announce(`Could not change ${lightingChannelLabel()}. The keyboard did not respond.`);
+  else if (turningOff)
+    announce(`${lightingChannelLabel()} turned off.`);
+  else
+    announce(`${lightingChannelLabel()} turned on at ${percentFromByte(lightingState.brightness)} percent.` +
+             (lightingChannel === LIGHTING_CH_RGB_MATRIX
+               ? ` Effect: ${lightingEffectName(lightingState.effect)}.` : ''));
 
   // Keep focus on the toggle so the user can immediately reverse it.
   $('btn-lighting-toggle').focus();
@@ -13040,7 +13072,9 @@ async function onLightingEffectChange(value) {
     return;
   }
   lightingState.effect = idx;
+  if (lightingChannel === LIGHTING_CH_RGB_MATRIX && idx > 0) lightingLastEffect = idx;
   updateLightingStatusText();
+  updateLightingToggleButton();
   scheduleLightingSave();
   announce(`Effect changed to ${lightingEffectName(idx)}.`);
 }

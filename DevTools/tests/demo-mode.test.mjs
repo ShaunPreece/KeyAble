@@ -251,6 +251,29 @@ test('lighting in demo loads the simulated settings', async () => {
   await page.close();
 });
 
+test('RGB Turn Off selects the Off effect and Turn On puts the effect back', async () => {
+  const page = await demoPage();
+  await page.keyboard.press('Alt+4');
+  await page.locator('#lighting-panel:visible').waitFor();
+  const toggle = page.locator('#btn-lighting-toggle');
+  const lighting = () => page.evaluate(() => ({ brightness: hidDevice.lighting[1], effect: hidDevice.lighting[2] }));
+
+  await toggle.click();
+  await page.locator('#sr-live', { hasText: 'RGB lighting turned off.' }).waitFor();
+  assert.deepEqual(await lighting(), { brightness: 128, effect: 0 });
+
+  // Leaving and coming back reads effect 0 with brightness above 0 as off.
+  await page.keyboard.press('Alt+1');
+  await page.keyboard.press('Alt+4');
+  await page.locator('#lighting-status', { hasText: 'RGB lighting is currently off.' }).waitFor();
+  assert.equal((await toggle.textContent()).trim(), 'Turn RGB lighting On');
+
+  await toggle.click();
+  await page.locator('#sr-live', { hasText: 'Effect: Solid colour.' }).waitFor();
+  assert.deepEqual(await lighting(), { brightness: 128, effect: 1 });
+  await page.close();
+});
+
 test('Capture Mode starts without a script error', async () => {
   const page = await demoPage();
   const errors = [];
