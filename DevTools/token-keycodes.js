@@ -2,14 +2,15 @@
  * token-keycodes.js
  * Source-derived QMK/Keychron token -> 16-bit keycode table.
  *
- * Every value mirrors the pinned Keychron firmware source:
- *   repo  : Keychron/qmk_firmware  branch wireless_playground
- *   commit: 666862cb8123b64a6b96718d739c6203ad99031f
- *   files : quantum/keycodes.h
- *           keyboards/keychron/common/keychron_common.h
- *           keyboards/keychron/common/wireless/wireless.mk (LK_WIRELESS_ENABLE)
- * The DevTools scripts read local copies from ProjectAssets/keychron-firmware-src/,
- * which is not in the repository: fetch the commit above to recreate it.
+ * Every value mirrors the pinned firmware sources (docs/KEYBOARD-DATA.txt):
+ *   Keychron/qmk_firmware, branch wireless_playground, commit 666862cb8123b64a6b96718d739c6203ad99031f:
+ *     quantum/keycodes.h
+ *     keyboards/keychron/common/keychron_common.h
+ *     keyboards/keychron/common/wireless/wireless.mk (LK_WIRELESS_ENABLE)
+ *   qmk/qmk_firmware, commit a738fad372c1e72e10c47f560c8d167d233416ad:
+ *     quantum/keycodes.h, for the LM_ and RM_ blocks
+ * Local copies sit in ProjectAssets/keychron-firmware-src/, which is not in the
+ * repository: fetch the commits above to recreate them.
  *
  * This is model-INDEPENDENT except for the Keychron custom block (QK_KB_0-based),
  * whose absolute values shift with two build flags. See customKeycodes() below.

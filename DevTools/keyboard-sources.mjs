@@ -1,5 +1,5 @@
 // Reads the two Keychron sources every supported keyboard is checked against, plus the
-// app's own tables. Shared by verify-keyboards.mjs and layout-from-firmware.mjs.
+// app's own tables. Shared by the DevTools scripts and tests.
 //
 // - Firmware: the pinned commits in docs/KEYBOARD-DATA.txt, as sparse clones of
 //   keyboards/keychron in ProjectAssets/keychron-firmware-src/{keychron-fork,qmk-mainline}.
