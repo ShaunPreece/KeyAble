@@ -92,27 +92,36 @@ function evaluate(tokens, where) {
   return new Function(`return (${tokens.join(' ')});`)() >>> 0;
 }
 
-// The ZMK headers' defines, which every keymap includes.
+// The ZMK headers' defines, which every keymap includes. Read once; callers copy before
+// adding their own.
+let zmkDefs = null;
 function zmkDefines() {
-  const defs = new Map();
-  for (const f of readdirSync(BINDINGS).filter(f => f.endsWith('.h'))) readDefines(readFileSync(path.join(BINDINGS, f), 'utf8'), defs);
-  return defs;
+  if (!zmkDefs) {
+    zmkDefs = new Map();
+    for (const f of readdirSync(BINDINGS).filter(f => f.endsWith('.h'))) readDefines(readFileSync(path.join(BINDINGS, f), 'utf8'), zmkDefs);
+  }
+  return zmkDefs;
 }
 
 // ---- Devicetree ----
-// Every labelled node: { labels, name, body }. The body runs to the matching brace.
-function labelledNodes(text) {
-  const out = [];
-  for (const m of text.matchAll(/((?:[A-Za-z_]\w*\s*:\s*)+)([A-Za-z_][\w,-]*)\s*\{/g)) {
-    const start = m.index + m[0].length;
-    let depth = 1, j = start;
-    for (; j < text.length && depth; j++) {
-      if (text[j] === '{') depth++;
-      else if (text[j] === '}') depth--;
-    }
-    out.push({ labels: m[1].split(':').map(s => s.trim()).filter(Boolean), name: m[2], body: text.slice(start, j - 1) });
+// The text between the brace at `open` and its matching brace.
+function braceBody(text, open) {
+  let depth = 1, j = open + 1;
+  for (; j < text.length && depth; j++) {
+    if (text[j] === '{') depth++;
+    else if (text[j] === '}') depth--;
   }
-  return out;
+  if (depth) throw new Error('unbalanced braces');
+  return text.slice(open + 1, j - 1);
+}
+
+// Every labelled node: { labels, name, body }.
+function labelledNodes(text) {
+  return [...text.matchAll(/((?:[A-Za-z_]\w*\s*:\s*)+)([A-Za-z_][\w,-]*)\s*\{/g)].map(m => ({
+    labels: m[1].split(':').map(s => s.trim()).filter(Boolean),
+    name: m[2],
+    body: braceBody(text, m.index + m[0].length - 1),
+  }));
 }
 
 // A property's value, `name = <...>, <...>;`, as tokens with the angle brackets and commas
@@ -176,9 +185,17 @@ function parseBindings(tokens, behaviors, where, sensor = false) {
 
 // ---- Keychron's translation (map_keycode.c) ----
 // The text of map_keycode.c with each `#if CONFIG_X ... #endif` kept only when the board
-// selects X. Blocks with #else are not used in the parts read here.
+// selects X. `#ifdef ENCODER_MAP_ENABLE` blocks are kept, as launcher.h defines it for every
+// board. Any other conditional (#else, #elif, nesting, another macro) stops the script,
+// because reading it as plain text would keep the wrong branch.
 function configured(source, options) {
-  return source.replace(/#if\s+CONFIG_(\w+)\s*\n([\s\S]*?)#endif/g, (_, opt, body) => (options.has(opt) ? body : ''));
+  const out = source.replace(/^[ \t]*#[ \t]*if[ \t]+CONFIG_(\w+)[ \t]*\r?\n([\s\S]*?)^[ \t]*#[ \t]*endif\b/gm, (_, opt, body) => {
+    if (/^[ \t]*#[ \t]*(?:if|elif|else)/m.test(body)) throw new Error(`map_keycode.c: the #if CONFIG_${opt} block holds another conditional`);
+    return options.has(opt) ? body : '';
+  });
+  const left = /^[ \t]*#[ \t]*(?:if(?!def[ \t]+ENCODER_MAP_ENABLE\b)\w*|elif|else)\b.*$/m.exec(out);
+  if (left) throw new Error(`map_keycode.c: unhandled conditional "${left[0].trim()}"`);
+  return out;
 }
 
 // "case X: gen_launcher_keymaps[...] = Y;" pairs inside the branch for one behavior, with
@@ -196,8 +213,15 @@ function caseTable(source, dev, defs, values) {
   return table;
 }
 
-// Everything the translation needs for one set of board options.
-function translator(options, defs) {
+// Everything the translation needs for one set of board options. Built once per set.
+const translators = new Map();
+function translator(options) {
+  const key = [...options].sort().join(' ');
+  if (!translators.has(key)) translators.set(key, buildTranslator(options, zmkDefines()));
+  return translators.get(key);
+}
+
+function buildTranslator(options, defs) {
   const keycodesH = readFileSync(path.join(LAUNCHER, 'keycodes.h'), 'utf8');
   const launcherH = readFileSync(path.join(LAUNCHER, 'launcher.h'), 'utf8');
   const v = enumValues(launcherH, enumValues(keycodesH));
@@ -264,6 +288,17 @@ function keyCode(b, T) {
   if (T.switchLayer && is('lp_mo_win')) return v.UC_WIN_LAYER;
   if (T.switchLayer && is('lp_mo_mac')) return v.UC_MAC_LAYER;
   return 0;
+}
+
+// The keymaps' `user_custom` is a key press under another name (compatible
+// "zmk,behavior-key-press"); the name only picks Keychron's table above. A binding missing
+// from that table, such as Win+H for Windows voice typing, reads back over VIA as 0 while
+// the key still types it. Returns the code that types the same keys, which the keyboard
+// turns back into a key press when it is written, or 0.
+function unreportedCode(b, T) {
+  if (!b.dev.startsWith('user_custom')) return 0;
+  if (!/zmk,behavior-key-press/.test(b.behavior.body)) throw new Error(`&${b.label} is not a key press`);
+  return keyCode({ dev: 'key_press', p1: b.p1 }, T);
 }
 
 // The knob's codes on one layer, { ccw, cw }, as sensor_layer_init (app/src/keymap.c) splits
@@ -334,10 +369,11 @@ function readKeymap(file, defs) {
   const raw = stripComments(readFileSync(file, 'utf8'));
   const local = readDefines(raw, new Map(defs));
   const behaviors = behaviorTable(raw);
-  const start = raw.search(/compatible\s*=\s*"zmk,keymap"/);
-  if (start < 0) throw new Error(`${file}: no keymap node`);
+  const compatible = raw.search(/compatible\s*=\s*"zmk,keymap"/);
+  if (compatible < 0) throw new Error(`${file}: no keymap node`);
+  const keymap = braceBody(raw, raw.lastIndexOf('{', compatible));
   const layers = [];
-  for (const m of raw.slice(start).matchAll(/([A-Za-z_]\w*)\s*\{([^{}]*)\}/g)) {
+  for (const m of keymap.matchAll(/([A-Za-z_]\w*)\s*\{([^{}]*)\}/g)) {
     const bindings = property(m[2], 'bindings', local);
     if (!bindings) continue;
     const sensors = property(m[2], 'sensor-bindings', local);
@@ -351,12 +387,13 @@ function readKeymap(file, defs) {
 }
 
 // Every Keychron shield on the branch, as { shield, pid, name, options, rows, cols, keys,
-// layers, encoders } or { shield, pid, name, error }. keys are the VIA-reachable positions
-// in transform order as { row, col, pos }; layers[l]["row,col"] = code; encoders[l] = [{ ccw, cw }].
+// layers, encoders, reportsNone } or { shield, pid, name, error }. keys are the VIA-reachable
+// positions in transform order as { row, col, pos }; layers[l]["row,col"] = code, the code
+// that types what the key does; encoders[l] = [{ ccw, cw }]. reportsNone lists, as
+// "layer:row,col", the keys whose code the keyboard reports as 0 until one is written.
 export function ultraBoards() {
   if (!existsSync(SHIELDS)) throw new Error(`${SHIELDS} not found: clone the source first`);
   const defs = zmkDefines();
-  const translators = new Map();
   const out = [];
   for (const shield of readdirSync(SHIELDS).filter(d => d.startsWith('keychron_')).sort()) {
     const dir = path.join(SHIELDS, shield);
@@ -367,30 +404,35 @@ export function ultraBoards() {
     try {
       const kconfig = readFileSync(path.join(dir, 'Kconfig.shield'), 'utf8');
       const options = new Set([...stripComments(kconfig).matchAll(/^\s*select\s+(\w+)/gm)].map(m => m[1]));
-      const key = [...options].sort().join(' ');
-      if (!translators.has(key)) translators.set(key, translator(options, defs));
-      const T = translators.get(key);
+      const T = translator(options);
       const { rows, cols, positions } = readOverlay(path.join(dir, `${shield}.overlay`));
       const km = readKeymap(path.join(dir, `${shield}.keymap`), defs);
       const keys = positions.map(([row, col], pos) => ({ row, col, pos })).filter(k => k.row < rows && k.col < cols);
-      const layers = km.layers.map(layer => {
+      const reportsNone = [];
+      const layers = km.layers.map((layer, l) => {
         if (layer.keys.length !== positions.length) throw new Error(`${layer.name} has ${layer.keys.length} bindings for ${positions.length} positions`);
         const codes = {};
         for (const k of keys) {
-          try { codes[`${k.row},${k.col}`] = keyCode(layer.keys[k.pos], T); }
-          catch (err) { throw new Error(`${layer.name} position ${k.pos}: ${err.message}`); }
+          const pos = `${k.row},${k.col}`;
+          try {
+            codes[pos] = keyCode(layer.keys[k.pos], T);
+            const typed = codes[pos] === 0 && unreportedCode(layer.keys[k.pos], T);
+            if (typed) { codes[pos] = typed; reportsNone.push(`${l}:${pos}`); }
+          } catch (err) { throw new Error(`${layer.name} position ${k.pos}: ${err.message}`); }
         }
         return codes;
       });
       const roles = layerRoles(km.layers, positions, rows, layers, T);
-      // Every shield declares the knob sensor, boards without a knob included. The knob is
-      // real where a key press holds Mute on the Windows layer, whose function row holds
-      // F1 to F12 (on the Mac layer F10 holds Mute as well).
+      // Every shield declares the knob sensor, boards without a knob included; the knob's
+      // decoder driver (REALTEK_AON_QDEC) is enabled only on boards that have one. Its press
+      // is the one key holding Mute on the Windows layer, whose function row holds F1 to F12
+      // (on the Mac layer F10 holds Mute as well).
+      const hasKnob = confValue(conf, 'CONFIG_REALTEK_AON_QDEC') === 'y';
       const presses = keys.filter(k => layers[roles.win][`${k.row},${k.col}`] === T.v.KC_AUDIO_MUTE);
-      if (presses.length > 1) throw new Error(`${presses.length} keys hold Mute on the Windows layer`);
-      const knob = presses[0] || null;
+      if (hasKnob && presses.length !== 1) throw new Error(`the knob is enabled, but ${presses.length} keys hold Mute on the Windows layer`);
+      const knob = hasKnob ? presses[0] : null;
       const encoders = km.layers.map(layer => (knob && layer.knob ? [knobCodes(layer.knob, km.behaviors, km.defs, T, layer.name)] : []));
-      Object.assign(board, { options: [...options], rows, cols, keys, layers, encoders, roles, knob });
+      Object.assign(board, { options: [...options], rows, cols, keys, layers, encoders, roles, knob, reportsNone });
     } catch (err) {
       board.error = err.message;
     }
@@ -459,7 +501,7 @@ const KEYCHRON_KEY_NAMES = {
 export function ultraLayout(board, { LABEL_TO_KEYCODE }) {
   const labelOf = {};
   for (const [label, code] of Object.entries(LABEL_TO_KEYCODE)) labelOf[code] ??= label;
-  const v = translator(new Set(board.options), zmkDefines()).v;
+  const v = translator(new Set(board.options)).v;
   const byCode = {};
   for (const [name, label] of Object.entries(KEYCHRON_KEY_NAMES)) byCode[v[name]] = label;
   const { mac, win, macFn, winFn } = board.roles;

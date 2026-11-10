@@ -16,6 +16,8 @@
 //   roles:    { mac, win, macFn, winFn, fn2 }, only when the layer order is not canonical
 //   layers:   [ { "row,col": code, ... }, ... ], index = device layer
 //   encoders: [ [ { ccw, cw }, ... ], ... ],     index = device layer, then knob
+//   reportsNone: [ "layer:row,col", ... ], keys the keyboard reports as 0 until written,
+//                though they type their code in layers (Win+H on some Ultra 8K boards)
 //
 // Usage:
 //   node DevTools/build-factory-dataset.mjs check
@@ -86,7 +88,7 @@ function buildEntries() {
   for (const pid of pids.filter(p => KEYBOARD_DB[p].firmware === 'zmk-ultra')) {
     const b = ultra.get(pid);
     if (!b || b.error) throw new Error(`${hex(pid)} ${KEYBOARD_DB[pid].name}: ${b ? b.error : 'not in the ZMK Ultra source'}`);
-    entries.set(pid, { roles: canonical(b.roles) ? null : b.roles, layers: b.layers, encoders: b.encoders });
+    entries.set(pid, { roles: canonical(b.roles) ? null : b.roles, layers: b.layers, encoders: b.encoders, reportsNone: b.reportsNone });
   }
   return entries;
 }
@@ -97,6 +99,7 @@ function renderEntry(pid, e) {
     (e.roles ? `    roles: ${JSON.stringify(e.roles)},\n` : '') +
     `    layers: [\n${e.layers.map(l => `      ${JSON.stringify(l)},\n`).join('')}    ],\n` +
     `    encoders: [\n${e.encoders.map(k => `      ${JSON.stringify(k)},\n`).join('')}    ],\n` +
+    (e.reportsNone?.length ? `    reportsNone: ${JSON.stringify(e.reportsNone)},\n` : '') +
     '  },\n';
 }
 
@@ -108,7 +111,8 @@ function renderTable(entries) {
     '// layers[layer]["row,col"] = 16-bit factory code, by DEVICE layer number. Canonical\n' +
     '// 4-layer boards: Mac=0, MacFn=1, Win=2, WinFn=3. Others (5-layer V2 Max, K6 Pro and\n' +
     '// wired V2) carry `roles` {mac,win,macFn,winFn,fn2} giving each layer\'s index; the app\n' +
-    '// uses the canonical map when `roles` is absent.\n' +
+    '// uses the canonical map when `roles` is absent. `reportsNone` lists, as "layer:row,col",\n' +
+    '// keys the keyboard reads back as 0 until written, though they type their code here.\n' +
     'const FACTORY_KEYMAPS = {\n' +
     [...entries.keys()].sort((a, b) => a - b).map(pid => renderEntry(pid, entries.get(pid))).join('') +
     '};\n' + END;

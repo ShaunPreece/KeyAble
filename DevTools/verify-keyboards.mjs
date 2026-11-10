@@ -92,7 +92,8 @@ function checkUltra(r, pid, layout) {
   for (const [pos, w] of wantAt) if (!appAt.has(pos)) r.problems.push(`(${pos}) is ${w.label} in the firmware, but no key in the app's layout uses it`);
   const model = FACTORY_KEYMAPS[pid];
   if (!model) r.notes.push('no factory dataset');
-  else if (JSON.stringify(model.layers) !== JSON.stringify(b.layers) || JSON.stringify(model.encoders) !== JSON.stringify(b.encoders)) {
+  else if (JSON.stringify(model.layers) !== JSON.stringify(b.layers) || JSON.stringify(model.encoders) !== JSON.stringify(b.encoders) ||
+    JSON.stringify(model.reportsNone || []) !== JSON.stringify(b.reportsNone)) {
     r.notes.push('factory dataset differs from the source');
   }
   const vias = launcherVia.get(pid) || [];
