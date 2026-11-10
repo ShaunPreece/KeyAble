@@ -1787,10 +1787,10 @@
           Not at the moment. HE (Hall Effect) keyboards, such as the Q1 HE or K2 HE, have magnetic
           switches whose extra features, like the actuation point and rapid trigger, use Keychron's
           own commands that KeyAble does not support, and we have not been able to test basic
-          remapping on one. The Ultra 8K models, such as the V6 Ultra 8K, run different firmware
-          (ZMK) that does not use the VIA connection KeyAble relies on, so they cannot be used at
-          all; KeyAble recognises them and tells you so. Both are set up with Keychron's own
-          Launcher instead.
+          remapping on one. The Ultra 8K models, such as the V6 Ultra 8K, run ZMK firmware, and we
+          do not yet know whether theirs includes the VIA connection KeyAble relies on. KeyAble
+          tries to connect to one and tells you if it does not respond; if it does respond, you
+          can report it so it can be added. Both kinds can be set up with Keychron's own Launcher.
         </p>
 
         <h4 style="margin-top:1.25rem">Which web browser do I need?</h4>
@@ -8202,14 +8202,11 @@ const KEYCODES_ZMK = {
 let viaProtocolVersion = null;
 let deviceKeycodes = KEYCODES_PROTOCOL_12;
 
-// The keyboard's VIA protocol version, or null when it does not answer.
-async function readViaProtocolVersion() {
-  if (!hidDevice) return null;
-  try {
-    const reply = await sendVIA([CMD_GET_PROTOCOL]);
-    if (!reply || reply[0] !== CMD_GET_PROTOCOL) return null;
-    return (reply[1] << 8) | reply[2];
-  } catch { return null; }
+// The VIA protocol version in a CMD_GET_PROTOCOL reply, or null for no reply or an
+// unhandled one.
+function viaProtocolFromReply(reply) {
+  if (!reply || reply[0] !== CMD_GET_PROTOCOL) return null;
+  return (reply[1] << 8) | reply[2];
 }
 
 function keycodesForBoard(entry, version) {
@@ -9664,14 +9661,13 @@ const FACTORY_KEYMAPS = {
   },
 };
 
-// - ZMK / non-VIA boards -
-// Keychron's newer "Ultra" / 8K boards run ZMK firmware, not QMK/VIA. They are
-// configured with Keychron Launcher (built on ZMK Studio), not the VIA Raw HID
-// protocol KeyAble speaks, so they cannot be remapped here. We recognise the
-// PID only so we can give an accurate message instead of the generic
-// "not responding" one a non-VIA board would otherwise trigger.
+// - ZMK boards with no dataset entry -
+// Keychron's ZMK firmware can carry its own VIA handler (the B6 Pro's answers the
+// whole command set), so a ZMK board is probed like any other. These names are used
+// only when one does not answer, to say ZMK is the likely reason rather than the
+// firmware's age. A board here that does answer is unsupported but reportable.
 // The PID below is not verified against firmware.
-const ZMK_BOARDS = {
+const ZMK_BOARD_NAMES = {
   0x0C61: 'Keychron V6 Ultra',
 };
 
@@ -11575,16 +11571,19 @@ let viaQueue = Promise.resolve();
 // Send one VIA command and resolve with its reply, or null on timeout or a send
 // failure. Requests are queued, so callers may start several at once. `echoLength`
 // overrides VIA_ECHO_LENGTH for this request.
+// A request belongs to the keyboard connected when it was queued: if that keyboard
+// has gone by the time the request reaches the head of the queue, it resolves null
+// rather than going to whichever keyboard is connected then.
 function sendVIA(bytes, timeoutMs = 2000, echoLength = undefined) {
-  const result = viaQueue.then(() => sendVIAOnce(bytes, timeoutMs, echoLength));
+  const device = hidDevice;
+  const result = viaQueue.then(() => sendVIAOnce(device, bytes, timeoutMs, echoLength));
   viaQueue = result;
   return result;
 }
 
-function sendVIAOnce(bytes, timeoutMs, echoLength) {
+function sendVIAOnce(device, bytes, timeoutMs, echoLength) {
   return new Promise(resolve => {
-    const device = hidDevice;   // a disconnect while queued must not redirect this request
-    if (!device) { resolve(null); return; }
+    if (!device || device !== hidDevice) { resolve(null); return; }
     const buf = new Uint8Array(REPORT_LEN);
     bytes.forEach((b, i) => { buf[i] = b; });
     const echo = echoLength ?? VIA_ECHO_LENGTH[buf[0]] ?? 1;
@@ -11992,19 +11991,24 @@ function connectDifferentKeyboard() {
 // `stateWord` and `retryHint` fit the message to connect or reconnect.
 async function startViaSession(stateWord, retryHint) {
   const viaReply = await sendVIA([CMD_GET_PROTOCOL]);
+  const zmkName  = ZMK_BOARD_NAMES[hidDevice.productId];
   if (!viaReply) {
     playChirp(false);
+    const switchHint =
+      `Check the connection switch on the keyboard is set to cable, not Bluetooth or ` +
+      `2.4 GHz, then ${retryHint}.`;
     setStatus(
-      `Keyboard ${stateWord} but not responding. Check the connection switch on the ` +
-      `keyboard is set to cable, not Bluetooth or 2.4 GHz, then ${retryHint}. If it still ` +
-      `does not respond, its firmware may be too old to include VIA: update it with ` +
-      `Keychron Launcher.`,
+      zmkName
+        ? `${zmkName} ${stateWord} (Product ID ${hex4(hidDevice.productId)}) but not ` +
+          `responding. ${switchHint} If it still does not respond, its ZMK firmware ` +
+          `does not include the VIA system KeyAble uses, so it cannot be remapped here: ` +
+          `use Keychron Launcher instead.`
+        : `Keyboard ${stateWord} but not responding. ${switchHint} If it still does not ` +
+          `respond, its firmware may be too old to include VIA: update it with ` +
+          `Keychron Launcher.`,
       'error'
     );
-    announce(
-      `The keyboard is not responding. Check the connection switch is set to cable, ` +
-      `then ${retryHint}.`
-    );
+    announce(`The keyboard is not responding. ${switchHint}`);
     await hidDevice.close();
     hidDevice = null;
     setConnectControlsEnabled(true);
@@ -12013,7 +12017,7 @@ async function startViaSession(stateWord, retryHint) {
 
   $('connect-instructions').hidden = true;
   $('reconnect-area').hidden       = true;
-  await identifyKeyboard(hidDevice.vendorId, hidDevice.productId);
+  await identifyKeyboard(hidDevice.vendorId, hidDevice.productId, viaProtocolFromReply(viaReply));
   return true;
 }
 
@@ -12073,27 +12077,6 @@ async function connectKeyboard() {
     }
 
     hidDevice = devices[0];
-
-    // Known ZMK board (Keychron Ultra / 8K series)? It speaks ZMK Studio, not
-    // VIA, so don't open or probe it as a VIA device. Give an accurate message
-    // and stop here, rather than letting the VIA probe fail into a misleading
-    // "not responding" message.
-    const zmkName = ZMK_BOARDS[hidDevice.productId];
-    if (zmkName) {
-      playChirp(false);
-      const zmkPidStr = hex4(hidDevice.productId);
-      setStatus(
-        `${zmkName} detected (Product ID ${zmkPidStr}). This keyboard uses ZMK firmware ` +
-        `and is set up with Keychron Launcher, not the VIA system KeyAble uses, so it ` +
-        `cannot be remapped here. KeyAble supports Keychron's QMK and VIA keyboards.`,
-        'error'
-      );
-      moveFocus('status-box', 300);   // see the Keychron Link case below
-      hidDevice = null;
-      setConnectControlsEnabled(true);
-      $('connect-instructions').hidden = false;
-      return;
-    }
 
     if (isWirelessReceiver(hidDevice)) {
       playChirp(false);
@@ -12158,7 +12141,8 @@ function osModeLabel(mode) {
 }
 
 // - Keyboard identification -
-async function identifyKeyboard(vid, pid) {
+// `protocolVersion` is from the GET_PROTOCOL reply that opened the session.
+async function identifyKeyboard(vid, pid, protocolVersion) {
   const vidStr = hex4(vid);
   const pidStr = hex4(pid);
   const idStr  = `Vendor ID ${vidStr} / Product ID ${pidStr}`;
@@ -12166,7 +12150,7 @@ async function identifyKeyboard(vid, pid) {
 
   if (entry) {
     activeKbd = { ...entry, vid, pid };
-    viaProtocolVersion = await readViaProtocolVersion();
+    viaProtocolVersion = protocolVersion;
     deviceKeycodes = keycodesForBoard(entry, viaProtocolVersion);
     playChirp(true);
     if (inDemoMode()) {
@@ -12254,7 +12238,8 @@ async function startDemoKeyboard() {
   }
   $('sec-manual').hidden = true;
   hidDevice = new DemoKeyboard(pid);
-  await identifyKeyboard(hidDevice.vendorId, hidDevice.productId);
+  const version = viaProtocolFromReply(await sendVIA([CMD_GET_PROTOCOL]));
+  await identifyKeyboard(hidDevice.vendorId, hidDevice.productId, version);
 }
 
 function startDemoMode() {
@@ -12272,6 +12257,13 @@ async function disconnectKeyboard(
 ) {
   playChirp(false);
 
+  // A lighting change still waiting for its debounced save is saved now, while the
+  // keyboard is still the one it was made on. On an unplug the save fails at once.
+  if (lightingSavePending) {
+    clearTimeout(lightingSavePending);
+    lightingSavePending = null;
+    await lightingSaveCommit();
+  }
   if (hidDevice) {
     // An unplugged keyboard cannot be closed, and is released either way.
     try { await hidDevice.close(); } catch { /* nothing to release */ }
@@ -12280,6 +12272,8 @@ async function disconnectKeyboard(
   activeKbd     = null;
   currentOSMode = null;
   writeTarget   = null;
+  lightingChannel     = null;
+  lightingState       = null;
   lightingLastOnLevel = LIGHTING_DEFAULT_ON_LEVEL;
   lightingLastEffect  = LIGHTING_DEFAULT_ON_EFFECT;
   deviceLayerCount = null;

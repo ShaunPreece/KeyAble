@@ -63,7 +63,7 @@ the app under Help, "Supported Keyboards".
 - Tested on real hardware: V5 Max, V6 Max, Q6 Max, and B6 Pro. The others are
   built from Keychron's own firmware data.
 - Not supported: JIS (Japanese) layouts, HE (Hall Effect) models, and the
-  Ultra 8K models, whose firmware does not use the VIA protocol.
+  Ultra 8K models, which run ZMK firmware that may not include VIA.
 
 ## Reporting a problem
 

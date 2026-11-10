@@ -3,7 +3,8 @@
 // Runs the real app in headless Edge. Run with `npm test` in DevTools.
 // The page's own names, used inside page.evaluate:
 /* global KEYBOARD_DB, KEYCHRON_LAYOUTS, FACTORY_KEYMAPS, BUTTON_ACTIONS, DemoKeyboard,
-   activeLayerRoles, activeLayout, deviceLayerCount, executeResetAll, hidDevice,
+   activeLayerRoles, activeLayout, deviceLayerCount, executeResetAll, hidDevice:writable,
+   sendVIA, CMD_GET_PROTOCOL,
    inDemoMode, scanChangedKeys, captureSession, writeKeyCodeOnLayer, restoreKeymapFileChosen,
    macroKeycode, offeredSystemKeys, codeName, LIST_STEP_TYPES, writeTarget:writable */
 import { test } from 'node:test';
@@ -160,6 +161,21 @@ test('the ZMK B6 Pro names its own Keychron keys and starts with no changes', as
     return { fn1: codeName(fn1), changes: scan.rows.length };
   });
   assert.deepEqual(out, { fn1: 'Bluetooth 1', changes: 0 });
+  await page.close();
+});
+
+test('a request queued for one keyboard is not sent to the next one connected', async () => {
+  const page = await demoPage();
+  const replies = await page.evaluate(async () => {
+    const first = hidDevice;
+    const queued = sendVIA([CMD_GET_PROTOCOL]);
+    hidDevice = new DemoKeyboard(first.productId);   // swapped before the request is sent
+    const next = sendVIA([CMD_GET_PROTOCOL]);
+    const out = [await queued, await next].map(r => r !== null);
+    hidDevice = first;
+    return out;
+  });
+  assert.deepEqual(replies, [false, true]);
   await page.close();
 });
 
