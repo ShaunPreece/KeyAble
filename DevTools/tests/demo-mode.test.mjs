@@ -5,7 +5,7 @@
 /* global KEYBOARD_DB, KEYCHRON_LAYOUTS, FACTORY_KEYMAPS, BUTTON_ACTIONS, DemoKeyboard,
    activeLayerRoles, activeLayout, deviceLayerCount, executeResetAll, hidDevice:writable,
    sendVIA, CMD_GET_PROTOCOL, CMD_GET_KEY, CMD_KEYMAP_GET_BUFFER, VIA_UNHANDLED,
-   inDemoMode, scanChangedKeys, captureSession, writeKeyCodeOnLayer, restoreKeymapFileChosen,
+   inDemoMode, scanChangedKeys, captureSession, writeKeyCodeOnLayer, restoreFileChosen,
    macroKeycode, offeredSystemKeys, codeName, LIST_STEP_TYPES, writeTarget:writable */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { APP_URL, useEdge } from './edge.mjs';
 
 const V2_MAX_ANSI = 0x0920;   // a five-layer model, so its own role map matters
-const V6_MAX_ANSI = 0x0960;   // Right Shift and Numpad 0 moved in 1.3 (keysMovedIn)
+const V6_MAX_ANSI = 0x0960;   // protocol 12 RGB: Keychron settings and Keychron lighting
 const K2_PRO_ANSI = 0x0220;   // protocol 9 firmware: the oldest keycode numbering and lighting commands
 const K2_PRO_ANSI_WHITE = 0x0223;
 const V1_ANSI = 0x0310;       // protocol 11 firmware: Keychron keys from 0x7F00
@@ -266,68 +266,131 @@ test('a request queued for one keyboard is not sent to the next one connected', 
   await page.close();
 });
 
-test('a demo backup saves the simulated keyboard\'s keymap', async () => {
-  const page = await demoPage();
-  await page.evaluate(async () => {
-    const key = activeLayout().keys.find(k => k.label === 'J');
-    await writeKeyCodeOnLayer(activeLayerRoles().win, key, 0x0000);
-  });
+// Back up the demo keyboard and return the file's contents.
+async function demoBackup(page) {
   const download = page.waitForEvent('download', { timeout: 30000 });
   await page.locator('#btn-backup').click();
   const file = await download;
   assert.match(file.suggestedFilename(), /^keyable-demo-/);
-  const backup = JSON.parse(readFileSync(await file.path(), 'utf8'));
-  const truth = await page.evaluate(() => {
-    const keys = activeLayout().keys;
-    const out = {};
-    for (let l = 0; l < hidDevice.layerCount; l++) {
-      out[l] = keys.map(k => hidDevice.keymap[hidDevice.cell(l, k.row, k.col)]);
-    }
-    return out;
+  return JSON.parse(readFileSync(await file.path(), 'utf8'));
+}
+
+// Choose `data` as the restore file, check the summary, confirm, and return the result.
+async function demoRestore(page, data, summary) {
+  await page.evaluate(d => restoreFileChosen({ target: { files: [new File([JSON.stringify(d)], 'backup.json')] } }), data);
+  const shown = page.locator('#restore-file-summary');
+  await shown.filter({ hasText: 'File:' }).waitFor();
+  if (summary) assert.match(await shown.textContent(), summary);
+  await page.locator('#btn-confirm-restore').click();
+  const progress = page.locator('#backup-progress');
+  await progress.filter({ hasText: /Restore (complete|failed)/ }).waitFor({ timeout: 30000 });
+  return progress.textContent();
+}
+
+test('a demo backup saves the whole keyboard in the shared format', async () => {
+  const page = await demoPage(V6_MAX_ANSI);
+  await page.evaluate(async () => {
+    const key = activeLayout().keys.find(k => k.label === 'J');
+    await writeKeyCodeOnLayer(activeLayerRoles().win, key, 0x0000);
   });
-  assert.deepEqual(backup.layers, truth);
+  const backup = await demoBackup(page);
+  const truth = await page.evaluate(() => ({
+    keymap: Array.from(hidDevice.keymap),
+    layers: hidDevice.layerCount,
+    rows: activeLayout().rows,
+    cols: activeLayout().cols,
+    leds: activeLayout().keys.length,
+  }));
+  assert.equal(backup.format, 'keyable-settings');
+  assert.equal(backup.version, 1);
+  assert.equal(backup.keyboard.pid, V6_MAX_ANSI);
+  assert.equal(backup.keyboard.firmware.versionReply, 'v1.0.0 demo');
+  assert.equal(backup.keyboard.firmware.bcdDevice, null);
+  assert.deepEqual(backup.shape, { layers: truth.layers, rows: truth.rows, cols: truth.cols, encoders: 1 });
+  assert.deepEqual(backup.via.keymap, truth.keymap);
+  assert.equal(backup.via.encoders.length, truth.layers);
+  assert.deepEqual([backup.via.macros.count, backup.via.macros.size], [16, 1024]);
+  assert.deepEqual(backup.via.lighting.map(e => [e.channel, e.value]), [[3, 1], [3, 2], [3, 3], [3, 4]]);
+  assert.ok(!('effectCount' in backup.via), 'the effect count is left out: reading it changes the board');
+  assert.deepEqual(backup.keychron.debounce, [0, 5]);
+  assert.equal(backup.keychronRgb.ledCount, truth.leds);
+  assert.equal(backup.keychronRgb.perKeyColours.length, 6 * truth.leds);
   await page.close();
 });
 
-test('restoring a backup from before a key moved leaves that key alone', async () => {
+// The demo keyboard's state that a restore should bring back, and a cell to hold a
+// Keychron key: { a, effect, brightness, debounce, colour, macro, keychronCell }.
+const demoState = page => page.evaluate(() => {
+  const kb = hidDevice;
+  const win = activeLayerRoles().win;
+  const cell = label => { const k = activeLayout().keys.find(key => key.label === label); return kb.cell(win, k.row, k.col); };
+  return {
+    a: kb.keymap[cell('A')], keychronKey: kb.keymap[cell('F5')],
+    brightness: kb.lighting[1], effect: kb.lighting[2],
+    debounce: kb.keychron.debounce, colour: kb.keychronRgb.colours[0], macro: kb.macros[0],
+    cells: { a: cell('A'), keychronKey: cell('F5') },
+  };
+});
+
+// Change everything demoState reads, as if the user had since changed their setup.
+const changeDemoBoard = page => page.evaluate(() => {
+  const kb = hidDevice;
+  const win = activeLayerRoles().win;
+  const cell = label => { const k = activeLayout().keys.find(key => key.label === label); return kb.cell(win, k.row, k.col); };
+  kb.keymap[cell('A')] = 0x0005;
+  kb.lighting[1] = 10;
+  kb.lighting[2] = 7;
+  kb.keychron.debounce = [1, 9];
+  kb.keychronRgb.colours[0] = 77;
+  kb.macros[0] = 0x41;
+});
+
+test('a restore onto the firmware that saved it puts everything back', async () => {
   const page = await demoPage(V6_MAX_ANSI);
-  const download = page.waitForEvent('download', { timeout: 30000 });
-  await page.locator('#btn-backup').click();
-  const backup = JSON.parse(readFileSync(await (await download).path(), 'utf8'));
+  const backup = await demoBackup(page);
+  const before = await demoState(page);
+  backup.via.keymap[before.cells.keychronKey] = 0x7E04;   // Mission Control, a Keychron key
+  await changeDemoBoard(page);
 
-  const cells = () => page.evaluate(() => {
-    const win = activeLayerRoles().win;
-    const cell = label => {
-      const k = activeLayout().keys.find(key => key.label === label);
-      return hidDevice.keymap[hidDevice.cell(win, k.row, k.col)];
-    };
-    return { rightShift: cell('Right Shift'), numpad0: cell('Numpad 0'), a: cell('A') };
-  });
-  const before = await cells();
+  const result = await demoRestore(page, backup, /It holds keys, the knob, macros, lighting, Keychron settings and Keychron lighting\.$/);
+  assert.equal(result, 'Restore complete. Your keyboard now matches the backup file.');
+  const after = await demoState(page);
+  assert.equal(after.a, before.a);
+  assert.equal(after.keychronKey, 0x7E04, 'a Keychron key restores onto the same firmware');
+  assert.deepEqual([after.brightness, after.effect], [before.brightness, before.effect]);
+  assert.deepEqual(after.debounce, before.debounce);
+  assert.equal(after.colour, before.colour);
+  assert.equal(after.macro, before.macro);
+  await page.close();
+});
 
-  // A 1.2 backup read Right Shift and Numpad 0 from empty positions, so holds no key.
-  await page.evaluate(old => {
-    const keys = activeLayout().keys;
-    const at = label => keys.findIndex(k => k.label === label);
-    old.appVersion = '1.2';
-    for (const codes of Object.values(old.layers)) {
-      codes[at('Right Shift')] = 0;
-      codes[at('Numpad 0')] = 0;
-    }
-    old.layers[String(activeLayerRoles().win)][at('A')] = 0x0005;   // B: the rest is restored
-    restoreKeymapFileChosen({ target: { files: [new File([JSON.stringify(old)], 'old.json')] } });
-  }, backup);
-  await page.locator('#restore-file-summary', { hasText: 'without Right Shift and Numpad 0' }).waitFor();
-  await page.locator('#btn-confirm-restore').click();
-  await page.locator('#backup-progress', { hasText: 'Restore complete.' }).waitFor({ timeout: 30000 });
-  assert.match(await page.locator('#backup-progress').textContent(),
-    /If you remap Right Shift or Numpad 0, make a new backup so it includes them\./);
+test('a restore onto other firmware leaves Keychron keys and lighting effects alone', async () => {
+  const page = await demoPage(V6_MAX_ANSI);
+  const backup = await demoBackup(page);
+  const before = await demoState(page);
+  backup.keyboard.firmware.versionReply = 'v0.9.0 2025-01-01-00:00:00';
+  backup.via.keymap[before.cells.keychronKey] = 0x7E04;
+  await changeDemoBoard(page);
 
-  const after = await cells();
-  assert.notEqual(before.rightShift, 0);
-  assert.equal(after.rightShift, before.rightShift, 'Right Shift was left as it was');
-  assert.equal(after.numpad0, before.numpad0, 'Numpad 0 was left as it was');
-  assert.equal(after.a, 0x0005, 'the other keys were restored');
+  const result = await demoRestore(page, backup, /firmware is not the one that saved it/);
+  assert.match(result, /One key set to Keychron's own keys was left as it is/);
+  assert.match(result, /The lighting effect was left as it is/);
+  const after = await demoState(page);
+  assert.equal(after.keychronKey, before.keychronKey, 'the Keychron key was not written');
+  assert.equal(after.effect, 7, 'the effect was not written');
+  assert.equal(after.a, before.a, 'ordinary keys still restore');
+  assert.equal(after.brightness, before.brightness);
+  assert.deepEqual(after.debounce, before.debounce);
+  await page.close();
+});
+
+test('a backup from KeyAble 1.3 or earlier is refused', async () => {
+  const page = await demoPage(V6_MAX_ANSI);
+  await page.evaluate(pid => restoreFileChosen({ target: { files: [new File([JSON.stringify({
+    format: 'keyable-keymap', version: 1, keyboard: { pid }, layers: {}, encoders: [],
+  })], 'old.json')] } }), V6_MAX_ANSI);
+  await page.locator('#status-text', { hasText: 'KeyAble 1.3 or earlier' }).waitFor();
+  assert.match(await page.locator('#status-text').textContent(), /cannot be restored by this version\./);
   await page.close();
 });
 

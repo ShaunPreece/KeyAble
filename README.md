@@ -51,7 +51,7 @@ browser; nothing is sent anywhere over the internet.
 - RGB lighting control, including turning the backlight off to save battery.
 - Review every key that differs from factory and reset any of them, reset a
   single key, or reset the whole keyboard.
-- Save the keyboard's setup to a file and restore it later.
+- Save the keyboard's keys, macros, lighting and settings to a file, and restore them later.
 - Light and dark themes, following your system setting unless you choose.
 
 ## Supported keyboards

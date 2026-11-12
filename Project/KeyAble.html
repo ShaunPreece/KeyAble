@@ -814,9 +814,9 @@
         aria-describedby="restore-confirm-desc restore-file-summary">
   <h3 id="h-restore-confirm" tabindex="-1">Confirm Restore of Saved Keyboard Setup.</h3>
   <p id="restore-confirm-desc" style="margin-bottom:.85rem">
-    This will overwrite every key on every layer of your keyboard with the data in the
-    selected file. Any remapping currently on the keyboard will be replaced. This cannot
-    be undone from this app. Are you sure you want to continue?
+    This replaces the keys, knob, macros, lighting and settings on your keyboard with
+    those saved in the selected file. Anything you have changed since the file was saved
+    will be lost. This cannot be undone from this app. Are you sure you want to continue?
   </p>
   <p id="restore-file-summary" style="margin-bottom:.85rem;color:var(--muted)"></p>
   <div class="btn-row" style="margin-top:0">
@@ -1035,13 +1035,13 @@
           <h4 id="h-manage-setup">Manage Your Setup.</h4>
           <div class="action-menu">
             <div class="action-item">
-              <button id="btn-backup" aria-describedby="desc-backup" data-action="backupKeymap">
+              <button id="btn-backup" aria-describedby="desc-backup" data-action="backupSettings">
                 Save Current Keyboard Setup to a File
               </button>
-              <p id="desc-backup" class="action-desc">Keep a copy of this keyboard's setup so you can restore it later.</p>
+              <p id="desc-backup" class="action-desc">Keep a copy of this keyboard's keys, macros, lighting and settings, so you can restore them later.</p>
             </div>
             <div class="action-item">
-              <button id="btn-restore" aria-describedby="desc-restore" data-action="restoreKeymapPrompt">
+              <button id="btn-restore" aria-describedby="desc-restore" data-action="restoreSettingsPrompt">
                 Restore a Saved Keyboard Setup from a File
               </button>
               <p id="desc-restore" class="action-desc">Write a saved setup back to this keyboard, replacing what is on it now.</p>
@@ -1937,6 +1937,23 @@
           setup to a file from Step 1, then restore it later if you change your mind.
         </p>
 
+        <h4 style="margin-top:1.25rem">What does a saved setup hold?</h4>
+        <p>
+          Every key on every layer, the knob, your macros and the lighting. On keyboards whose
+          firmware has them, it also holds Keychron's own settings, such as debounce and the
+          wireless sleep times, and Keychron's own lighting, such as per-key colours. A file
+          restores onto the same keyboard model only, and only what differs is written.
+        </p>
+        <p>
+          If the keyboard's firmware has been updated since the file was saved, keys set to
+          Keychron's own functions and the lighting effect are left as they are, because their
+          numbers can change between firmware versions. Before you confirm, KeyAble says what
+          will be left alone, and it says so again when the restore finishes.
+        </p>
+        <p>
+          Setups saved by KeyAble 1.3 or earlier cannot be restored by this version.
+        </p>
+
         <h4 style="margin-top:1.25rem">Does Reset Keyboard to Default Settings delete my macros too?</h4>
         <p>
           Yes. It returns every key on every layer to its factory setting and clears all macro
@@ -2204,12 +2221,7 @@
 // Each layout entry:
 //   rows/cols - the firmware's matrix size; whole-layer reads place keys by it
 //   keys      - { label, row, col }, the matrix coordinates the VIA protocol uses;
-//               isEncoder: true marks the knob press. Backups store keycodes in
-//               this order, so a layout whose keys reorder takes a new layoutId,
-//               and validateBackup then refuses older backups.
-//   keysMovedIn - { version: [labels] }, keys whose position changed in that app
-//               version. A backup from an earlier version read them from the old
-//               position, so restore leaves them as they are (keysNotInBackup).
+//               isEncoder: true marks the knob press.
 //
 // JIS variants have no layout here: KEYBOARD_DB recognises them, and Step 2
 // reports that the model cannot be remapped.
@@ -2476,7 +2488,6 @@ const KEYCHRON_LAYOUTS = {
   'v6_max_ansi_knob': {
     rows: 6,
     cols: 21,
-    keysMovedIn: { '1.3': ['Right Shift', 'Numpad 0'] },
     keys: [
       // Function row
       { label: 'Escape',          row: 0, col: 0  },
@@ -11207,6 +11218,13 @@ const CMD_MACRO_GET_BUFFER_SIZE = 0x0D;   // -> reply bytes 1..2 = total buffer 
 const CMD_MACRO_GET_BUFFER      = 0x0E;   // args: [offset_hi, offset_lo, size]      reply: data at bytes 4..
 const CMD_MACRO_SET_BUFFER      = 0x0F;   // args: [offset_hi, offset_lo, size, ...] echo reply
 
+// Keychron's own raw HID commands (keychron_raw_hid.c, keychron_rgb.c). Firmware without
+// one answers it as unhandled. 0xA7 and 0xA8 take a sub-command at byte 1, and their
+// replies carry a status byte at 2, 0 for success, with data from byte 3.
+const CMD_KC_FIRMWARE_VERSION = 0xA1;   // reply: the build's text from byte 1, e.g. "v1.1.1 2026-01-15-09:56:47"
+const CMD_KC_MISC = 0xA7;               // language, debounce, Snap Click, wireless sleep
+const CMD_KC_RGB  = 0xA8;               // indicators, per-key colours, effect regions and lists
+
 // - Keycode numbering -
 // Keychron firmware comes in three keycode numberings, told apart by the VIA protocol
 // version the board reports. Every code the app writes above the modifier
@@ -11229,11 +11247,14 @@ const CMD_MACRO_SET_BUFFER      = 0x0F;   // args: [offset_hi, offset_lo, size, 
 // that is what tells Command and Option apart from Win and Alt on the same physical
 // keys. Each family's order is its firmware enum (protocol 12: keychron_common.h).
 // Keys past the last named one shift with build options, so they are not named.
+// keychronRange spans the codes a firmware build numbers for itself: one may mean
+// another key in a different build of the same board's firmware, so a backup's codes
+// in it are written back only onto the build that made it.
 const VIA_PROTOCOL_9  = 0x0009;
 const VIA_PROTOCOL_11 = 0x000B;
 const VIA_PROTOCOL_12 = 0x000C;
 const KEYCODES_PROTOCOL_9 = {
-  macroBase: 0x5F12, macroKeycodeCount: 16,
+  macroBase: 0x5F12, macroKeycodeCount: 16, keychronRange: [0x5F80, 0x5FFF],
   missionControl: 0x5F84, launchpad: 0x5F85,
   keychronNames: {
     0x5F80: 'Left Option', 0x5F81: 'Right Option', 0x5F82: 'Left Command', 0x5F83: 'Right Command',
@@ -11242,7 +11263,7 @@ const KEYCODES_PROTOCOL_9 = {
   },
 };
 const KEYCODES_PROTOCOL_11 = {
-  macroBase: 0x7700, macroKeycodeCount: 32,
+  macroBase: 0x7700, macroKeycodeCount: 32, keychronRange: [0x7E00, 0x7FFF],
   missionControl: 0x7F00, launchpad: 0x7F01,
   keychronNames: {
     0x7F00: 'Mission Control', 0x7F01: 'Launchpad', 0x7F02: 'Left Option', 0x7F03: 'Right Option',
@@ -11251,7 +11272,7 @@ const KEYCODES_PROTOCOL_11 = {
   },
 };
 const KEYCODES_PROTOCOL_12 = {
-  macroBase: 0x7700, macroKeycodeCount: 32,
+  macroBase: 0x7700, macroKeycodeCount: 32, keychronRange: [0x7E00, 0x7FFF],
   missionControl: 0x00C1, launchpad: 0x00C2,
   keychronNames: {
     0x7E00: 'Left Option', 0x7E01: 'Right Option', 0x7E02: 'Left Command', 0x7E03: 'Right Command',
@@ -11260,7 +11281,7 @@ const KEYCODES_PROTOCOL_12 = {
   },
 };
 const KEYCODES_ZMK = {
-  macroBase: 0x7700, macroKeycodeCount: 16,
+  macroBase: 0x7700, macroKeycodeCount: 16, keychronRange: [0x7E00, 0x7FFF],
   missionControl: 0x00C1, launchpad: 0x00C2,
   keychronNames: {
     0x7E00: 'Bluetooth 1', 0x7E01: 'Bluetooth 2', 0x7E02: 'Bluetooth 3', 0x7E03: 'Bootloader',
@@ -14343,6 +14364,14 @@ async function readLayerMatrix(layer, keys, { onProgress = () => {}, isCancelled
 }
 
 async function readLayerFromBuffer(layer, layout, keys, isCancelled) {
+  const cells = await readLayerCellsFromBuffer(layer, layout, isCancelled);
+  if (!cells) return null;
+  return new Map(keys.map(key => [matrixPos(key), cells[key.row * layout.cols + key.col]]));
+}
+
+// Every matrix position of `layer`, row by row, from the keymap buffer; null when the
+// board does not answer or `isCancelled` turns true.
+async function readLayerCellsFromBuffer(layer, layout, isCancelled = () => false) {
   const layerBytes = layout.rows * layout.cols * 2;
   const bytes = new Uint8Array(layerBytes);
   for (let at = 0; at < layerBytes; at += KEYMAP_BUFFER_CHUNK) {
@@ -14353,12 +14382,29 @@ async function readLayerFromBuffer(layer, layout, keys, isCancelled) {
     if (!reply || reply[0] !== CMD_KEYMAP_GET_BUFFER) return null;
     bytes.set(reply.subarray(4, 4 + size), at);
   }
-  const codes = new Map();
-  for (const key of keys) {
-    const i = (key.row * layout.cols + key.col) * 2;
-    codes.set(matrixPos(key), (bytes[i] << 8) | bytes[i + 1]);
+  return Array.from({ length: layerBytes / 2 }, (_, i) => (bytes[2 * i] << 8) | bytes[2 * i + 1]);
+}
+
+// Every matrix position of `layer`, row by row, keys and the empty positions between
+// them alike: from the buffer once it is trusted, else key by key. Null on no answer.
+async function readLayerCells(layer, layout, onProgress = () => {}) {
+  if (keymapBufferState === 'untested') {
+    await readLayerMatrix(layer, layout.keys);   // settles whether the buffer can be trusted
   }
-  return codes;
+  if (keymapBufferState === 'trusted') {
+    const cells = await readLayerCellsFromBuffer(layer, layout);
+    if (cells) { onProgress(cells.length); return cells; }
+  }
+  const cells = [];
+  for (let row = 0; row < layout.rows; row++) {
+    for (let col = 0; col < layout.cols; col++) {
+      const reply = await sendVIA([CMD_GET_KEY, layer, row, col]);
+      if (!reply || reply[0] !== CMD_GET_KEY) return null;
+      cells.push((reply[4] << 8) | reply[5]);
+      onProgress(cells.length);
+    }
+  }
+  return cells;
 }
 
 async function readLayerKeyByKey(layer, keys, onProgress, isCancelled) {
@@ -15112,6 +15158,7 @@ const VIA_ECHO_LENGTH = {
   [CMD_MACRO_GET_BUFFER]: 4, [CMD_MACRO_SET_BUFFER]: 4,   // offset, size
   [CMD_KEYMAP_GET_BUFFER]: 4,                         // offset, size
   [CMD_GET_ENCODER]: 4, [CMD_SET_ENCODER]: 6,         // layer, encoder, direction (+ value)
+  [CMD_KC_MISC]: 2, [CMD_KC_RGB]: 2,                  // sub-command; byte 2 is the status
 };
 const VIA_UNHANDLED = 0xFF;   // VIA's reply byte 0 for a command the firmware does not handle
 
@@ -15205,6 +15252,9 @@ async function readSwitchMatrix(layout) {
 const DEMO_MACRO_SLOTS = 16;
 const DEMO_MACRO_BYTES = 1024;
 const DEMO_SWITCH_HOLD_MS = 50;
+const DEMO_FIRMWARE_VERSION = 'v1.0.0 demo';
+const DEMO_RGB_REGIONS = 2;
+const DEMO_RGB_EFFECTS_PER_REGION = 5;
 // Each demo model answers the protocol whose Keychron keys its factory keymap holds,
 // so it uses the same keycode numbering and lighting commands as the real board.
 const DEMO_PROTOCOLS = [[VIA_PROTOCOL_9, KEYCODES_PROTOCOL_9], [VIA_PROTOCOL_11, KEYCODES_PROTOCOL_11]];
@@ -15233,6 +15283,17 @@ class DemoKeyboard extends EventTarget {
     this.lightingChannel = /\bWhite\b/.test(entry.name) ? LIGHTING_CH_BACKLIGHT : LIGHTING_CH_RGB_MATRIX;
     this.lighting = { 1: 128, 2: 1, 3: 128, 4: [0, 255] };   // brightness, effect, speed, [hue, sat]
     this.macros   = new Uint8Array(DEMO_MACRO_BYTES);
+    // The Max boards' QMK firmware reports its build and has Keychron's own settings
+    // (debounce and wireless sleep times here) and, on RGB models, Keychron's lighting.
+    // Older and ZMK firmware answers none of these.
+    const isMax = keycodesForBoard(entry, this.protocolVersion) === KEYCODES_PROTOCOL_12;
+    this.keychron = isMax ? { debounce: [0, 5], wirelessSleep: [0x58, 0x02, 0x20, 0x1C] } : null;
+    const leds = this.layout.keys.length;
+    this.keychronRgb = isMax && this.lightingChannel === LIGHTING_CH_RGB_MATRIX ? {
+      leds, indicators: new Uint8Array(4), perKeyType: 0,
+      colours: new Uint8Array(3 * leds), regions: new Uint8Array(leds),
+      effects: new Uint8Array(DEMO_RGB_REGIONS * DEMO_RGB_EFFECTS_PER_REGION * KC_RGB_EFFECT_BYTES),
+    } : null;
     this.matrixAnswered = true;   // tests clear it to play firmware without the switch matrix value
     this.resetKeymap();
 
@@ -15386,6 +15447,53 @@ class DemoKeyboard extends EventTarget {
     else if (id === 4) { d[at] = this.lighting[4][0]; d[at + 1] = this.lighting[4][1]; }
     else d[at] = this.lighting[id];
   }
+
+  answerFirmwareVersion(d) {
+    if (!this.keychron) { d[0] = VIA_UNHANDLED; return; }
+    d.fill(0, 1);
+    for (let i = 0; i < DEMO_FIRMWARE_VERSION.length; i++) d[1 + i] = DEMO_FIRMWARE_VERSION.charCodeAt(i);
+  }
+
+  // Keychron 0xA7 and 0xA8: arguments from byte 2, then the status over byte 2 and any
+  // data from byte 3, as keychron_raw_hid.c and keychron_rgb.c answer them.
+  answerKeychronMisc(d) {
+    const k = this.keychron;
+    if (!k) { d[0] = VIA_UNHANDLED; return; }
+    switch (d[1]) {
+      case 0x01: d[3] = 2; d[4] = 0; d[5] = KC_MISC_SETTINGS.debounce.flag | KC_MISC_SETTINGS.wirelessSleep.flag; break;
+      case 0x05: d[4] = k.debounce[0]; d[5] = k.debounce[1]; break;
+      case 0x06: k.debounce = [d[2], d[3]]; break;
+      case 0x0B: d.set(k.wirelessSleep, 3); break;
+      case 0x0C: k.wirelessSleep = Array.from(d.subarray(2, 6)); break;
+      default: d[2] = 1; return;   // a setting this build does not have
+    }
+    d[2] = 0;
+  }
+
+  answerKeychronRgb(d) {
+    const r = this.keychronRgb;
+    if (!r) { d[0] = VIA_UNHANDLED; return; }
+    const [a, b, c] = [d[2], d[3], d[4]];
+    const effectAt = (region, start) => (region * DEMO_RGB_EFFECTS_PER_REGION + start) * KC_RGB_EFFECT_BYTES;
+    switch (d[1]) {
+      case 0x01: d[3] = 1; d[4] = 0; break;   // protocol 1
+      case KC_RGB.SAVE: break;
+      case KC_RGB.GET_INDICATORS:   d.set(r.indicators, 4); break;
+      case KC_RGB.SET_INDICATORS:   r.indicators = d.slice(2, 6); break;
+      case KC_RGB.GET_LED_COUNT:    d[3] = r.leds; break;
+      case KC_RGB.GET_PER_KEY_TYPE: d[3] = r.perKeyType; break;
+      case KC_RGB.SET_PER_KEY_TYPE: r.perKeyType = a; break;
+      case KC_RGB.GET_COLOURS:      d.set(r.colours.subarray(3 * a, 3 * (a + b)), 3); break;
+      case KC_RGB.SET_COLOURS:      r.colours.set(d.subarray(4, 4 + 3 * b), 3 * a); break;
+      case KC_RGB.GET_MIXED_INFO:   d[3] = DEMO_RGB_REGIONS; d[4] = DEMO_RGB_EFFECTS_PER_REGION; break;
+      case KC_RGB.GET_REGIONS:      d.set(r.regions.subarray(a, a + b), 3); break;
+      case KC_RGB.SET_REGIONS:      r.regions.set(d.subarray(4, 4 + b), a); break;
+      case KC_RGB.GET_EFFECTS:      d.set(r.effects.subarray(effectAt(a, b), effectAt(a, b + c)), 3); break;
+      case KC_RGB.SET_EFFECTS:      r.effects.set(d.subarray(5, 5 + c * KC_RGB_EFFECT_BYTES), effectAt(a, b)); break;
+      default: d[2] = 1; return;
+    }
+    d[2] = 0;
+  }
 }
 
 // Big-endian 16-bit values in a report, as VIA sends them.
@@ -15423,6 +15531,9 @@ const DEMO_COMMANDS = {
   [CMD_GET_ENCODER]: (kb, d) => put16At(d, 4, kb.encoders.get(`${d[1]},${d[2]},${d[3]}`) ?? 0),
   [CMD_SET_ENCODER]: (kb, d) => kb.encoders.set(`${d[1]},${d[2]},${d[3]}`, u16At(d, 4)),
   [CMD_KC_GET_DEFAULT_LAYER]: (kb, d) => { d[1] = kb.roles.win; },   // the switch is on Windows
+  [CMD_KC_FIRMWARE_VERSION]: (kb, d) => kb.answerFirmwareVersion(d),
+  [CMD_KC_MISC]: (kb, d) => kb.answerKeychronMisc(d),
+  [CMD_KC_RGB]:  (kb, d) => kb.answerKeychronRgb(d),
 };
 
 const inDemoMode = () => hidDevice instanceof DemoKeyboard;
@@ -15813,11 +15924,7 @@ async function disconnectKeyboard(
 
   // A lighting change still waiting for its debounced save is saved now, while the
   // keyboard is still the one it was made on. On an unplug the save fails at once.
-  if (lightingSavePending) {
-    clearTimeout(lightingSavePending);
-    lightingSavePending = null;
-    await lightingSaveCommit();
-  }
+  await flushLightingSave();
   if (hidDevice) {
     // An unplugged keyboard cannot be closed, and is released either way.
     try { await hidDevice.close(); } catch { /* nothing to release */ }
@@ -15855,7 +15962,7 @@ async function disconnectKeyboard(
     $('capture-box').hidden = true;
   }
   document.querySelectorAll('dialog[open]').forEach(d => closeDialog(d.id));
-  pendingRestoreData = null;
+  pendingRestore = null;
   goToSection('connect', false);
 
   $('sec-manual').hidden            = true;
@@ -15957,8 +16064,6 @@ async function executeResetAll() {
 // Bump KEYABLE_VERSION by hand at a real release (MAJOR.MINOR.PATCH: a small
 // fix is a PATCH, a new feature a MINOR); update KEYABLE_RELEASE_DATE (ISO)
 // to that day. showAppVersion writes it under the page title and the Help page.
-// Backups record the version, and keysMovedIn is compared with it, so a change
-// that moves a key in a layout bumps it in the same commit.
 const KEYABLE_VERSION       = '1.3';
 const KEYABLE_RELEASE_DATE  = '2026-11-10';   // ISO yyyy-mm-dd
 
@@ -16009,66 +16114,333 @@ function showAppVersion() {
 }
 
 // - Backup / Restore -
-// Save and restore the keyboard's full dynamic keymap (every layer the device
-// reports + encoder rotations) to/from a JSON file. Most boards have 4 layers;
-// the 5-layer boards (V2 Max, K6 Pro, wired V2) back up all 5 so FN2 round-
-// trips. Restore/validate iterate whatever layers the FILE holds, so 4-layer
-// and 5-layer backups both restore correctly.
+// A backup is a `keyable-settings` file, version 1, a format shared with the KeyAble
+// Firmware Updater, which writes and reads the same files. Values are saved exactly as
+// the keyboard gives them: keycodes as numbers, raw bytes as lowercase hex.
 //
-// Wire format:
 //   {
-//     format: "keyable-keymap",
-//     version: 1,
-//     createdAt: ISO timestamp,
-//     appVersion: string,
-//     keyboard: { pid, layoutId, name },
-//     layers: { "0": [code, code, ...], "1": ..., ...up to the device count },
-//       - array index matches layout.keys order; each entry is a 16-bit QMK keycode
-//     encoders: [ { id, layer, ccw, cw }, ... ]
+//     format: "keyable-settings", version: 1, created: ISO time, app: "KeyAble 1.3",
+//     keyboard: { vid, pid, name, firmware: { versionReply, bcdDevice, sha256 } },
+//     shape:    { layers, rows, cols, encoders },
+//     via: {
+//       protocol,
+//       keymap:   every layer's whole matrix, layer by layer, then row by row,
+//       encoders: [[ccw, cw], ...], layer by layer, then encoder by encoder,
+//       macros:   { count, size, buffer: hex up to the last macro's terminator },
+//       lighting: [{ channel, value, data: hex }, ...], each value the board answers,
+//       effectCount: written by the updater only, since reading it changes the effect
+//     },
+//     keychron:    Keychron's 0xA7 settings, or null,
+//     keychronRgb: Keychron's 0xA8 lighting, or null
 //   }
 //
-// Only keys that appear in the layout's `keys` array are backed up - phantom
-// matrix positions (writable but not connected to a physical switch) are
-// ignored. Restore writes back to those same positions only.
+// Only format, version, keyboard.vid and pid, shape, via.protocol and via.keymap are
+// required. A missing section was not saved, and restore leaves that part of the board
+// alone. bcdDevice is always null here, as WebHID does not expose it; sha256 hashes the
+// firmware file, which only the updater knows.
+//
+// The keymap is in matrix order, which needs no layout data, so a later correction to a
+// layout cannot misplace a backup. Backups from KeyAble 1.3 and earlier, `keyable-keymap`,
+// held the layout's keys in layout order, and are refused.
+//
+// A restore reads the board first and writes only what differs. Keychron's own keycodes
+// and lighting effect numbers can mean something else in another build of the firmware,
+// so they are written only onto the build that saved the file; anything that cannot be
+// restored is left as it is and named.
 
-const BACKUP_FORMAT       = 'keyable-keymap';
-const BACKUP_VERSION      = 1;
+const SETTINGS_FORMAT       = 'keyable-settings';
+const SETTINGS_VERSION      = 1;
+const OLD_BACKUP_FORMAT     = 'keyable-keymap';   // KeyAble 1.3 and earlier
 
-// Dotted version strings compared number by number, so '1.10' is later than '1.9'.
-function versionBefore(a, b) {
-  const pa = String(a).split('.').map(Number);
-  const pb = String(b).split('.').map(Number);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const x = pa[i] || 0;
-    const y = pb[i] || 0;
-    if (x !== y) return x < y;
+// Thrown with a message written for the user.
+class BackupError extends Error {}
+
+const toHex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+const fromHex = text => Uint8Array.from(text.match(/../g) || [], h => parseInt(h, 16));
+const sameValue = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+function isKeychronCode(code) {
+  const [first, last] = deviceKeycodes.keychronRange;
+  return code >= first && code <= last;
+}
+
+// The firmware build's text, or null when the board does not answer 0xA1. QMK ends it
+// with a NUL; ZMK sends none, leaving the request's zero padding after it.
+async function readFirmwareVersion() {
+  const reply = await sendVIA([CMD_KC_FIRMWARE_VERSION]);
+  if (!reply || reply[0] !== CMD_KC_FIRMWARE_VERSION) return null;
+  const end  = reply.indexOf(0, 1);
+  const text = reply.subarray(1, end < 0 ? REPORT_LEN : end);
+  if (!text.length || text.some(b => b < 0x20 || b > 0x7E)) return null;
+  return String.fromCharCode(...text);
+}
+
+// One Keychron 0xA7 or 0xA8 sub-command's reply. Throws when the board does not answer
+// or reports a failure.
+async function askKeychron(command, sub, ...args) {
+  const reply = await sendVIA([command, sub, ...args]);
+  if (!reply || reply[0] !== command || reply[2] !== 0) {
+    throw new Error('The keyboard did not accept a Keychron settings request.');
   }
-  return false;
+  return reply;
 }
 
-// Indices of the layout's keys that a backup did not save: those listed in keysMovedIn for
-// a later version than the one that made it. A missing appVersion counts as earlier, which
-// can only leave keys untouched.
-function keysNotInBackup(data, layout) {
-  const made = typeof data.appVersion === 'string' ? data.appVersion : '0';
-  const skip = new Set();
-  for (const [version, labels] of Object.entries(layout.keysMovedIn || {})) {
-    if (!versionBefore(made, version)) continue;
-    layout.keys.forEach((k, i) => { if (labels.includes(k.label)) skip.add(i); });
+// A Keychron command family's sub-command 1 reply, which starts with the family's
+// protocol version; null when the board does not have the family. Keychron's ZMK
+// firmware has neither family and returns the request unchanged, which reads as
+// version 0.
+async function keychronInfo(command) {
+  const reply = await sendVIA([command, 0x01]);
+  if (!reply || reply[0] !== command || reply[2] !== 0) return null;
+  return (reply[3] | (reply[4] << 8)) ? reply : null;
+}
+
+// - Keychron settings (0xA7, keychron_raw_hid.c) -
+// Sub-command 1 reports the protocol and, at byte 5, which settings the build has. The
+// layouts are Keychron's language.c, keychron_debounce.c, snap_click.c and wireless.c.
+const KC_MISC_SETTINGS = {
+  language:      { flag: 0x02, get: 0x03, set: 0x04, name: 'keyboard language' },
+  debounce:      { flag: 0x04, get: 0x05, set: 0x06, name: 'debounce' },
+  snapClick:     { flag: 0x08, get: 0x08, set: 0x09, name: 'Snap Click' },
+  wirelessSleep: { flag: 0x10, get: 0x0B, set: 0x0C, name: 'wireless sleep times' },
+};
+const KC_SNAP_CLICK_INFO = 0x07;
+const KC_SNAP_CLICK_SAVE = 0x0A;
+const KC_SNAP_CLICK_ENTRY_BYTES  = 3;   // type, first key, second key
+const KC_SNAP_CLICK_PER_REQUEST  = 9;
+
+async function readKeychronSettings() {
+  const info = await keychronInfo(CMD_KC_MISC);
+  if (!info) return null;
+  const protocol = info[3] | (info[4] << 8);
+  const features = info[5];
+  const out = { protocol, features, language: null, debounce: null, snapClick: null, wirelessSleep: null };
+  const has = name => (features & KC_MISC_SETTINGS[name].flag) !== 0;
+  const get = async (name, ...args) => askKeychron(CMD_KC_MISC, KC_MISC_SETTINGS[name].get, ...args);
+  if (has('language')) out.language = (await get('language'))[3];
+  if (has('debounce')) {
+    const reply = await get('debounce');
+    out.debounce = [reply[4], reply[5]];   // type, milliseconds
   }
-  return skip;
+  if (has('snapClick')) {
+    const count = (await askKeychron(CMD_KC_MISC, KC_SNAP_CLICK_INFO))[3];
+    out.snapClick = [];
+    for (let start = 0; start < count; start += KC_SNAP_CLICK_PER_REQUEST) {
+      const n = Math.min(KC_SNAP_CLICK_PER_REQUEST, count - start);
+      const data = (await get('snapClick', start, n)).subarray(3, 3 + n * KC_SNAP_CLICK_ENTRY_BYTES);
+      for (let i = 0; i < n; i++) {
+        out.snapClick.push(toHex(data.subarray(i * KC_SNAP_CLICK_ENTRY_BYTES, (i + 1) * KC_SNAP_CLICK_ENTRY_BYTES)));
+      }
+    }
+  }
+  // Backlight-off and sleep times: two little-endian 16-bit counts of seconds.
+  if (has('wirelessSleep')) out.wirelessSleep = toHex((await get('wirelessSleep')).subarray(3, 7));
+  return out;
 }
 
-// The skipped keys' names as a list: "A and B", or "A or B" with type 'disjunction'.
-function skippedKeysText(layout, skip, type = 'conjunction') {
-  const labels = [...skip].map(i => layout.keys[i].label);
-  return new Intl.ListFormat('en-GB', { type }).format(labels);
+async function writeKeychronSetting(name, value) {
+  const set = KC_MISC_SETTINGS[name].set;
+  if (name === 'language') await askKeychron(CMD_KC_MISC, set, value);
+  else if (name === 'debounce') await askKeychron(CMD_KC_MISC, set, ...value);
+  else if (name === 'wirelessSleep') await askKeychron(CMD_KC_MISC, set, ...fromHex(value));
+  else {
+    for (let start = 0; start < value.length; start += KC_SNAP_CLICK_PER_REQUEST) {
+      const chunk = value.slice(start, start + KC_SNAP_CLICK_PER_REQUEST);
+      await askKeychron(CMD_KC_MISC, set, start, chunk.length, ...chunk.flatMap(e => [...fromHex(e)]));
+    }
+    await askKeychron(CMD_KC_MISC, KC_SNAP_CLICK_SAVE);
+  }
 }
 
-// The one knob entry per layer that validateBackup checks and executeRestore writes.
-function backupEncoderEntry(data, layer) {
-  return data.encoders.find(e => e && e.id === 0 && e.layer === layer);
+// - Keychron lighting (0xA8, keychron_rgb.c) -
+// Indicators, per-key colours, and mixed effect regions with each region's effect list.
+// Changes take effect at once and persist only after the save sub-command.
+const KC_RGB = {
+  SAVE: 0x02, GET_INDICATORS: 0x03, SET_INDICATORS: 0x04, GET_LED_COUNT: 0x05,
+  GET_PER_KEY_TYPE: 0x07, SET_PER_KEY_TYPE: 0x08, GET_COLOURS: 0x09, SET_COLOURS: 0x0A,
+  GET_MIXED_INFO: 0x0B, GET_REGIONS: 0x0C, SET_REGIONS: 0x0D, GET_EFFECTS: 0x0E, SET_EFFECTS: 0x0F,
+};
+const KC_RGB_COLOURS_PER_REQUEST = 9;    // each hue, saturation, value
+const KC_RGB_REGIONS_PER_REQUEST = 28;   // Keychron reads up to 29 a request but writes up to 28
+const KC_RGB_EFFECTS_PER_REQUEST = 3;
+const KC_RGB_EFFECT_BYTES        = 8;    // effect, hue, saturation, speed, a little-endian 32-bit time
+const KC_RGB_SHAPE = ['protocol', 'ledCount', 'effectRegions', 'effectsPerRegion'];
+
+async function readKeychronRgb() {
+  const head = await keychronInfo(CMD_KC_RGB);
+  if (!head) return null;
+  const protocol = head[3] | (head[4] << 8);
+  const ledCount = (await askKeychron(CMD_KC_RGB, KC_RGB.GET_LED_COUNT))[3];
+  const info = await askKeychron(CMD_KC_RGB, KC_RGB.GET_MIXED_INFO);
+  const [effectRegions, effectsPerRegion] = [info[3], info[4]];
+  const colours = [], regions = [], effects = [];
+  for (let start = 0; start < ledCount; start += KC_RGB_COLOURS_PER_REQUEST) {
+    const n = Math.min(KC_RGB_COLOURS_PER_REQUEST, ledCount - start);
+    colours.push(...(await askKeychron(CMD_KC_RGB, KC_RGB.GET_COLOURS, start, n)).subarray(3, 3 + 3 * n));
+  }
+  for (let start = 0; start < ledCount; start += KC_RGB_REGIONS_PER_REQUEST) {
+    const n = Math.min(KC_RGB_REGIONS_PER_REQUEST, ledCount - start);
+    regions.push(...(await askKeychron(CMD_KC_RGB, KC_RGB.GET_REGIONS, start, n)).subarray(3, 3 + n));
+  }
+  for (let region = 0; region < effectRegions; region++) {
+    for (let start = 0; start < effectsPerRegion; start += KC_RGB_EFFECTS_PER_REQUEST) {
+      const n = Math.min(KC_RGB_EFFECTS_PER_REQUEST, effectsPerRegion - start);
+      const reply = await askKeychron(CMD_KC_RGB, KC_RGB.GET_EFFECTS, region, start, n);
+      effects.push(...reply.subarray(3, 3 + n * KC_RGB_EFFECT_BYTES));
+    }
+  }
+  return {
+    protocol, ledCount, effectRegions, effectsPerRegion,
+    indicators:    toHex((await askKeychron(CMD_KC_RGB, KC_RGB.GET_INDICATORS)).subarray(4, 8)),
+    perKeyType:    (await askKeychron(CMD_KC_RGB, KC_RGB.GET_PER_KEY_TYPE))[3],
+    perKeyColours: toHex(colours),
+    regions:       toHex(regions),
+    effects:       toHex(effects),
+  };
 }
+
+// Writes each part of `parts` (the keychronRgb fields that are not null), then saves.
+async function writeKeychronRgb(shape, parts) {
+  const { ledCount, effectRegions, effectsPerRegion } = shape;
+  if (parts.indicators != null) await askKeychron(CMD_KC_RGB, KC_RGB.SET_INDICATORS, ...fromHex(parts.indicators));
+  if (parts.perKeyType != null) await askKeychron(CMD_KC_RGB, KC_RGB.SET_PER_KEY_TYPE, parts.perKeyType);
+  if (parts.perKeyColours != null) {
+    const bytes = fromHex(parts.perKeyColours);
+    for (let start = 0; start < ledCount; start += KC_RGB_COLOURS_PER_REQUEST) {
+      const n = Math.min(KC_RGB_COLOURS_PER_REQUEST, ledCount - start);
+      await askKeychron(CMD_KC_RGB, KC_RGB.SET_COLOURS, start, n, ...bytes.subarray(3 * start, 3 * (start + n)));
+    }
+  }
+  if (parts.regions != null) {
+    const bytes = fromHex(parts.regions);
+    for (let start = 0; start < ledCount; start += KC_RGB_REGIONS_PER_REQUEST) {
+      const n = Math.min(KC_RGB_REGIONS_PER_REQUEST, ledCount - start);
+      await askKeychron(CMD_KC_RGB, KC_RGB.SET_REGIONS, start, n, ...bytes.subarray(start, start + n));
+    }
+  }
+  if (parts.effects != null) {
+    const bytes = fromHex(parts.effects);
+    for (let region = 0; region < effectRegions; region++) {
+      for (let start = 0; start < effectsPerRegion; start += KC_RGB_EFFECTS_PER_REQUEST) {
+        const n  = Math.min(KC_RGB_EFFECTS_PER_REQUEST, effectsPerRegion - start);
+        const at = (region * effectsPerRegion + start) * KC_RGB_EFFECT_BYTES;
+        await askKeychron(CMD_KC_RGB, KC_RGB.SET_EFFECTS, region, start, n,
+                          ...bytes.subarray(at, at + n * KC_RGB_EFFECT_BYTES));
+      }
+    }
+  }
+  await askKeychron(CMD_KC_RGB, KC_RGB.SAVE);
+}
+
+// - VIA lighting -
+// Each value in VIA_LIGHTING_VALUES that the board answers.
+async function readViaLighting() {
+  const values = [];
+  for (const [channel, value, length] of VIA_LIGHTING_VALUES) {
+    const data = await lightingGet(channel, value, length);
+    if (data) values.push({ channel, value, data: toHex(data) });
+  }
+  return values;
+}
+
+// Writes one lighting value and saves it on its own: Keychron's current via.c stores
+// nothing on a save after several values were set. QMK scales brightness to the board's
+// maximum on the way in and back on the way out, rounding down both times, so a value
+// written back can read one or two lower; brightness is therefore written up to two
+// steps higher until it reads back exactly.
+async function writeViaLightingValue(channel, value, data) {
+  const bytes = Array.from(fromHex(data));
+  const attempts = [bytes];
+  if (value === LIGHTING_BRIGHTNESS && bytes.length === 1) {
+    for (const step of [1, 2]) if (bytes[0] + step <= 0xFF) attempts.push([bytes[0] + step]);
+  }
+  let matched = false;
+  for (const attempt of attempts) {
+    if (!await lightingSet(channel, value, attempt)) throw new Error('No response writing lighting.');
+    const back = await lightingGet(channel, value, bytes.length);
+    if (back && sameValue(back, bytes)) { matched = true; break; }
+  }
+  if (!matched && attempts.length > 1) await lightingSet(channel, value, bytes);
+  if (!await lightingSaveCommit(channel)) throw new Error('No response saving lighting.');
+}
+
+// - Macros -
+// The macro buffer up to and including the last macro's terminator; the whole buffer
+// when it does not hold `count` terminators.
+function usedMacroBytes(buffer, count) {
+  let end = 0;
+  for (let n = 0; n < count; n++) {
+    const terminator = buffer.indexOf(0, end);
+    if (terminator < 0) return buffer;
+    end = terminator + 1;
+  }
+  return buffer.subarray(0, end);
+}
+
+async function readMacroBackup() {
+  const geo = await readMacroGeometry();
+  if (!geo || !geo.slotCount || !geo.bufferSize) return null;
+  const buffer = await readMacroBuffer(geo.bufferSize);
+  if (!buffer) throw new Error('No response reading macros.');
+  return { count: geo.slotCount, size: geo.bufferSize, buffer: toHex(usedMacroBytes(buffer, geo.slotCount)) };
+}
+
+async function writeMacroBuffer(hex, size) {
+  const bytes = new Uint8Array(size);
+  bytes.set(fromHex(hex));
+  for (let offset = 0; offset < size; offset += MACRO_CHUNK_SIZE) {
+    const n = Math.min(MACRO_CHUNK_SIZE, size - offset);
+    const reply = await sendVIA([CMD_MACRO_SET_BUFFER, (offset >> 8) & 0xFF, offset & 0xFF, n,
+                                 ...bytes.subarray(offset, offset + n)]);
+    if (!reply || reply[0] !== CMD_MACRO_SET_BUFFER) throw new Error('No response writing macros.');
+  }
+}
+
+// - Reading the whole board -
+// Everything a backup holds except its header, in the file's own form, so a backup
+// writes it as it is and a restore compares a file with the board value by value.
+// `onKeys(fraction)` follows the keymap read, which is most of the time on boards read
+// key by key.
+async function readBoardSettings(layout, onKeys = () => {}) {
+  if (viaProtocolVersion === null) throw new Error('The keyboard did not report its VIA protocol.');
+  const layers   = backupLayerList().length;
+  const encoders = layout.keys.some(k => k.isEncoder) ? 1 : 0;   // the app assumes one knob, id 0
+  const cells    = layout.rows * layout.cols;
+
+  const keymap = [];
+  for (let layer = 0; layer < layers; layer++) {
+    const codes = await readLayerCells(layer, layout, n => onKeys((keymap.length + n) / (layers * cells)));
+    if (!codes) throw new Error(`No response reading layer ${layer}.`);
+    keymap.push(...codes);
+  }
+  const encoderCodes = [];
+  for (let layer = 0; layer < layers; layer++) {
+    for (let id = 0; id < encoders; id++) {
+      const pair = [];
+      for (const clockwise of [0, 1]) {
+        const reply = await sendVIA([CMD_GET_ENCODER, layer, id, clockwise]);
+        if (!reply || reply[0] !== CMD_GET_ENCODER) throw new Error(`No response reading the knob on layer ${layer}.`);
+        pair.push((reply[4] << 8) | reply[5]);
+      }
+      encoderCodes.push(pair);
+    }
+  }
+  return {
+    firmware: { versionReply: await readFirmwareVersion(), bcdDevice: null, sha256: null },
+    shape: { layers, rows: layout.rows, cols: layout.cols, encoders },
+    via: {
+      protocol: viaProtocolVersion,
+      keymap,
+      encoders: encoderCodes,
+      macros:   await readMacroBackup(),
+      lighting: await readViaLighting(),
+    },
+    keychron:    await readKeychronSettings(),
+    keychronRgb: await readKeychronRgb(),
+  };
+}
+
+// - Shared helpers, both formats -
 
 // Long HID operations (backup, restore, factory reset) report through a progress
 // box that is NOT a live region. It takes focus at the start, which reads the
@@ -16104,19 +16476,14 @@ function startProgress(id, text) {
 }
 
 // Layers to back up = every layer the connected device reports (so the 5-layer
-// boards' FN2 round-trips), defaulting to the canonical 4 when unknown. Restore
-// and validate instead iterate whatever layers the FILE actually contains, so
-// 4-layer and 5-layer backups both restore correctly.
+// boards' FN2 round-trips), defaulting to the canonical 4 when unknown.
 function backupLayerList() {
   const n = (deviceLayerCount && deviceLayerCount >= 1) ? deviceLayerCount : 4;
   return Array.from({ length: n }, (_, i) => i);
 }
-function fileLayerList(data) {
-  return Object.keys((data && data.layers) || {})
-    .map(Number).filter(n => Number.isInteger(n)).sort((a, b) => a - b);
-}
 
-let pendingRestoreData = null;
+// The file chosen for restore: { data, sameFirmware }.
+let pendingRestore = null;
 
 function setBackupControlsBusy(busy) {
   ['btn-backup', 'btn-restore', 'btn-continue', 'btn-reset-all', 'btn-disconnect']
@@ -16133,7 +16500,19 @@ function backupFileStamp() {
   return `${d.getDate()} ${month} ${d.getFullYear()} ${hh}-${mm}`;
 }
 
-async function backupKeymap() {
+// "12 November 2026 at 20:15", or 'an unknown date'. The month is spelled out because
+// an all-number date reads differently by country.
+function backupDateText(iso) {
+  const d = iso ? new Date(iso) : null;
+  if (!d || isNaN(d)) return 'an unknown date';
+  return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })} at ` +
+         d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+const listText = items => new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(items);
+
+// - Backup -
+async function backupSettings() {
   if (!hidDevice || !activeKbd) {
     setStatus('Connect a keyboard before backing up.', 'error');
     announce('Backup needs a connected keyboard. Please connect first.');
@@ -16146,68 +16525,29 @@ async function backupKeymap() {
     return;
   }
 
-  const progress = startProgress('backup-progress', 'Backing up keymap. Please wait.');
+  const progress = startProgress('backup-progress', 'Backing up your keyboard setup. Please wait.');
   setBackupControlsBusy(true);
 
   try {
-    const physicalKeys = layout.keys;   // keep order - restore relies on it
-    const backupLayers = backupLayerList();
-    const totalKeys    = physicalKeys.length * backupLayers.length;
-    const layers       = {};
-    let done = 0;
-
-    for (const layer of backupLayers) {
-      const codes = await readLayerKeys(layer, physicalKeys, {
-        onProgress: n => progress.update(`Backing up keymap. Read ${done + n} of ${totalKeys} keys.`),
-      });
-      if (!codes) throw new Error(`No response reading layer ${layer}.`);
-      layers[String(layer)] = codes;
-      done += physicalKeys.length;
-    }
-
-    // Encoder rotations. Keychron boards have at most one encoder, id 0.
-    const encoders = [];
-    const hasEncoder = physicalKeys.some(k => k.isEncoder);
-    if (hasEncoder) {
-      const id = 0;
-      for (const layer of backupLayers) {
-        const ccwReply = await sendVIA([CMD_GET_ENCODER, layer, id, 0]);
-        const cwReply  = await sendVIA([CMD_GET_ENCODER, layer, id, 1]);
-        if (!ccwReply || ccwReply[0] !== CMD_GET_ENCODER ||
-            !cwReply  || cwReply[0]  !== CMD_GET_ENCODER) {
-          throw new Error(`No response reading encoder on layer ${layer}.`);
-        }
-        encoders.push({
-          id,
-          layer,
-          ccw: (ccwReply[4] << 8) | ccwReply[5],
-          cw:  (cwReply[4]  << 8) | cwReply[5],
-        });
-      }
-    }
-
+    await flushLightingSave();
+    const board = await readBoardSettings(layout, fraction =>
+      progress.update(`Backing up keys, ${Math.round(fraction * 100)} percent done.`));
     const payload = {
-      format:     BACKUP_FORMAT,
-      version:    BACKUP_VERSION,
-      createdAt:  new Date().toISOString(),
-      appVersion: KEYABLE_VERSION,
-      keyboard: {
-        pid:      activeKbd.pid,
-        layoutId: activeKbd.layoutId,
-        name:     activeKbd.name,
-        osMode:   currentOSMode,   // 'mac' | 'windows' | 'unknown' at backup time (informational)
-      },
-      layers,
-      encoders,
+      format:  SETTINGS_FORMAT,
+      version: SETTINGS_VERSION,
+      created: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+      app:     `KeyAble ${KEYABLE_VERSION}`,
+      keyboard: { vid: activeKbd.vid, pid: activeKbd.pid, name: activeKbd.name, firmware: board.firmware },
+      shape:       board.shape,
+      via:         board.via,
+      keychron:    board.keychron,
+      keychronRgb: board.keychronRgb,
     };
 
-    const json = JSON.stringify(payload, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(payload, null, 1)], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
-
     const safeId   = (activeKbd.layoutId || 'keyboard').replace(/[^a-z0-9_-]/gi, '');
     const filename = `keyable-${inDemoMode() ? 'demo-' : ''}${safeId} ${backupFileStamp()}.json`;
-
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
@@ -16217,7 +16557,7 @@ async function backupKeymap() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 
     playChirp(true);
-    progress.finish(`Backup complete. Saved as ${filename}.`);
+    progress.finish(`Backup complete. Saved ${listText(settingsSectionNames(payload))} as ${filename}.`);
   } catch (err) {
     playChirp(false);
     progress.finish(`Backup failed: ${err.message || String(err)}`);
@@ -16227,8 +16567,20 @@ async function backupKeymap() {
   }
 }
 
-// - Restore flow -
-function restoreKeymapPrompt() {
+// What a settings file holds, in words: "keys", "the knob", "macros", ...
+function settingsSectionNames(data) {
+  const via = data.via || {};
+  const names = ['keys'];
+  if (via.encoders && via.encoders.length) names.push('the knob');
+  if (via.macros) names.push('macros');
+  if (via.lighting && via.lighting.length) names.push('lighting');
+  if (data.keychron) names.push('Keychron settings');
+  if (data.keychronRgb) names.push('Keychron lighting');
+  return names;
+}
+
+// - Restore -
+function restoreSettingsPrompt() {
   if (!hidDevice || !activeKbd) {
     setStatus('Connect a keyboard before restoring.', 'error');
     announce('Restore needs a connected keyboard. Please connect first.');
@@ -16239,73 +16591,7 @@ function restoreKeymapPrompt() {
   input.click();
 }
 
-function describeBackup(data) {
-  const name  = (data.keyboard && data.keyboard.name) || 'unknown keyboard';
-  // Month spelled out: an all-number date reads differently by country.
-  const d     = data.createdAt ? new Date(data.createdAt) : null;
-  const when  = d && !isNaN(d)
-    ? `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })} at ` +
-      d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-    : 'unknown date';
-  const layerCount = data.layers ? Object.keys(data.layers).length : 0;
-  const layout  = activeLayout();
-  const skip    = keysNotInBackup(data, layout);
-  const skipped = skip.size
-    ? ` An earlier version of KeyAble made this backup without ${skippedKeysText(layout, skip)}, ` +
-      `so those keys will be left as they are.`
-    : '';
-  return `File: ${name}, ${layerCount} layers, saved ${when}.${skipped}`;
-}
-
-function validateBackup(data) {
-  if (!data || typeof data !== 'object') return 'File is not a valid KeyAble backup.';
-  if (data.format !== BACKUP_FORMAT)     return 'File is not a KeyAble backup.';
-  if (data.version !== BACKUP_VERSION)   return `Backup version ${data.version} is not supported by this app.`;
-  if (!data.keyboard || typeof data.keyboard !== 'object') return 'Backup is missing keyboard information.';
-
-  const layout = activeLayout();
-  if (!layout) return 'No layout data available for the connected keyboard.';
-
-  if (data.keyboard.pid !== activeKbd.pid) {
-    return `This backup is for a different keyboard (Product ID ${hex4(data.keyboard.pid)}). ` +
-           `Your connected keyboard has Product ID ${hex4(activeKbd.pid)}.`;
-  }
-  if (data.keyboard.layoutId !== activeKbd.layoutId) {
-    return `This backup is for layout "${data.keyboard.layoutId}", but your connected keyboard uses "${activeKbd.layoutId}".`;
-  }
-
-  if (!data.layers || typeof data.layers !== 'object') return 'Backup is missing layer data.';
-  const layerList = fileLayerList(data);
-  if (!layerList.length) return 'Backup is missing layer data.';
-  for (const layer of layerList) {
-    const arr = data.layers[String(layer)];
-    if (!Array.isArray(arr)) return `Backup is missing data for layer ${layer}.`;
-    if (arr.length !== layout.keys.length) {
-      return `Backup layer ${layer} has ${arr.length} keys but this keyboard expects ${layout.keys.length}.`;
-    }
-    for (const code of arr) {
-      if (!Number.isInteger(code) || code < 0 || code > 0xFFFF) {
-        return `Backup contains an invalid keycode in layer ${layer}.`;
-      }
-    }
-  }
-
-  const hasEncoder = layout.keys.some(k => k.isEncoder);
-  if (hasEncoder) {
-    if (!Array.isArray(data.encoders)) return 'Backup is missing encoder data for this keyboard.';
-    for (const layer of layerList) {
-      const entry = backupEncoderEntry(data, layer);
-      if (!entry) return `Backup is missing encoder data for layer ${layer}.`;
-      if (!Number.isInteger(entry.ccw) || !Number.isInteger(entry.cw)) {
-        return `Backup contains an invalid encoder keycode in layer ${layer}.`;
-      }
-    }
-  }
-
-  return null;   // valid
-}
-
-function restoreKeymapFileChosen(event) {
+function restoreFileChosen(event) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
 
@@ -16314,7 +16600,7 @@ function restoreKeymapFileChosen(event) {
     setStatus('Could not read the selected file.', 'error');
     announce('Could not read the selected file.');
   };
-  reader.onload = () => {
+  reader.onload = async () => {
     let data;
     try {
       data = JSON.parse(reader.result);
@@ -16323,14 +16609,15 @@ function restoreKeymapFileChosen(event) {
       announce('Selected file is not valid JSON. Restore cancelled.');
       return;
     }
-    const problem = validateBackup(data);
+    const problem = validateSettingsFile(data);
     if (problem) {
       setStatus(problem, 'error');
       announce(`Cannot restore. ${problem}`);
       return;
     }
-    pendingRestoreData = data;
-    $('restore-file-summary').textContent = describeBackup(data);
+    const same = sameFirmware(data, await readFirmwareVersion());
+    pendingRestore = { data, sameFirmware: same };
+    $('restore-file-summary').textContent = describeSettingsFile(data, same);
     openDialog('restore-confirm');
   };
   reader.readAsText(file);
@@ -16338,75 +16625,253 @@ function restoreKeymapFileChosen(event) {
 
 function cancelRestore() {
   closeDialog('restore-confirm');
-  pendingRestoreData = null;
+  pendingRestore = null;
   announce('Restore cancelled. No changes have been made.');
   moveFocus('btn-restore');
 }
 
 async function executeRestore() {
-  const data = pendingRestoreData;
+  const pending = pendingRestore;
+  pendingRestore = null;
   closeDialog('restore-confirm');
-
-  if (!data) {
+  if (!pending) {
     announce('Restore failed: no backup data is loaded.');
     moveFocus('btn-restore');
     return;
   }
+  await executeSettingsRestore(pending.data, pending.sameFirmware);
+}
 
-  const progress = startProgress('backup-progress', 'Restoring keymap. Please wait.');
+// Whether the file was saved on the firmware build the board runs now. A file with a
+// firmware file hash proves it by the hash alone, which KeyAble cannot check, so such a
+// file counts as other firmware; otherwise only an identical version text proves it.
+function sameFirmware(data, boardVersionReply) {
+  const firmware = data.keyboard.firmware || {};
+  if (firmware.sha256 != null) return false;
+  return firmware.versionReply != null && firmware.versionReply === boardVersionReply;
+}
+
+// The file checked against the shared format and the connected keyboard: a message
+// for the user, or null when it can be restored. Sections that do not fit this board
+// are not refused here; the restore skips them and says so.
+function validateSettingsFile(data) {
+  if (!data || typeof data !== 'object') return 'File is not a KeyAble backup.';
+  if (data.format === OLD_BACKUP_FORMAT) {
+    return 'This backup was made by KeyAble 1.3 or earlier and cannot be restored by this version.';
+  }
+  if (data.format !== SETTINGS_FORMAT) return 'File is not a KeyAble backup.';
+  if (!activeLayout()) return 'No layout data available for the connected keyboard.';
+  if (data.version !== SETTINGS_VERSION) return `Backup version ${data.version} is not supported by this app.`;
+  const kb = data.keyboard;
+  if (!kb || typeof kb !== 'object' || !Number.isInteger(kb.vid) || !Number.isInteger(kb.pid)) {
+    return 'Backup is missing keyboard information.';
+  }
+  if (kb.vid !== activeKbd.vid || kb.pid !== activeKbd.pid) {
+    const name = typeof kb.name === 'string' && kb.name ? `${kb.name}, ` : '';
+    return `This backup is for a different keyboard (${name}Product ID ${hex4(kb.pid)}). ` +
+           `Your connected keyboard has Product ID ${hex4(activeKbd.pid)}.`;
+  }
+  return settingsFileDamage(data) ? 'This backup file is damaged, so it cannot be restored.' : null;
+}
+
+// True when any section of the file is not in the shared format's form.
+function settingsFileDamage(data) {
+  const isCount = v => Number.isInteger(v) && v >= 0;
+  const isByte  = v => Number.isInteger(v) && v >= 0 && v <= 0xFF;
+  const isCode  = v => Number.isInteger(v) && v >= 0 && v <= 0xFFFF;
+  const isHex   = (v, chars) => typeof v === 'string' && /^(?:[0-9a-f]{2})*$/i.test(v) &&
+                                (chars === undefined || v.length === chars);
+  const absent  = v => v === undefined || v === null;
+  const { shape, via, keychron: kc, keychronRgb: rgb } = data;
+
+  if (!shape || ![shape.layers, shape.rows, shape.cols].every(v => isCount(v) && v > 0) ||
+      !isCount(shape.encoders)) return true;
+  if (!via || !Number.isInteger(via.protocol) || !Array.isArray(via.keymap) ||
+      via.keymap.length !== shape.layers * shape.rows * shape.cols || !via.keymap.every(isCode)) return true;
+  if (!absent(via.encoders) && !(Array.isArray(via.encoders) &&
+      [0, shape.layers * shape.encoders].includes(via.encoders.length) &&
+      via.encoders.every(p => Array.isArray(p) && p.length === 2 && p.every(isCode)))) return true;
+  if (!absent(via.macros) && !(isCount(via.macros.count) && isCount(via.macros.size) &&
+      isHex(via.macros.buffer) && via.macros.buffer.length <= 2 * via.macros.size)) return true;
+  if (!absent(via.lighting) && !(Array.isArray(via.lighting) &&
+      via.lighting.every(e => e && isByte(e.channel) && isByte(e.value) && isHex(e.data) && e.data.length > 0))) return true;
+  if (!absent(kc) && !(Number.isInteger(kc.protocol) &&
+      (absent(kc.language) || isByte(kc.language)) &&
+      (absent(kc.debounce) || (Array.isArray(kc.debounce) && kc.debounce.length === 2 && kc.debounce.every(isByte))) &&
+      (absent(kc.snapClick) || (Array.isArray(kc.snapClick) &&
+        kc.snapClick.every(e => isHex(e, 2 * KC_SNAP_CLICK_ENTRY_BYTES)))) &&
+      (absent(kc.wirelessSleep) || isHex(kc.wirelessSleep, 8)))) return true;
+  if (!absent(rgb)) {
+    if (!KC_RGB_SHAPE.every(f => isCount(rgb[f]))) return true;
+    const chars = {
+      indicators: 8, perKeyColours: 6 * rgb.ledCount, regions: 2 * rgb.ledCount,
+      effects: 2 * KC_RGB_EFFECT_BYTES * rgb.effectRegions * rgb.effectsPerRegion,
+    };
+    if (!Object.entries(chars).every(([f, n]) => absent(rgb[f]) || isHex(rgb[f], n))) return true;
+    if (!absent(rgb.perKeyType) && !isByte(rgb.perKeyType)) return true;
+  }
+  return false;
+}
+
+function describeSettingsFile(data, same) {
+  const name = (typeof data.keyboard.name === 'string' && data.keyboard.name) || 'unknown keyboard';
+  const by   = typeof data.app === 'string' && data.app ? ` by ${data.app}` : '';
+  const notes = [];
+  if (!keymapFits(data)) {
+    notes.push('Its key layout does not match this keyboard, so keys and the knob will be left as they are.');
+  } else if (data.via.protocol !== viaProtocolVersion) {
+    notes.push('This keyboard\'s firmware numbers keys differently from the one that saved it, ' +
+               'so keys and the knob will be left as they are.');
+  }
+  if (!same) {
+    notes.push('This keyboard\'s firmware is not the one that saved it, so Keychron\'s own keys ' +
+               'and lighting effects will be left as they are.');
+  }
+  return `File: ${name}, saved ${backupDateText(data.created)}${by}. ` +
+         `It holds ${listText(settingsSectionNames(data))}.${notes.length ? ' ' + notes.join(' ') : ''}`;
+}
+
+// Whether the file's keymap and knobs have this board's shape.
+function keymapFits(data) {
+  const layout = activeLayout();
+  const s = data.shape;
+  return s.layers === backupLayerList().length && s.rows === layout.rows && s.cols === layout.cols &&
+         s.encoders === (layout.keys.some(k => k.isEncoder) ? 1 : 0);
+}
+
+// What a restore writes, worked out from the file and the board as it is now. Each
+// part holds only values that differ; `notes` says, in sentences, what is left alone.
+function planSettingsRestore(file, board, same) {
+  const plan = { keys: [], encoders: [], macros: null, lighting: [], keychron: [], keychronRgb: null, notes: [] };
+  const fv = file.via, bv = board.via;
+
+  // Keys and knob.
+  if (!keymapFits(file)) {
+    plan.notes.push('Keys and the knob were left as they are, because the file\'s key layout does not match this keyboard.');
+  } else if (fv.protocol !== bv.protocol) {
+    plan.notes.push('Keys and the knob were left as they are, because this keyboard\'s firmware numbers keys differently from the one that saved the file.');
+  } else {
+    const { rows, cols } = board.shape;
+    let leftAlone = 0;
+    const carries = code => same || !isKeychronCode(code) || (leftAlone++, false);
+    fv.keymap.forEach((code, i) => {
+      if (code === bv.keymap[i] || !carries(code)) return;
+      const layer = Math.floor(i / (rows * cols));
+      plan.keys.push({ layer, row: Math.floor(i / cols) % rows, col: i % cols, code });
+    });
+    (fv.encoders || []).forEach((pair, i) => {
+      const layer = Math.floor(i / board.shape.encoders), id = i % board.shape.encoders;
+      pair.forEach((code, clockwise) => {
+        if (code !== bv.encoders[i][clockwise] && carries(code)) plan.encoders.push({ layer, id, clockwise, code });
+      });
+    });
+    if (leftAlone) {
+      plan.notes.push(`${leftAlone === 1 ? 'One key' : `${leftAlone} keys`} set to Keychron's own keys ` +
+                      `${leftAlone === 1 ? 'was' : 'were'} left as ${leftAlone === 1 ? 'it is' : 'they are'}, ` +
+                      'because this keyboard\'s firmware is not the one that saved the file.');
+    }
+  }
+
+  // Macros.
+  if (fv.macros) {
+    const fm = fv.macros, bm = bv.macros;
+    if (!bm) plan.notes.push('Macros were not restored, because this keyboard has none.');
+    else if (fm.count !== bm.count) plan.notes.push('Macros were not restored, because this keyboard has a different number of them.');
+    else if (fm.buffer.length > 2 * bm.size) plan.notes.push('Macros were not restored, because they do not fit in this keyboard\'s macro space.');
+    else if (fm.buffer.toLowerCase() !== bm.buffer) plan.macros = { buffer: fm.buffer, size: bm.size };
+  }
+
+  // VIA lighting.
+  let lightingMissing = false, effectLeft = false;
+  for (const entry of fv.lighting || []) {
+    const now = bv.lighting.find(e => e.channel === entry.channel && e.value === entry.value);
+    if (!now) { lightingMissing = true; continue; }
+    if (entry.value === LIGHTING_EFFECT && !same) { effectLeft = true; continue; }
+    if (entry.data.toLowerCase() !== now.data) plan.lighting.push(entry);
+  }
+  if (lightingMissing) plan.notes.push('Some lighting settings were not restored, because this keyboard does not have them.');
+  if (effectLeft) plan.notes.push('The lighting effect was left as it is, because this keyboard\'s firmware is not the one that saved the file.');
+
+  // Keychron settings.
+  const fk = file.keychron, bk = board.keychron;
+  if (fk) {
+    const missing = [];
+    for (const [name, { name: words }] of Object.entries(KC_MISC_SETTINGS)) {
+      const value = fk[name], now = bk && bk[name];
+      if (value == null || sameValue(value, now)) continue;
+      if (now == null || bk.protocol !== fk.protocol || (name === 'snapClick' && value.length !== now.length)) {
+        missing.push(words);
+      } else {
+        plan.keychron.push({ name, value });
+      }
+    }
+    if (missing.length) {
+      plan.notes.push(`This keyboard's firmware does not have ${listText(missing)} in the same form, so ` +
+                      `${missing.length === 1 ? 'it was' : 'they were'} not restored.`);
+    }
+  }
+
+  // Keychron lighting.
+  const fr = file.keychronRgb, br = board.keychronRgb;
+  if (fr) {
+    if (!br || KC_RGB_SHAPE.some(f => fr[f] !== br[f])) {
+      plan.notes.push('Keychron lighting was not restored, because this keyboard does not have it in the same form.');
+    } else {
+      const parts = {};
+      for (const f of ['indicators', 'perKeyType', 'perKeyColours', 'regions', 'effects']) {
+        const value = typeof fr[f] === 'string' ? fr[f].toLowerCase() : fr[f];
+        if (value == null || value === br[f]) continue;
+        if (f === 'effects' && !same) {
+          plan.notes.push('Keychron lighting effects were left as they are, because this keyboard\'s firmware is not the one that saved the file.');
+        } else {
+          parts[f] = value;
+        }
+      }
+      if (Object.keys(parts).length) plan.keychronRgb = parts;
+    }
+  }
+  return plan;
+}
+
+async function executeSettingsRestore(file, same) {
+  const progress = startProgress('backup-progress', 'Restoring. Reading the keyboard first. Please wait.');
   setBackupControlsBusy(true);
-
   try {
+    await flushLightingSave();
     const layout = activeLayout();
-    const physicalKeys = layout.keys;
-    const restoreLayers = fileLayerList(data);   // restore exactly what the file holds
-    const skip         = keysNotInBackup(data, layout);
-    const toWrite      = physicalKeys.map((key, i) => ({ key, i })).filter(({ i }) => !skip.has(i));
-    const totalKeys    = toWrite.length * restoreLayers.length;
+    const board = await readBoardSettings(layout, fraction =>
+      progress.update(`Restoring. Reading the keyboard, ${Math.round(fraction * 100)} percent done.`));
+    const plan = planSettingsRestore(file, board, same);
+
+    const total = plan.keys.length + plan.encoders.length + (plan.macros ? 1 : 0) +
+                  plan.lighting.length + plan.keychron.length + (plan.keychronRgb ? 1 : 0);
     let done = 0;
+    const wrote = () => progress.update(`Restoring. Wrote ${++done} of ${total} settings.`);
 
-    for (const layer of restoreLayers) {
-      const codes = data.layers[String(layer)];
-      for (const { key, i } of toWrite) {
-        const code = codes[i];
-        const high = (code >> 8) & 0xFF;
-        const low  = code & 0xFF;
-        const reply = await sendVIA([CMD_SET_KEY, layer, key.row, key.col, high, low]);
-        if (!reply || reply[0] !== CMD_SET_KEY) {
-          throw new Error(`No response writing layer ${layer} key "${key.label}".`);
-        }
-        done++;
-        progress.update(`Restoring keymap. Wrote ${done} of ${totalKeys} keys.`);
-      }
+    for (const { layer, row, col, code } of plan.keys) {
+      const reply = await sendVIA([CMD_SET_KEY, layer, row, col, (code >> 8) & 0xFF, code & 0xFF]);
+      if (!reply || reply[0] !== CMD_SET_KEY) throw new Error(`No response writing a key on layer ${layer}.`);
+      wrote();
     }
-
-    if (physicalKeys.some(k => k.isEncoder)) {
-      for (const layer of restoreLayers) {
-        const entry = backupEncoderEntry(data, layer);
-        const high = (entry.cw  >> 8) & 0xFF;
-        const lowC = entry.cw  & 0xFF;
-        const highCCW = (entry.ccw >> 8) & 0xFF;
-        const lowCCW  = entry.ccw  & 0xFF;
-        const rCcw = await sendVIA([CMD_SET_ENCODER, entry.layer, entry.id, 0, highCCW, lowCCW]);
-        const rCw  = await sendVIA([CMD_SET_ENCODER, entry.layer, entry.id, 1, high,    lowC]);
-        if (!rCcw || rCcw[0] !== CMD_SET_ENCODER || !rCw || rCw[0] !== CMD_SET_ENCODER) {
-          throw new Error(`No response writing encoder on layer ${entry.layer}.`);
-        }
-      }
+    for (const { layer, id, clockwise, code } of plan.encoders) {
+      const reply = await sendVIA([CMD_SET_ENCODER, layer, id, clockwise, (code >> 8) & 0xFF, code & 0xFF]);
+      if (!reply || reply[0] !== CMD_SET_ENCODER) throw new Error(`No response writing the knob on layer ${layer}.`);
+      wrote();
     }
+    if (plan.macros) { await writeMacroBuffer(plan.macros.buffer, plan.macros.size); wrote(); }
+    for (const { channel, value, data } of plan.lighting) { await writeViaLightingValue(channel, value, data); wrote(); }
+    for (const { name, value } of plan.keychron) { await writeKeychronSetting(name, value); wrote(); }
+    if (plan.keychronRgb) { await writeKeychronRgb(board.keychronRgb, plan.keychronRgb); wrote(); }
 
     currentKeymap = new Map();   // Step 2 cache is now stale
     playChirp(true);
-    progress.finish(skip.size
-      ? `Restore complete. ${skippedKeysText(layout, skip)} were left as they were, ` +
-        'because this backup did not save them. Every other key now matches the backup file. ' +
-        `If you remap ${skippedKeysText(layout, skip, 'disjunction')}, make a new backup so it includes them.`
+    progress.finish(plan.notes.length
+      ? `Restore complete. ${plan.notes.join(' ')} Everything else now matches the backup file.`
       : 'Restore complete. Your keyboard now matches the backup file.');
   } catch (err) {
     playChirp(false);
     progress.finish(`Restore failed: ${err.message || String(err)}`);
   } finally {
-    pendingRestoreData = null;
     setBackupControlsBusy(false);
     focusAfterUnbusy($('btn-restore'));   // back where the user started, as Backup does
   }
@@ -16436,8 +16901,19 @@ async function executeRestore() {
 // switch, and their White binaries have no lighting handler.
 
 const LIGHTING_CH_BACKLIGHT  = 1;
+const LIGHTING_CH_RGBLIGHT   = 2;
 const LIGHTING_CH_RGB_MATRIX = 3;
 const LIGHTING_VALUE_ID_BASE_BEFORE_PROTOCOL_11 = 0x7F;   // value id N is 0x7F + N
+const LIGHTING_BRIGHTNESS = 1;
+const LIGHTING_EFFECT     = 2;
+
+// Every [channel, value id, length] of VIA's QMK lighting channels, which a backup saves
+// where the board answers them.
+const VIA_LIGHTING_VALUES = [
+  [LIGHTING_CH_BACKLIGHT, 1, 1], [LIGHTING_CH_BACKLIGHT, 2, 1],
+  [LIGHTING_CH_RGBLIGHT, 1, 1], [LIGHTING_CH_RGBLIGHT, 2, 1], [LIGHTING_CH_RGBLIGHT, 3, 1], [LIGHTING_CH_RGBLIGHT, 4, 2],
+  [LIGHTING_CH_RGB_MATRIX, 1, 1], [LIGHTING_CH_RGB_MATRIX, 2, 1], [LIGHTING_CH_RGB_MATRIX, 3, 1], [LIGHTING_CH_RGB_MATRIX, 4, 2],
+];
 
 function lightingHasChannels() {
   return viaProtocolVersion === null || viaProtocolVersion >= VIA_PROTOCOL_11;
@@ -16525,7 +17001,7 @@ const LIGHTING_DEFAULT_ON_LEVEL  = 128;
 const LIGHTING_DEFAULT_ON_EFFECT = 1;   // Solid colour, which every RGB Matrix build has
 let lightingLastOnLevel   = LIGHTING_DEFAULT_ON_LEVEL;
 let lightingLastEffect    = LIGHTING_DEFAULT_ON_EFFECT;
-let lightingSavePending   = null;     // debounce handle for CMD_CUSTOM_SAVE
+let lightingSavePending   = null;     // { valueId, timer }: the debounced CMD_CUSTOM_SAVE
 
 function lightingChannelLabel() {
   return lightingChannel === LIGHTING_CH_RGB_MATRIX ? 'RGB lighting' : 'backlighting';
@@ -16596,22 +17072,34 @@ async function lightingSet(channel, valueId, dataBytes) {
   return !!(reply && reply[0] === CMD_CUSTOM_SET);
 }
 
-async function lightingSaveCommit() {
-  if (lightingChannel === null) return false;
-  const head = lightingHasChannels() ? [CMD_CUSTOM_SAVE, lightingChannel] : [CMD_CUSTOM_SAVE];
+async function lightingSaveCommit(channel = lightingChannel) {
+  if (channel === null) return false;
+  const head = lightingHasChannels() ? [CMD_CUSTOM_SAVE, channel] : [CMD_CUSTOM_SAVE];
   const reply = await sendVIA(head, undefined, head.length);
   return !!(reply && reply[0] === CMD_CUSTOM_SAVE);
 }
 
-// Debounced save - coalesces a burst of slider changes into a single EEPROM
-// commit ~600 ms after the last change. Reduces flash wear without making the
-// user wait for a manual Save button.
-function scheduleLightingSave() {
-  if (lightingSavePending) clearTimeout(lightingSavePending);
-  lightingSavePending = setTimeout(async () => {
-    lightingSavePending = null;
-    await lightingSaveCommit();
-  }, 600);
+// Sets one lighting value from the RGB Lighting section and saves it about 600 ms
+// after the last change, so a slider's burst of values costs one EEPROM write.
+// Keychron's current via.c stores lighting on a save only when exactly one value
+// was set since the last save, so a pending save is made before a different value
+// is set. Hue and saturation share one value.
+async function setLightingValue(valueId, dataBytes) {
+  if (lightingSavePending && lightingSavePending.valueId !== valueId) await flushLightingSave();
+  const ok = await lightingSet(lightingChannel, valueId, dataBytes);
+  if (ok) {
+    clearTimeout(lightingSavePending && lightingSavePending.timer);
+    lightingSavePending = { valueId, timer: setTimeout(flushLightingSave, 600) };
+  }
+  return ok;
+}
+
+// Makes a pending lighting save now, if there is one.
+async function flushLightingSave() {
+  if (!lightingSavePending) return;
+  clearTimeout(lightingSavePending.timer);
+  lightingSavePending = null;
+  await lightingSaveCommit();
 }
 
 // Try RGB Matrix first (channel 3) then Backlight (channel 1). Returns the
@@ -16758,7 +17246,7 @@ async function toggleLighting() {
 
   let ok = true;
   for (const [field, byte] of Object.entries(lightingToggleChanges(turningOff))) {
-    ok = await lightingSet(lightingChannel, field === 'effect' ? 2 : 1, [byte]);
+    ok = await setLightingValue(field === 'effect' ? 2 : 1, [byte]);
     if (!ok) break;
     lightingState[field] = byte;
   }
@@ -16766,7 +17254,6 @@ async function toggleLighting() {
   setSelectListboxValue('lighting-effect-listbox', String(lightingState.effect));
   updateLightingStatusText();
   updateLightingToggleButton();
-  scheduleLightingSave();
 
   if (!ok)
     announce(`Could not change ${lightingChannelLabel()}. The keyboard did not respond.`);
@@ -16791,7 +17278,7 @@ async function onLightingSliderInput(ev, field) {
   ev.target.setAttribute('aria-valuetext', spec.spoken(ui));
   if (byte === lightingState[field]) return;
 
-  const ok = await lightingSet(lightingChannel, spec.valueId, spec.payload(byte));
+  const ok = await setLightingValue(spec.valueId, spec.payload(byte));
   if (!ok) {
     showLightingSlider(field);   // back to the level the keyboard still has
     announce(`Could not change ${spec.name}. The keyboard did not respond.`);
@@ -16803,7 +17290,6 @@ async function onLightingSliderInput(ev, field) {
     updateLightingStatusText();
     updateLightingToggleButton();
   }
-  scheduleLightingSave();
 }
 
 async function onLightingEffectChange(value) {
@@ -16811,7 +17297,7 @@ async function onLightingEffectChange(value) {
   const idx = parseInt(value, 10);
   if (Number.isNaN(idx) || idx === lightingState.effect) return;
 
-  const ok = await lightingSet(lightingChannel, 2, [idx]);
+  const ok = await setLightingValue(2, [idx]);
   if (!ok) {
     announce('Could not change effect. The keyboard did not respond.');
     return;
@@ -16820,7 +17306,6 @@ async function onLightingEffectChange(value) {
   if (lightingChannel === LIGHTING_CH_RGB_MATRIX && idx > 0) lightingLastEffect = idx;
   updateLightingStatusText();
   updateLightingToggleButton();
-  scheduleLightingSave();
   announce(`Effect changed to ${lightingEffectName(idx)}.`);
 }
 
@@ -16923,6 +17408,19 @@ async function readMacroGeometry() {
   return { slotCount: countReply[1], bufferSize: (sizeReply[1] << 8) | sizeReply[2] };
 }
 
+// The whole macro buffer, `size` bytes, 28 a request; null when the keyboard does not
+// answer.
+async function readMacroBuffer(size) {
+  const buf = new Uint8Array(size);
+  for (let offset = 0; offset < size; offset += MACRO_CHUNK_SIZE) {
+    const n = Math.min(MACRO_CHUNK_SIZE, size - offset);
+    const reply = await sendVIA([CMD_MACRO_GET_BUFFER, (offset >> 8) & 0xFF, offset & 0xFF, n]);
+    if (!reply || reply[0] !== CMD_MACRO_GET_BUFFER) return null;
+    buf.set(reply.subarray(4, 4 + n), offset);
+  }
+  return buf;
+}
+
 // Read the whole macro buffer, then split into per-slot Uint8Arrays. The
 // firmware's terminator pattern: each slot ends with 0x00, and the buffer is
 // initialised to all-zero so empty slots are simply zero-length.
@@ -16933,17 +17431,8 @@ async function readMacroState() {
   macroBufferSize = geo.bufferSize;
 
   if (macroSlotCount === 0 || macroBufferSize === 0) return false;
-
-  // Read the entire buffer in chunks. VIA caps each get_buffer response at
-  // 28 bytes (32-byte report - 4 header bytes). We page through until we've
-  // pulled the full buffer.
-  const buf = new Uint8Array(macroBufferSize);
-  for (let offset = 0; offset < macroBufferSize; offset += MACRO_CHUNK_SIZE) {
-    const size = Math.min(MACRO_CHUNK_SIZE, macroBufferSize - offset);
-    const reply = await sendVIA([CMD_MACRO_GET_BUFFER, (offset >> 8) & 0xFF, offset & 0xFF, size]);
-    if (!reply || reply[0] !== CMD_MACRO_GET_BUFFER) return false;
-    for (let i = 0; i < size; i++) buf[offset + i] = reply[4 + i];
-  }
+  const buf = await readMacroBuffer(macroBufferSize);
+  if (!buf) return false;
 
   // Split into slots by 0x00 terminators. The buffer holds at most
   // macroSlotCount macros - anything past that is unreachable so we ignore it.
@@ -18770,14 +19259,14 @@ const withoutArguments = fns =>
 
 const BUTTON_ACTIONS = {
   ...withoutArguments({
-    applyRemap, attemptRemapKey, backupKeymap, cancelKeyWarning, cancelRemap,
+    applyRemap, attemptRemapKey, backupSettings, cancelKeyWarning, cancelRemap,
     cancelResetAll, cancelRestore, cancelStepEditor, cancelWriteTargetDialog,
     changeKeyFromConfirm, chooseADifferentKey, closeChangedKeys, confirmKeyWarning,
     confirmMacro, confirmResetAll, confirmShortcut, connectKeyboard,
     disconnectFromUnsupported, disconnectKeyboard, executeResetAll, executeRestore,
     getStartedFromWelcome, goToHelp, openChangedKeys, openWriteTargetDialog,
     reportUnknownKeyboard, resetAllChanged, resetChoiceCancel, resetSelectedKeyToDefault,
-    restoreKeymapPrompt, saveStepEditor, saveWriteTargetDialog, selectDisableAction,
+    restoreSettingsPrompt, saveStepEditor, saveWriteTargetDialog, selectDisableAction,
     startDemoKeyboard, startDemoMode, startFreshMacro, toggleLighting,
   }),
   goToSection:         btn => goToSection(btn.dataset.section),
@@ -18795,7 +19284,7 @@ function onButtonAction(ev) {
 }
 
 function bindFormControls() {
-  $('restore-file-input').addEventListener('change', restoreKeymapFileChosen);
+  $('restore-file-input').addEventListener('change', restoreFileChosen);
   $('use-fn-layer').addEventListener('change', onUseFnLayerChange);
   for (const mod of MOD_KINDS) {
     $(`mod-${mod}`).addEventListener('change', updateShortcutPreview);
