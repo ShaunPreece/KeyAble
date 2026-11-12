@@ -48,6 +48,13 @@ Both datasets were derived from Keychron's own public, open sources:
     Factory keymaps are the via keymaps, for example:
       keyboards/keychron/v6_max/ansi_encoder/keymaps/via/keymap.c
 
+  - The same fork's Hall Effect branch, the only home of the HE boards:
+      repo:   https://github.com/Keychron/qmk_firmware
+      branch: hall_effect_playground
+      commit: bc56b3c611dcc1a8ed9a2acb8bdc4da5e1a80c27
+    Their factory keymaps are the via keymaps too, for example:
+      keyboards/keychron/q1_he/ansi_encoder/keymaps/via/keymap.c
+
   - Mainline QMK, for the wired Q, V and S boards, whose Keychron keymaps live
     there:
       repo:   https://github.com/qmk/qmk_firmware

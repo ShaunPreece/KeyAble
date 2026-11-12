@@ -2,7 +2,9 @@
 // app's own tables. Shared by the DevTools scripts and tests.
 //
 // - Firmware: the pinned commits in docs/KEYBOARD-DATA.txt, as sparse clones of
-//   keyboards/keychron in ProjectAssets/keychron-firmware-src/{keychron-fork,qmk-mainline}.
+//   keyboards/keychron in ProjectAssets/keychron-firmware-src/{keychron-fork,qmk-mainline,
+//   keychron-he}. keychron-he is Keychron's hall_effect_playground branch, the only home
+//   of the HE boards.
 //   A board's matrix positions come from its info.json or keyboard.json, matched by USB
 //   product ID; QMK builds the board's LAYOUT macro from that file, so it is what the
 //   compiled keyboard uses. The key at each position is the Windows base layer token in
@@ -115,7 +117,7 @@ let firmwareIndex = null;
 function indexFirmware() {
   if (firmwareIndex) return firmwareIndex;
   firmwareIndex = new Map();
-  for (const repo of ['keychron-fork', 'qmk-mainline']) {
+  for (const repo of ['keychron-fork', 'qmk-mainline', 'keychron-he']) {
     const kb = path.join(FW, repo, 'keyboards', 'keychron');
     if (!existsSync(kb)) throw new Error(`Firmware not fetched: ${kb}`);
     for (const dir of walkDirs(kb)) {
@@ -153,13 +155,14 @@ function indexFirmware() {
 
 // The source a board's factory data is read from: { source, layouts, matrixSize,
 // lockOpts, keymapFile }, or { error }. Wired boards are read from mainline QMK, with its
-// default keymap, and Max and Pro boards from Keychron's fork, with its via keymap.
+// default keymap; Max and Pro boards from Keychron's fork, and HE boards from its HE
+// branch, each with its via keymap.
 export function firmwareSource(pid) {
   const sources = indexFirmware().get(pid) || [];
   if (!sources.length) return { error: 'NO FIRMWARE SOURCE' };
   const wireless = /_max|_pro/.test(sources.map(s => s.source).join(' '));
   const src = sources.find(s => s.repo === (wireless ? 'keychron-fork' : 'qmk-mainline')) || sources[0];
-  const keymapFile = (src.repo === 'keychron-fork' ? ['via', 'default'] : ['default', 'via'])
+  const keymapFile = (src.repo === 'qmk-mainline' ? ['default', 'via'] : ['via', 'default'])
     .map(k => path.join(src.dir, 'keymaps', k, 'keymap.c')).find(f => existsSync(f));
   if (!keymapFile) return { error: 'NO FIRMWARE KEYMAP', source: src.source };
   return { ...src, keymapFile };
@@ -216,7 +219,8 @@ let viaIndex = null;
 export function viaBoards(pid) {
   if (!viaIndex) {
     viaIndex = new Map();
-    const roots = [path.join(FW, 'keychron-fork', 'keyboards', 'keychron'), path.join(FW, 'via-keyboards', 'v3', 'keychron')];
+    const roots = ['keychron-fork', 'keychron-he'].map(repo => path.join(FW, repo, 'keyboards', 'keychron'))
+      .concat(path.join(FW, 'via-keyboards', 'v3', 'keychron'));
     for (const root of roots.filter(existsSync)) {
       for (const f of walkFiles(root).filter(f => f.endsWith('.json') && (/via_json/.test(f) || f.includes('via-keyboards')))) {
         const j = readViaFile(f);
