@@ -56,7 +56,7 @@ browser; nothing is sent anywhere over the internet.
 
 ## Supported keyboards
 
-39 Keychron models across the Q, V, K, S, and B series (98 variants once you count
+48 Keychron models across the Q, V, K, S, and B series (114 variants once you count
 each ANSI, ISO, knob, and non-knob version separately). The full list is inside
 the app under Help, "Supported Keyboards".
 
@@ -64,8 +64,10 @@ the app under Help, "Supported Keyboards".
   built from Keychron's own firmware data.
 - The Ultra 8K models are built from Keychron's ZMK firmware source and have
   not yet been tested on a real keyboard.
-- Not supported: JIS (Japanese) layouts, HE (Hall Effect) models, and a few
-  Ultra 8K models, such as the V2 Ultra 8K.
+- The HE (Hall Effect) models work like any other, but their own settings,
+  such as the actuation point and rapid trigger, still need Keychron's Launcher.
+- Not supported: JIS (Japanese) layouts, and a few HE and Ultra 8K models, such
+  as the Q0 HE and the V2 Ultra 8K.
 
 ## Reporting a problem
 

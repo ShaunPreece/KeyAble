@@ -1725,15 +1725,15 @@
       <div class="card">
         <h3 style="border-left:none;padding-left:0;margin-bottom:.6rem">Supported Keyboards.</h3>
         <p>
-          KeyAble works with 39 Keychron models. Each is supported in its ANSI (US) and
+          KeyAble works with 48 Keychron models. Each is supported in its ANSI (US) and
           ISO (UK and European) layout, with or without the rotary knob where the model has
           one, except where noted. Japanese JIS layouts are not supported yet.
         </p>
         <h4 style="margin-top:1rem">Q series</h4>
         <ul style="margin:.3rem 0 0 1.25rem;padding:0;line-height:1.55">
-          <li>Q1 (versions 1 and 2)</li><li>Q1 Max</li><li>Q1 Ultra 8K</li><li>Q3 Ultra 8K</li>
-          <li>Q5 Ultra 8K (ISO only)</li><li>Q6</li><li>Q6 Max</li><li>Q6 Ultra 8K</li>
-          <li>Q13 Ultra 8K (ANSI only)</li>
+          <li>Q1 (versions 1 and 2)</li><li>Q1 Max</li><li>Q1 HE</li><li>Q1 Ultra 8K</li>
+          <li>Q3 HE</li><li>Q3 Ultra 8K</li><li>Q5 HE (ANSI only)</li><li>Q5 Ultra 8K (ISO only)</li>
+          <li>Q6</li><li>Q6 Max</li><li>Q6 HE</li><li>Q6 Ultra 8K</li><li>Q13 Ultra 8K (ANSI only)</li>
         </ul>
         <h4 style="margin-top:1rem">V series</h4>
         <ul style="margin:.3rem 0 0 1.25rem;padding:0;line-height:1.55">
@@ -1743,9 +1743,10 @@
         </ul>
         <h4 style="margin-top:1rem">K series</h4>
         <ul style="margin:.3rem 0 0 1.25rem;padding:0;line-height:1.55">
-          <li>K1 Ultra 8K</li><li>K2 Pro</li><li>K2 Max</li><li>K2 Ultra 8K</li><li>K3 Max</li>
-          <li>K3 Ultra 8K</li><li>K4 Ultra 8K (ANSI only)</li><li>K5 Max</li><li>K5 Ultra 8K</li>
-          <li>K6 Pro</li><li>K8 Ultra 8K</li><li>K10 Ultra 8K (ANSI only)</li>
+          <li>K1 Ultra 8K</li><li>K2 Pro</li><li>K2 Max</li><li>K2 HE</li><li>K2 Ultra 8K</li>
+          <li>K3 Max</li><li>K3 Ultra 8K</li><li>K4 HE</li><li>K4 Ultra 8K (ANSI only)</li>
+          <li>K5 Max</li><li>K5 Ultra 8K</li><li>K6 Pro</li><li>K6 HE (ANSI only)</li><li>K8 HE</li>
+          <li>K8 Ultra 8K</li><li>K10 HE</li><li>K10 Ultra 8K (ANSI only)</li>
         </ul>
         <h4 style="margin-top:1rem">S series</h4>
         <ul style="margin:.3rem 0 0 1.25rem;padding:0;line-height:1.55">
@@ -1767,9 +1768,14 @@
           and what does not.
         </p>
         <p>
-          Not supported: the HE (Hall Effect) models, and the Ultra 8K models not listed here,
-          such as the V2 Ultra 8K. See "Does KeyAble work with HE or Ultra 8K keyboards?" in
-          Frequently Asked Questions.
+          On the HE (Hall Effect) models, KeyAble does everything it does on other keyboards.
+          Their own settings, such as the actuation point and rapid trigger, still need
+          Keychron's Launcher.
+        </p>
+        <p>
+          Not supported: the HE and Ultra 8K models not listed here, such as the Q0 HE, the HE
+          8K models and the V2 Ultra 8K. See "Does KeyAble work with HE or Ultra 8K keyboards?"
+          in Frequently Asked Questions.
         </p>
       </div>
 
@@ -1792,8 +1798,10 @@
           <li>Keychron's Bluetooth, 2.4 GHz and battery check keys.</li>
           <li>Japanese and Korean input keys, and Japanese (JIS) keyboard layouts.</li>
           <li>Keyboard-wide settings such as debounce and polling rate.</li>
-          <li>HE (Hall Effect) keyboards, and the Ultra 8K keyboards not in Supported Keyboards,
-            such as the V2 Ultra 8K.</li>
+          <li>Settings of HE (Hall Effect) keyboards, such as the actuation point and rapid
+            trigger.</li>
+          <li>The HE and Ultra 8K keyboards not in Supported Keyboards, such as the Q0 HE, the HE
+            8K models and the V2 Ultra 8K.</li>
         </ul>
         <p style="margin-top:.85rem">
           The audio and music mode keys are left out on purpose: they need a speaker in the
@@ -1834,15 +1842,20 @@
 
         <h4 style="margin-top:1.25rem">Does KeyAble work with HE or Ultra 8K keyboards?</h4>
         <p>
-          Most Ultra 8K models, yes; HE models, not at the moment. The Ultra 8K models run ZMK
+          Most of them, yes. The Ultra 8K models run ZMK
           firmware rather than QMK, but Keychron's ZMK includes the same VIA connection KeyAble
           uses, so they connect like any other model. Supported Keyboards lists them. None has
           been tested on a real keyboard yet, so please tell us how yours goes. A few are not
-          supported yet, such as the V2 Ultra 8K, which has two Fn layers for each system. HE
-          (Hall Effect) keyboards, such as the Q1 HE or K2 HE, have magnetic switches whose extra
-          features, like the actuation point and rapid trigger, use Keychron's own commands that
-          KeyAble does not support, and we have not been able to test basic remapping on one.
-          Keyboards KeyAble does not support can be set up with Keychron's own Launcher.
+          supported yet, such as the V2 Ultra 8K, which has two Fn layers for each system.
+        </p>
+        <p>
+          The HE (Hall Effect) models in Supported Keyboards work like any other: remapping,
+          macros, lighting and backups. They are built from Keychron's released firmware, like
+          most models. Their magnetic switches also have settings of their own, such as the
+          actuation point and rapid trigger, which use Keychron commands KeyAble does not
+          support yet, so set those with Keychron's Launcher. Some HE models are not supported
+          yet, such as the Q0 HE and the HE 8K models. Keyboards KeyAble does not support can be
+          set up with Keychron's own Launcher.
         </p>
 
         <h4 style="margin-top:1.25rem">Which web browser do I need?</h4>
