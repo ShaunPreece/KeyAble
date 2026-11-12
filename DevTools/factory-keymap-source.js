@@ -36,24 +36,25 @@ function extractEncoderMap(src) {
 
 // Layer roles from the MO() references, independent of layer names: the wireless
 // 5-layer boards name their Fn layers MAC_FN1/WIN_FN1/FN2, the wired V2 _FN1/_FN2/_FN3,
-// and the 4-layer boards MAC_FN/WIN_FN. MAC_BASE reaches Mac's Fn layer, WIN_BASE
+// and the 4-layer boards MAC_FN/WIN_FN; the HE keymaps reach them through #defines
+// (FN_MAC for MO(MAC_FN)), which are expanded first. MAC_BASE reaches Mac's Fn layer, WIN_BASE
 // reaches Windows', and a layer reached from both is a shared extra (fn2).
-function moTargets(blocks, layerName, idx) {
+function moTargets(blocks, layerName, idx, defs) {
   const b = blocks.find(x => x.layer === layerName);
   if (!b) throw new Error(`no ${layerName} layer block to derive roles from`);
   const set = new Set();
   for (const tok of b.tokens) {
-    const m = String(tok).match(/^MO\(\s*([A-Za-z0-9_]+)\s*\)$/);
+    const m = expandDefines(tok, defs).match(/^MO\(\s*([A-Za-z0-9_]+)\s*\)$/);
     if (m && Object.hasOwn(idx, m[1])) set.add(idx[m[1]]);
   }
   return set;
 }
-function deriveRoles(blocks, idx) {
+function deriveRoles(blocks, idx, defs) {
   if (idx.MAC_BASE === undefined || idx.WIN_BASE === undefined) {
     throw new Error('enum has no MAC_BASE / WIN_BASE, so layer roles cannot be derived');
   }
-  const macRefs = moTargets(blocks, 'MAC_BASE', idx);
-  const winRefs = moTargets(blocks, 'WIN_BASE', idx);
+  const macRefs = moTargets(blocks, 'MAC_BASE', idx, defs);
+  const winRefs = moTargets(blocks, 'WIN_BASE', idx, defs);
   const macOnly = [...macRefs].filter(i => !winRefs.has(i));
   const winOnly = [...winRefs].filter(i => !macRefs.has(i));
   const shared  = [...macRefs].filter(i => winRefs.has(i));
@@ -107,7 +108,7 @@ function factoryKeymap(keymapSource, layouts, lockOpts = {}) {
   }
   if (unresolved.size) throw new Error(`no keycode for ${[...unresolved].join(', ')}`);
 
-  const roles = deriveRoles(blocks, idx);
+  const roles = deriveRoles(blocks, idx, defs);
   const canonical = names.length === 4 && roles.mac === 0 && roles.macFn === 1 &&
     roles.win === 2 && roles.winFn === 3 && roles.fn2 === undefined;
   return { layers, encoders, roles: canonical ? null : roles };

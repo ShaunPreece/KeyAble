@@ -186,9 +186,13 @@ export function firmwareBoard(pid) {
     return { error: `${macro} has ${matrix.length} positions but ${winBase.layer} has ${tokens.length} keys`, source: src.source };
   }
   const macBase = blocks.find(b => /MAC_BASE/.test(b.layer));
+  // Tokens with the keymap's own #defines expanded (the HE keymaps write FN_WIN for
+  // MO(WIN_FN)), so a key is named the same whichever way its keymap spells it.
   const keys = matrix.map((k, i) => ({
     pos: `${k.matrix[0]},${k.matrix[1]}`, row: k.matrix[0], col: k.matrix[1],
-    token: tokens[i], macToken: macBase ? macBase.tokens[i] : undefined, code: standardCode(tokens[i], defs),
+    token: expandDefines(tokens[i], defs),
+    macToken: macBase ? expandDefines(macBase.tokens[i], defs) : undefined,
+    code: standardCode(tokens[i], defs),
     x: k.x, y: k.y, w: k.w || 1, h: k.h || 1,
   }));
   return { source: src.source, macro, matrixSize: src.matrixSize, hasEncoder: /encoder_map/.test(code), keys };
