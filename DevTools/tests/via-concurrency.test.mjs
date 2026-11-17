@@ -4,7 +4,8 @@
 // in DevTools.
 // The page's own names, used inside page.evaluate:
 /* global KEYBOARD_DB, KEYCHRON_LAYOUTS, CMD_GET_KEY, activeLayout, changedKeysScan,
-   currentKeymap, decodeAction, keymapBufferState, lightingState, sendVIA, stepKeys */
+   currentKeymap, decodeAction, keymapBufferState, lightingState, sendVIA, stepKeys,
+   setLightingValue, flushLightingSave */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -124,16 +125,20 @@ async function backupMatchesKeyboard(page) {
   assert.match(outcome, /Backup complete/, outcome);
   const backup = JSON.parse(readFileSync(await (await download).path(), 'utf8'));
 
-  const truth = await page.evaluate(layers => {
+  assert.equal(backup.format, 'keyable-settings');
+  // The whole matrix of every layer, row by row, empty positions included.
+  const truth = await page.evaluate(({ layers, rows, cols }) => {
     const f = window.__fakeKeychron;
-    const keys = activeLayout().keys;
-    return Object.fromEntries(layers.map(l => [l, keys.map(k => f.getKey(l, k.row, k.col))]));
-  }, Object.keys(backup.layers).map(Number));
+    const out = [];
+    for (let l = 0; l < layers; l++) {
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) out.push(f.getKey(l, r, c));
+    }
+    return out;
+  }, backup.shape);
 
   const wrong = [];
-  for (const [layer, codes] of Object.entries(backup.layers)) {
-    codes.forEach((code, i) => { if (code !== truth[layer][i]) wrong.push(`layer ${layer} key ${i}`); });
-  }
+  backup.via.keymap.forEach((code, i) => { if (code !== truth[i]) wrong.push(`position ${i}`); });
+  assert.equal(backup.via.keymap.length, truth.length);
   assert.deepEqual(wrong, [], `${wrong.length} keys saved with the wrong code`);
 }
 
@@ -212,5 +217,25 @@ test('Lighting opened during the Step 2 read loads the keyboard settings', async
     'lighting panel shown, not "does not support lighting"');
   const state = await page.evaluate(() => lightingState);
   assert.deepEqual({ brightness: state.brightness, effect: state.effect }, { brightness: 128, effect: 1 });
+  await page.close();
+});
+
+// Keychron's current via.c stores lighting on a save only when exactly one value was set
+// since the last save, so the section saves before it sets a different value.
+test('RGB Lighting saves one value before setting another', async () => {
+  const page = await connectedPage();
+  await page.keyboard.press('Alt+4');
+  await page.locator('#lighting-panel').waitFor({ timeout: 30000 });
+  await idle(page);
+  const from = await logLength(page);
+  await page.evaluate(async () => {
+    await setLightingValue(1, [50]);
+    await setLightingValue(1, [60]);
+    await setLightingValue(2, [3]);
+    await flushLightingSave();
+  });
+  const sent = await page.evaluate(n => window.__fakeKeychron.log.slice(n)
+    .filter(r => r[0] === 0x07 || r[0] === 0x09).map(r => (r[0] === 0x07 ? `set ${r[2]}` : 'save')), from);
+  assert.deepEqual(sent, ['set 1', 'set 1', 'save', 'set 2', 'save']);
   await page.close();
 });

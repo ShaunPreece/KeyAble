@@ -2,7 +2,7 @@
 // Builds FACTORY_KEYMAPS, the factory keymap of every keyboard KeyAble has a layout for,
 // and writes it into KeyAble.html between the two GENERATED FACTORY_KEYMAPS markers.
 //
-// Each entry comes from one of three places, best first:
+// Each entry comes from one of four places, best first:
 // - ZMK boards (the B6 Pro): their shipped .uf2 firmware (zmk-firmware.mjs).
 // - ZMK Ultra 8K boards: Keychron's ZMK source (zmk-source.mjs), translated as the keyboard
 //   translates it for VIA on first boot.
@@ -26,14 +26,11 @@
 //     builds the table and writes it into KeyAble.html
 // A board whose source cannot be read stops the build, and nothing is written.
 import { readFileSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { APP, appTables, firmwareSource, hex } from './keyboard-sources.mjs';
 import { shippedEntries } from './firmware-binaries.mjs';
 import { zmkEntries } from './zmk-firmware.mjs';
 import { ultraBoards } from './zmk-source.mjs';
-
-const require = createRequire(import.meta.url);
-const { factoryKeymap } = require('./factory-keymap-source.js');
+import { factoryKeymap } from './factory-keymap-source.js';
 
 const BEGIN = '// BEGIN GENERATED FACTORY_KEYMAPS\n';
 const END   = '// END GENERATED FACTORY_KEYMAPS\n';
@@ -136,7 +133,7 @@ function tableSpan(html) {
 // Each entry's text in a rendered table, by pid, for comparing entry by entry.
 function entryTexts(table) {
   const out = new Map();
-  for (const m of table.matchAll(/(?:  \/\/ Shipped firmware: [^\n]*\n)?  (0x[0-9A-F]{4}): \{\n[\s\S]*?\n  \},\n/g)) {
+  for (const m of table.matchAll(/(?: {2}\/\/ Shipped firmware: [^\n]*\n)? {2}(0x[0-9A-F]{4}): \{\n[\s\S]*?\n {2}\},\n/g)) {
     out.set(Number(m[1]), m[0]);
   }
   return out;

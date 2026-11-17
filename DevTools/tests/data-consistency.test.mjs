@@ -5,10 +5,8 @@
    LABEL_TO_KEYCODE, KEYCODE_TO_LABEL */
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { APP_URL, useEdge } from './edge.mjs';
-import { ROOT, appTables, hex } from '../keyboard-sources.mjs';
-import { versionNewer } from '../firmware-files.mjs';
+import { hex } from '../keyboard-sources.mjs';
 
 const newPage = useEdge('data');
 
@@ -71,32 +69,4 @@ test('every standard key in a layout holds its own keycode in the factory data',
     if (wrong.length) problems.push(`${board.name}: ${wrong.join(', ')}`);
   }
   assert.deepEqual(problems, [], `\n${problems.join('\n')}`);
-});
-
-// Backups store keycodes by key order, and validateBackup accepts a backup whose layoutId and
-// key count match. A backup made before a key moved holds the keycode from its old position,
-// so the key must be listed in its layout's keysMovedIn under a version after the release,
-// which makes restore leave it alone.
-test('every key moved since the last release is listed in keysMovedIn', () => {
-  const tag = execFileSync('git', ['tag', '--sort=-v:refname'], { cwd: ROOT, encoding: 'utf8' })
-    .split('\n')[0].trim();
-  assert.ok(tag, 'no release tag found');
-  const released = appTables(execFileSync('git', ['show', `${tag}:Project/KeyAble.html`],
-    { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })).KEYCHRON_LAYOUTS;
-  const parts = v => v.replace(/^v/, '').split('.').map(Number);
-  const later = version => versionNewer(parts(version), parts(tag));
-  const current = appTables().KEYCHRON_LAYOUTS;
-  const problems = [];
-  for (const [id, layout] of Object.entries(current)) {
-    const old = released[id];
-    if (!old || old.keys.length !== layout.keys.length) continue;
-    const declared = Object.entries(layout.keysMovedIn || {})
-      .filter(([version]) => later(version)).flatMap(([, labels]) => labels);
-    const moved = layout.keys
-      .map((k, i) => [k, old.keys[i]])
-      .filter(([k, o]) => (k.row !== o.row || k.col !== o.col) && !declared.includes(k.label))
-      .map(([k, o]) => `${k.label} (${o.row},${o.col}) to (${k.row},${k.col})`);
-    if (moved.length) problems.push(`${id}: ${moved.join(', ')}`);
-  }
-  assert.deepEqual(problems, [], `\nKeys moved since ${tag}, not in keysMovedIn:\n${problems.join('\n')}`);
 });

@@ -1,8 +1,6 @@
 // Reads a Keychron keymap.c: its layer blocks and its object-like #defines.
 // Shared by factory-keymap-source.js and keyboard-sources.mjs.
-'use strict';
-
-function stripComments(src) {
+export function stripComments(src) {
   return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/.*$/gm, ' ');
 }
 
@@ -27,7 +25,7 @@ function splitTopLevel(text) {
 
 // Every `[LAYER] = LAYOUT_xxx( ... )` block of comment-free source, in source order:
 // [{ layer, macro, tokens }].
-function layerBlocks(src) {
+export function layerBlocks(src) {
   const blocks = [];
   const re = /\[(\w+)\]\s*=\s*(LAYOUT\w*)\s*\(/g;
   let m;
@@ -46,7 +44,7 @@ function layerBlocks(src) {
 // Board-local object-like #defines (`#define KC_FLXP LGUI(KC_E)`), which override
 // header defaults per model. A function-like macro has no space between its name and
 // `(`, so it does not match.
-function defines(src) {
+export function defines(src) {
   const map = {};
   for (const m of src.matchAll(/^[ \t]*#define[ \t]+([A-Za-z_]\w*)[ \t]+(\S.*?)[ \t]*$/gm)) {
     map[m[1]] = m[2].trim();
@@ -55,10 +53,8 @@ function defines(src) {
 }
 
 // The token after following #defines; the depth limit stops a define cycle.
-function expandDefines(token, defs) {
+export function expandDefines(token, defs) {
   let t = String(token).trim();
   for (let i = 0; i < 8 && Object.hasOwn(defs, t); i++) t = defs[t].trim();
   return t;
 }
-
-module.exports = { stripComments, splitTopLevel, layerBlocks, defines, expandDefines };

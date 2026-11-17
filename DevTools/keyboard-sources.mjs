@@ -2,7 +2,9 @@
 // app's own tables. Shared by the DevTools scripts and tests.
 //
 // - Firmware: the pinned commits in docs/KEYBOARD-DATA.txt, as sparse clones of
-//   keyboards/keychron in ProjectAssets/keychron-firmware-src/{keychron-fork,qmk-mainline}.
+//   keyboards/keychron in ProjectAssets/keychron-firmware-src/{keychron-fork,qmk-mainline,
+//   keychron-he}. keychron-he is Keychron's hall_effect_playground branch, the only home
+//   of the HE boards.
 //   A board's matrix positions come from its info.json or keyboard.json, matched by USB
 //   product ID; QMK builds the board's LAYOUT macro from that file, so it is what the
 //   compiled keyboard uses. The key at each position is the Windows base layer token in
@@ -20,12 +22,10 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
+import Hjson from 'hjson';
+import { resolveToken } from './token-keycodes.js';
+import { stripComments, layerBlocks, defines, expandDefines } from './keymap-source.js';
 
-const require = createRequire(import.meta.url);
-const { resolveToken } = require('./token-keycodes.js');
-const { stripComments, layerBlocks, defines, expandDefines } = require('./keymap-source.js');
-const Hjson = require('hjson');
 const here   = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(here, '..');
 export const FW   = path.join(ROOT, 'ProjectAssets', 'keychron-firmware-src');
@@ -40,7 +40,6 @@ export function appTables(html = readFileSync(APP, 'utf8')) {
     const start = html.indexOf(`const ${name} = {`);
     const end   = html.indexOf('\n};', start);
     if (start < 0 || end < 0) throw new Error(`${name} not found in KeyAble.html`);
-    // eslint-disable-next-line no-new-func
     return new Function(`return (${html.slice(start + `const ${name} = `.length, end + 2)});`)();
   };
   return {
@@ -49,6 +48,23 @@ export function appTables(html = readFileSync(APP, 'utf8')) {
     FACTORY_KEYMAPS:  grab('FACTORY_KEYMAPS'),
     LABEL_TO_KEYCODE: grab('LABEL_TO_KEYCODE'),
   };
+}
+
+// One KEYCHRON_LAYOUTS entry as the app's source text, for pasting into KeyAble.html.
+// `headerLines` are its comment lines, without the `// `; `layout` is
+// { rows, cols, keys: [{ label, row, col, isEncoder }] }.
+export function renderLayoutEntry(headerLines, id, layout) {
+  const quote = s => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+  return [
+    ...headerLines.map(line => `  // ${line}`),
+    `  ${quote(id)}: {`,
+    `    rows: ${layout.rows},`,
+    `    cols: ${layout.cols},`,
+    '    keys: [',
+    ...layout.keys.map(k => `      { label: ${quote(k.label)}, row: ${k.row}, col: ${k.col}${k.isEncoder ? ', isEncoder: true' : ''} },`),
+    '    ],',
+    '  },',
+  ].join('\n');
 }
 
 // Files that exist but could not be parsed, path relative to FW -> parse error. A board
@@ -88,7 +104,7 @@ function walkFiles(dir, out = []) {
 
 // A plain HID key's code (0x02 to 0xFF), or undefined for layers, Keychron customs,
 // lighting and media keys, which are compared by position only.
-export function standardCode(token, defs = {}) {
+function standardCode(token, defs = {}) {
   const code = resolveToken(expandDefines(token, defs));
   return Number.isInteger(code) && code > 0x0001 && code <= 0xFF ? code : undefined;
 }
@@ -115,7 +131,7 @@ let firmwareIndex = null;
 function indexFirmware() {
   if (firmwareIndex) return firmwareIndex;
   firmwareIndex = new Map();
-  for (const repo of ['keychron-fork', 'qmk-mainline']) {
+  for (const repo of ['keychron-fork', 'qmk-mainline', 'keychron-he']) {
     const kb = path.join(FW, repo, 'keyboards', 'keychron');
     if (!existsSync(kb)) throw new Error(`Firmware not fetched: ${kb}`);
     for (const dir of walkDirs(kb)) {
@@ -153,13 +169,14 @@ function indexFirmware() {
 
 // The source a board's factory data is read from: { source, layouts, matrixSize,
 // lockOpts, keymapFile }, or { error }. Wired boards are read from mainline QMK, with its
-// default keymap, and Max and Pro boards from Keychron's fork, with its via keymap.
+// default keymap; Max and Pro boards from Keychron's fork, and HE boards from its HE
+// branch, each with its via keymap.
 export function firmwareSource(pid) {
   const sources = indexFirmware().get(pid) || [];
   if (!sources.length) return { error: 'NO FIRMWARE SOURCE' };
   const wireless = /_max|_pro/.test(sources.map(s => s.source).join(' '));
   const src = sources.find(s => s.repo === (wireless ? 'keychron-fork' : 'qmk-mainline')) || sources[0];
-  const keymapFile = (src.repo === 'keychron-fork' ? ['via', 'default'] : ['default', 'via'])
+  const keymapFile = (src.repo === 'qmk-mainline' ? ['default', 'via'] : ['via', 'default'])
     .map(k => path.join(src.dir, 'keymaps', k, 'keymap.c')).find(f => existsSync(f));
   if (!keymapFile) return { error: 'NO FIRMWARE KEYMAP', source: src.source };
   return { ...src, keymapFile };
@@ -183,19 +200,24 @@ export function firmwareBoard(pid) {
     return { error: `${macro} has ${matrix.length} positions but ${winBase.layer} has ${tokens.length} keys`, source: src.source };
   }
   const macBase = blocks.find(b => /MAC_BASE/.test(b.layer));
+  // Tokens with the keymap's own #defines expanded (the HE keymaps write FN_WIN for
+  // MO(WIN_FN)), so a key is named the same whichever way its keymap spells it.
   const keys = matrix.map((k, i) => ({
     pos: `${k.matrix[0]},${k.matrix[1]}`, row: k.matrix[0], col: k.matrix[1],
-    token: tokens[i], macToken: macBase ? macBase.tokens[i] : undefined, code: standardCode(tokens[i], defs),
+    token: expandDefines(tokens[i], defs),
+    macToken: macBase ? expandDefines(macBase.tokens[i], defs) : undefined,
+    code: standardCode(tokens[i], defs),
     x: k.x, y: k.y, w: k.w || 1, h: k.h || 1,
   }));
   return { source: src.source, macro, matrixSize: src.matrixSize, hasEncoder: /encoder_map/.test(code), keys };
 }
 
 // ---- VIA definitions by product ID ----
-// Matrix keys only: encoders (legend 10 starting "e"), decals and layout options other
-// than the default are left out.
-function viaKeys(json) {
-  const out = []; let y = -1;
+// A VIA definition's KLE keymap as { keys: [{ pos, x, y }], knobs }: the matrix keys,
+// each with its centre, and the number of knobs (legend 10 starting "e"). Decals and
+// layout options other than the default are left out of both.
+export function viaKeys(json) {
+  const keys = []; let knobs = 0, y = -1;
   for (const row of json.layouts.keymap) {
     y += 1; let x = 0, w = 1, decal = false;
     for (const item of row) {
@@ -205,25 +227,28 @@ function viaKeys(json) {
       const m = lines[0].replace(/\s/g, '').match(/^(\d+),(\d+)$/);
       const encoder = lines[9] && /^e/.test(lines[9]);
       const nonDefault = /^\d+,\d+$/.test(option) && !/,0$/.test(option);
-      if (m && !decal && !encoder && !nonDefault) out.push({ pos: `${m[1]},${m[2]}`, x: x + w / 2, y });
+      const shown = !decal && !nonDefault;
+      if (shown && encoder) knobs++;
+      else if (shown && m) keys.push({ pos: `${m[1]},${m[2]}`, x: x + w / 2, y });
       x += w; w = 1; decal = false;
     }
   }
-  return out;
+  return { keys, knobs };
 }
 
 let viaIndex = null;
 export function viaBoards(pid) {
   if (!viaIndex) {
     viaIndex = new Map();
-    const roots = [path.join(FW, 'keychron-fork', 'keyboards', 'keychron'), path.join(FW, 'via-keyboards', 'v3', 'keychron')];
+    const roots = ['keychron-fork', 'keychron-he'].map(repo => path.join(FW, repo, 'keyboards', 'keychron'))
+      .concat(path.join(FW, 'via-keyboards', 'v3', 'keychron'));
     for (const root of roots.filter(existsSync)) {
       for (const f of walkFiles(root).filter(f => f.endsWith('.json') && (/via_json/.test(f) || f.includes('via-keyboards')))) {
         const j = readViaFile(f);
         if (!j || !j.productId || !j.layouts || !j.layouts.keymap) continue;
         const p = parseInt(j.productId, 16);
         if (!viaIndex.has(p)) viaIndex.set(p, []);
-        viaIndex.get(p).push({ source: path.relative(FW, f).replace(/\\/g, '/'), matrix: j.matrix, keys: viaKeys(j) });
+        viaIndex.get(p).push({ source: path.relative(FW, f).replace(/\\/g, '/'), matrix: j.matrix, keys: viaKeys(j).keys });
       }
     }
   }

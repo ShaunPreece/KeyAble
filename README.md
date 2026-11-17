@@ -51,12 +51,12 @@ browser; nothing is sent anywhere over the internet.
 - RGB lighting control, including turning the backlight off to save battery.
 - Review every key that differs from factory and reset any of them, reset a
   single key, or reset the whole keyboard.
-- Save the keyboard's setup to a file and restore it later.
+- Save the keyboard's keys, macros, lighting and settings to a file, and restore them later.
 - Light and dark themes, following your system setting unless you choose.
 
 ## Supported keyboards
 
-39 Keychron models across the Q, V, K, S, and B series (98 variants once you count
+49 Keychron models across the Q, V, K, S, and B series (121 variants once you count
 each ANSI, ISO, knob, and non-knob version separately). The full list is inside
 the app under Help, "Supported Keyboards".
 
@@ -64,8 +64,10 @@ the app under Help, "Supported Keyboards".
   built from Keychron's own firmware data.
 - The Ultra 8K models are built from Keychron's ZMK firmware source and have
   not yet been tested on a real keyboard.
-- Not supported: JIS (Japanese) layouts, HE (Hall Effect) models, and a few
-  Ultra 8K models, such as the V2 Ultra 8K.
+- The HE (Hall Effect) models work like any other, but their own settings,
+  such as the actuation point and rapid trigger, still need Keychron's Launcher.
+- Not supported: JIS (Japanese) layouts, and a few HE and Ultra 8K models, such
+  as the Q0 HE and the V2 Ultra 8K.
 
 ## Reporting a problem
 
@@ -109,8 +111,8 @@ Copyright (c) 2026 Shaun Preece.
 KeyAble is by Shaun Preece and Steven Scott, and stands on open work by others:
 
 - **QMK firmware** - the open keyboard firmware most Keychron boards run on.
-- **ZMK firmware** - the open firmware the B6 Pro runs on, with Keychron's
-  VIA support added.
+- **ZMK firmware** - the open firmware the B Pro and the Ultra 8K models
+  run on, with Keychron's VIA support added.
 - **VIA** - the open protocol (and configurator) used to read and write key
   assignments over USB.
 - **Keychron** - their public firmware source, released firmware and VIA JSON

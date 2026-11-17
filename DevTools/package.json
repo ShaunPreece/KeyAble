@@ -3,6 +3,7 @@
   "private": true,
   "description": "Development tools and tests for KeyAble.",
   "license": "MIT",
+  "type": "module",
   "scripts": {
     "test": "powershell -NoProfile -ExecutionPolicy Bypass -File tests/run-tests.ps1"
   },

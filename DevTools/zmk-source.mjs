@@ -31,8 +31,8 @@
 //     prints a KEYCHRON_LAYOUTS entry for the board
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { ROOT, appTables, hex } from './keyboard-sources.mjs';
-import { enumValues, returnTable } from './zmk-firmware.mjs';
+import { ROOT, appTables, hex, viaKeys, renderLayoutEntry } from './keyboard-sources.mjs';
+import { enumValues, returnTable, zmkLayout } from './zmk-firmware.mjs';
 import { runAsCommand } from './firmware-files.mjs';
 
 const APP_SRC   = path.join(ROOT, 'ProjectAssets', 'keychron-firmware-src', 'keychron-zmk-ultra', 'app');
@@ -88,7 +88,6 @@ function expand(tokens, defs, disabled = new Set()) {
 function evaluate(tokens, where) {
   const name = tokens.find(t => /^[A-Za-z_"]/.test(t));
   if (name) throw new Error(`${where}: unknown name ${name}`);
-  // eslint-disable-next-line no-new-func
   return new Function(`return (${tokens.join(' ')});`)() >>> 0;
 }
 
@@ -313,6 +312,8 @@ function knobCodes(binding, behaviors, defs, T, where) {
     halves = parseBindings(tokens, behaviors, `${where} &${binding.label}`);
     if (halves.length !== 2) throw new Error(`${where}: &${binding.label} has ${halves.length} bindings, not 2`);
   }
+  // For the knob, map_keycode.c compares only the first 8 characters of key_press and
+  // mouse_key_press.
   const code = h => {
     if (h.dev.startsWith('rgb_ug') && h.p1 >= 1 && h.p1 <= 10) return 0x7820 + h.p1;
     if (h.dev.startsWith('key_pres')) return (h.p1 & 0xFF0000) === 0x0C0000 ? (T.consumer.get(h.p1 & 0xFFFF) ?? 0) : h.p1 & 0xFF;
@@ -418,7 +419,7 @@ export function ultraBoards() {
             codes[pos] = keyCode(layer.keys[k.pos], T);
             const typed = codes[pos] === 0 && unreportedCode(layer.keys[k.pos], T);
             if (typed) { codes[pos] = typed; reportsNone.push(`${l}:${pos}`); }
-          } catch (err) { throw new Error(`${layer.name} position ${k.pos}: ${err.message}`); }
+          } catch (err) { throw new Error(`${layer.name} position ${k.pos}: ${err.message}`, { cause: err }); }
         }
         return codes;
       });
@@ -448,24 +449,17 @@ export function ultraBoards() {
 // and the compiled one Keychron Launcher loads (vendorProductId, layouts.keys with row
 // and col, a knob as a key with an encoder index `ei`, placed at the knob press). Either
 // way a knob press is not among the keys, and alternative layout options are left out.
-export function launcherViaDefinitions() {
+// `dir` is one branch's launcher folder; the B Pro branch keeps the same two formats.
+export function launcherViaDefinitions(dir = LAUNCHER) {
   const out = new Map();
-  for (const file of readdirSync(LAUNCHER).filter(f => f.endsWith('.json')).sort()) {
-    const j = JSON.parse(readFileSync(path.join(LAUNCHER, file), 'utf8'));
+  for (const file of readdirSync(dir).filter(f => f.endsWith('.json')).sort()) {
+    const j = JSON.parse(readFileSync(path.join(dir, file), 'utf8'));
     let pid, keys = new Set(), knobs = 0;
     if (j.productId && Array.isArray(j.layouts?.keymap)) {
       pid = parseInt(j.productId, 16);
-      for (const row of j.layouts.keymap) {
-        for (const item of row) {
-          if (typeof item !== 'string') continue;
-          const lines = item.split('\n');
-          const option = (lines[3] || '').replace(/\s/g, '');
-          if (/^\d+,\d+$/.test(option) && !/,0$/.test(option)) continue;
-          if (lines[9] && /^e/.test(lines[9])) { knobs++; continue; }
-          const m = lines[0].replace(/\s/g, '').match(/^(\d+),(\d+)$/);
-          if (m) keys.add(`${m[1]},${m[2]}`);
-        }
-      }
+      const via = viaKeys(j);
+      keys = new Set(via.keys.map(k => k.pos));
+      knobs = via.knobs;
     } else if (j.vendorProductId && Array.isArray(j.layouts?.keys)) {
       pid = j.vendorProductId & 0xFFFF;
       for (const k of j.layouts.keys) {
@@ -483,51 +477,7 @@ export function launcherViaDefinitions() {
 }
 
 // ---- Key names ----
-// Keychron's own keys, by their name in keycodes.h or launcher.h, named as the app names the
-// same key on the QMK boards (the V6 Max calls the Siri / Cortana key "Voice Assistant").
-const KEYCHRON_KEY_NAMES = {
-  RGB_MODE_FORWARD: 'RGB Mode',
-  UC_SIRI: 'Voice Assistant',
-  UC_CORTANA: 'Voice Assistant',
-  UC_LOCK: 'Lock Screen',
-  MAC_SCRN_LOCK: 'Lock Screen',
-};
-
-// The layout entry for a board, keys in transform order:
-// - a plain key (LABEL_TO_KEYCODE) is named by its Windows code, then by its Mac code;
-// - the Fn key, macro keys and Keychron's own keys are named by what they do;
-// - two keys with one name, as the two B keys of an Alice layout, are told apart as left
-//   and right.
-export function ultraLayout(board, { LABEL_TO_KEYCODE }) {
-  const labelOf = {};
-  for (const [label, code] of Object.entries(LABEL_TO_KEYCODE)) labelOf[code] ??= label;
-  const v = translator(new Set(board.options)).v;
-  const byCode = {};
-  for (const [name, label] of Object.entries(KEYCHRON_KEY_NAMES)) byCode[v[name]] = label;
-  const { mac, win, macFn, winFn } = board.roles;
-  const at = (l, k) => board.layers[l][`${k.row},${k.col}`];
-  const nameOf = code => {
-    if (labelOf[code]) return labelOf[code];
-    if (code === (v.QK_MOMENTARY | macFn) || code === (v.QK_MOMENTARY | winFn)) return 'Fn';
-    if ((code & ~0xFF) === v.QK_MACRO) return `M${code & 0xFF}`;
-    return byCode[code];
-  };
-  const keys = board.keys.map(k => {
-    if (k === board.knob) return { label: 'Knob (press)', row: k.row, col: k.col, isEncoder: true };
-    const label = nameOf(at(win, k)) || nameOf(at(mac, k));
-    if (!label) throw new Error(`${hex(board.pid)}: no name for (${k.row},${k.col}), Windows ${hex(at(win, k))}, Mac ${hex(at(mac, k))}`);
-    return { label, row: k.row, col: k.col };
-  });
-  const byLabel = Map.groupBy(keys, k => k.label);
-  for (const [label, same] of byLabel) {
-    if (same.length === 1) continue;
-    if (same.length > 2) throw new Error(`${hex(board.pid)}: ${same.length} keys named ${label}`);
-    same.sort((a, b) => a.col - b.col);
-    same[0].label = `${label} (left)`;
-    same[1].label = `${label} (right)`;
-  }
-  return { rows: board.rows, cols: board.cols, keys };
-}
+export const ultraLayout = (board, tables) => zmkLayout(board, translator(new Set(board.options)).v, tables);
 
 // ---- Commands ----
 function entry(pid, id) {
@@ -535,20 +485,11 @@ function entry(pid, id) {
   if (!b) throw new Error(`${hex(pid)}: no such board`);
   if (b.error) throw new Error(b.error);
   const layout = ultraLayout(b, appTables());
-  const quote = s => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
-  const lines = [
-    `  // ${b.name} (${b.shield}). Generated by DevTools/zmk-source.mjs from Keychron/zmk`,
-    `  // rtl8762g, app/boards/shields/${b.shield}: positions from the overlay's transform, names`,
-    '  // from the factory keymap. The switch row is outside the VIA matrix.',
-    `  ${quote(id)}: {`,
-    `    rows: ${layout.rows},`,
-    `    cols: ${layout.cols},`,
-    '    keys: [',
-    ...layout.keys.map(k => `      { label: ${quote(k.label)}, row: ${k.row}, col: ${k.col}${k.isEncoder ? ', isEncoder: true' : ''} },`),
-    '    ],',
-    '  },',
-  ];
-  console.log(lines.join('\n'));
+  console.log(renderLayoutEntry([
+    `${b.name} (${b.shield}). Generated by DevTools/zmk-source.mjs from Keychron/zmk`,
+    `rtl8762g, app/boards/shields/${b.shield}: positions from the overlay's transform, names`,
+    'from the factory keymap. The switch row is outside the VIA matrix.',
+  ], id, layout));
 }
 
 function list() {

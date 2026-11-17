@@ -130,7 +130,7 @@ function newestBinaries() {
 // the binary holds our knob map. Or { error }.
 function shipped(pid, fk, file) {
   const board = firmwareBoard(pid);
-  if (!board.matrixSize) return { error: 'NO MATRIX SIZE' };
+  if (!board.matrixSize) return { error: board.error || 'NO MATRIX SIZE' };
   const { rows, cols } = board.matrixSize;
   const bin = readFirmware(file);
   const expected = fk.layers.map(layer => {
