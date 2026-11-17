@@ -20,7 +20,8 @@ const K2_PRO_ANSI = 0x0220;   // protocol 9 firmware: the oldest keycode numberi
 const K2_PRO_ANSI_WHITE = 0x0223;
 const V1_ANSI = 0x0310;       // protocol 11 firmware: Keychron keys from 0x7F00
 const Q1_V1_ANSI = 0x0100;    // AVR firmware, read from its .hex file: protocol 11 numbering
-const B6_PRO_ISO = 0x0762;    // ZMK firmware: protocol 12, but its own list of Keychron keys
+// ZMK firmware: protocol 12, but its own list of Keychron keys. Original and 2025 boards.
+const B_PRO_BOARDS = [0x0711, 0x0712, 0x071A, 0x071B, 0x0761, 0x0762, 0x076B, 0x076C];
 const V6_ULTRA_ANSI = 0x0C60; // Ultra 8K ZMK: 0x7E18 is Siri here, where the B6 Pro has its Keychron key
 const V6_ULTRA_ISO = 0x0C61;  // its Win+H voice key reads back as 0 (FACTORY_KEYMAPS reportsNone)
 
@@ -218,18 +219,21 @@ test('the Macro tab opens for a key set to a macro past the keyboard\'s slots', 
   await page.close();
 });
 
-test('the ZMK B6 Pro names its own Keychron keys and starts with no changes', async () => {
-  const page = await demoPage(B6_PRO_ISO);
-  await page.keyboard.press('Alt+2');   // Review Changes scans the Step 2 key list
-  const out = await page.evaluate(async () => {
-    const winFn = activeLayerRoles().winFn;
-    const fn1 = FACTORY_KEYMAPS[hidDevice.productId].layers[winFn]['7,1'];   // Fn+1
-    const scan = await scanChangedKeys();
-    return { fn1: codeName(fn1), changes: scan.rows.length };
+// Every B Pro board: Fn+1 is Bluetooth 1 in Keychron's ZMK list, not the QMK boards'.
+for (const pid of B_PRO_BOARDS) {
+  test(`the ZMK B Pro ${pid.toString(16)} names its own Keychron keys and starts with no changes`, async () => {
+    const page = await demoPage(pid);
+    await page.keyboard.press('Alt+2');   // Review Changes scans the Step 2 key list
+    const out = await page.evaluate(async () => {
+      const one = activeLayout().keys.find(k => k.label === '1');
+      const fn1 = FACTORY_KEYMAPS[hidDevice.productId].layers[activeLayerRoles().winFn][`${one.row},${one.col}`];
+      const scan = await scanChangedKeys();
+      return { fn1: codeName(fn1), changes: scan.rows.length };
+    });
+    assert.deepEqual(out, { fn1: 'Bluetooth 1', changes: 0 });
+    await page.close();
   });
-  assert.deepEqual(out, { fn1: 'Bluetooth 1', changes: 0 });
-  await page.close();
-});
+}
 
 test('the V6 Ultra names its own Keychron keys, has its knob, and starts with no changes', async () => {
   const page = await demoPage(V6_ULTRA_ANSI);
