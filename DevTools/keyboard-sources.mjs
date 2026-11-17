@@ -22,12 +22,10 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
+import Hjson from 'hjson';
+import { resolveToken } from './token-keycodes.js';
+import { stripComments, layerBlocks, defines, expandDefines } from './keymap-source.js';
 
-const require = createRequire(import.meta.url);
-const { resolveToken } = require('./token-keycodes.js');
-const { stripComments, layerBlocks, defines, expandDefines } = require('./keymap-source.js');
-const Hjson = require('hjson');
 const here   = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(here, '..');
 export const FW   = path.join(ROOT, 'ProjectAssets', 'keychron-firmware-src');

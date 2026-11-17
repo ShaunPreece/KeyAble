@@ -6,9 +6,8 @@
 // Each token becomes the 16-bit code CMD_GET_KEY returns, through token-keycodes.js. A
 // token with no code, or a layer whose length differs from the layout, throws, so the
 // dataset never holds a gap.
-'use strict';
-const { resolveToken } = require('./token-keycodes.js');
-const { stripComments, layerBlocks, defines, expandDefines } = require('./keymap-source.js');
+import { resolveToken } from './token-keycodes.js';
+import { stripComments, layerBlocks, defines, expandDefines } from './keymap-source.js';
 
 // Layer enum order from keymap.c. Boards differ, so the canonical order is never assumed.
 function parseLayerEnum(src) {
@@ -72,7 +71,7 @@ function deriveRoles(blocks, idx, defs) {
 // Returns { layers, encoders, roles }: layers[l]["row,col"] and encoders[l][knob] =
 // { ccw, cw } at each layer's device index, and roles only when the layer order is not
 // the canonical Mac, Mac Fn, Windows, Windows Fn (null otherwise).
-function factoryKeymap(keymapSource, layouts, lockOpts = {}) {
+export function factoryKeymap(keymapSource, layouts, lockOpts = {}) {
   const src = stripComments(keymapSource);
   const { names, idx } = parseLayerEnum(src);
   const blocks = layerBlocks(src);
@@ -113,5 +112,3 @@ function factoryKeymap(keymapSource, layouts, lockOpts = {}) {
     roles.win === 2 && roles.winFn === 3 && roles.fn2 === undefined;
   return { layers, encoders, roles: canonical ? null : roles };
 }
-
-module.exports = { factoryKeymap };

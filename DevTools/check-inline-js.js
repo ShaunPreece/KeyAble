@@ -1,7 +1,7 @@
 // Extracts inline <script> blocks from an HTML file and syntax-checks each
 // with the V8 parser (vm.Script), reporting the source line of any error.
-const fs = require('fs');
-const vm = require('vm');
+import fs from 'node:fs';
+import vm from 'node:vm';
 
 const target = process.argv[2];
 if (!target) { console.error('usage: node check-inline-js.js <file.html>'); process.exit(2); }

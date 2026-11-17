@@ -14,7 +14,6 @@
  * This is model-INDEPENDENT except for the Keychron custom block (QK_KB_0-based),
  * whose absolute values shift with two build flags. See customKeycodes() below.
  */
-'use strict';
 
 // Board layer name -> dynamic-keymap layer index, in the CANONICAL 4-layer
 // order. Boards with a different enum (5-layer V2 Max / K6 Pro / wired V2)
@@ -125,7 +124,7 @@ function customKeycodes(opts = {}) {
  * opts.layerIndex: the model's layer enum, name -> index, for MO() (default
  * LAYER_INDEX).
  */
-function resolveToken(token, opts = {}) {
+export function resolveToken(token, opts = {}) {
   if (token === null || token === undefined) return null;
   token = String(token).trim();
   if (Object.hasOwn(STD, token)) return STD[token];
@@ -145,5 +144,3 @@ function resolveToken(token, opts = {}) {
   }
   return null;
 }
-
-module.exports = { resolveToken };

@@ -26,14 +26,11 @@
 //     builds the table and writes it into KeyAble.html
 // A board whose source cannot be read stops the build, and nothing is written.
 import { readFileSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { APP, appTables, firmwareSource, hex } from './keyboard-sources.mjs';
 import { shippedEntries } from './firmware-binaries.mjs';
 import { zmkEntries } from './zmk-firmware.mjs';
 import { ultraBoards } from './zmk-source.mjs';
-
-const require = createRequire(import.meta.url);
-const { factoryKeymap } = require('./factory-keymap-source.js');
+import { factoryKeymap } from './factory-keymap-source.js';
 
 const BEGIN = '// BEGIN GENERATED FACTORY_KEYMAPS\n';
 const END   = '// END GENERATED FACTORY_KEYMAPS\n';
