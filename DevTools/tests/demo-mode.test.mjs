@@ -6,7 +6,8 @@
    activeLayerRoles, activeLayout, deviceLayerCount, executeResetAll, hidDevice:writable,
    sendVIA, CMD_GET_PROTOCOL, CMD_GET_KEY, CMD_KEYMAP_GET_BUFFER, VIA_UNHANDLED,
    inDemoMode, scanChangedKeys, captureSession, writeKeyCodeOnLayer, restoreFileChosen,
-   macroKeycode, offeredSystemKeys, codeName, LIST_STEP_TYPES, writeTarget:writable */
+   macroKeycode, offeredSystemKeys, codeName, LIST_STEP_TYPES, writeTarget:writable,
+   readKeyCodeOnLayer, decodeAction, layerActionChanged, resetValueForLayer */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

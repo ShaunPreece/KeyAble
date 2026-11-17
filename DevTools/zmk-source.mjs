@@ -313,6 +313,8 @@ function knobCodes(binding, behaviors, defs, T, where) {
     halves = parseBindings(tokens, behaviors, `${where} &${binding.label}`);
     if (halves.length !== 2) throw new Error(`${where}: &${binding.label} has ${halves.length} bindings, not 2`);
   }
+  // For the knob, map_keycode.c compares only the first 8 characters of key_press and
+  // mouse_key_press.
   const code = h => {
     if (h.dev.startsWith('rgb_ug') && h.p1 >= 1 && h.p1 <= 10) return 0x7820 + h.p1;
     if (h.dev.startsWith('key_pres')) return (h.p1 & 0xFF0000) === 0x0C0000 ? (T.consumer.get(h.p1 & 0xFFFF) ?? 0) : h.p1 & 0xFF;
