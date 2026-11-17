@@ -12,32 +12,59 @@
 // Sources: Keychron/zmk branch keychron_bpro, pinned in docs/KEYBOARD-DATA.txt, as a sparse
 // clone in ProjectAssets/keychron-firmware-src/keychron-zmk ('/app/src/launcher/' and
 // '/app/boards/shields/keychron/'). Firmware: the .uf2 files in
-// ProjectAssets/keychron-firmware-bin/zmk.
+// ProjectAssets/keychron-firmware-bin/zmk, from Keychron's B Pro firmware page. That page
+// also lists .kfw files for Telink-based B Pro boards; those are encrypted and unreadable.
 //
 // Usage:
 //   node DevTools/zmk-firmware.mjs fetch <keychron firmware page url> [...]
 //     downloads every .uf2 linked from the pages, skipping files already there
+//   node DevTools/zmk-firmware.mjs list
+//     every firmware file: its board and layers, or why it cannot be decoded
 //   node DevTools/zmk-firmware.mjs show <uf2 file>
 //     prints the decoded keymap, layer by layer, by matrix position
+//   node DevTools/zmk-firmware.mjs entry <pid> <layoutId>
+//     prints a KEYCHRON_LAYOUTS entry for the board, from its newest firmware
 // build-factory-dataset.mjs takes these boards' entries from zmkEntries.
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import { ROOT, appTables, hex } from './keyboard-sources.mjs';
+import { ROOT, appTables, hex, renderLayoutEntry } from './keyboard-sources.mjs';
 import { downloadLinkedFiles, versionNewer, runAsCommand } from './firmware-files.mjs';
 
 const BIN_DIR = path.join(ROOT, 'ProjectAssets', 'keychron-firmware-bin', 'zmk');
 const SRC     = path.join(ROOT, 'ProjectAssets', 'keychron-firmware-src', 'keychron-zmk', 'app');
-const LAUNCHER = path.join(SRC, 'src', 'launcher');
+export const LAUNCHER = path.join(SRC, 'src', 'launcher');
 const SHIELDS  = path.join(SRC, 'boards', 'shields', 'keychron');
 const KEYCHRON_VID = 0x3434;
 
-// The overlay holding each board's matrix transform, by USB product ID. The firmware file
-// names say which shield a build is (zmk_b6pro_uk_..., zmk_b6pro25_uk_... = b6n).
-const ZMK_BOARDS = {
-  0x0761: 'b6/us/keychron_b6_us.overlay',
-  0x0762: 'b6/uk/keychron_b6_uk.overlay',
-  0x076C: 'b6n/uk/keychron_b6_ukn.overlay',
-};
+// Every shield on the branch, by USB product ID: { shield, name, overlay, keymap }, where
+// shield is its folder under SHIELDS (b6/uk; b6n/uk is the 2025 B6 Pro, whose firmware
+// files are named b6pro25). A shield folder holds one .conf, .overlay and .keymap.
+let shieldTable = null;
+function shields() {
+  if (shieldTable) return shieldTable;
+  if (!existsSync(SHIELDS)) throw new Error(`${SHIELDS} not found: clone the source first`);
+  shieldTable = new Map();
+  const dirs = parent => readdirSync(parent, { withFileTypes: true }).filter(d => d.isDirectory()).map(d => d.name).sort();
+  for (const series of dirs(SHIELDS)) {
+    for (const variant of dirs(path.join(SHIELDS, series))) {
+      const dir = path.join(SHIELDS, series, variant);
+      const conf = readdirSync(dir).find(f => f.endsWith('.conf'));
+      if (!conf) continue;
+      const text = readFileSync(path.join(dir, conf), 'utf8');
+      const pid = /^\s*CONFIG_USB_DEVICE_PID\s*=\s*(0x[0-9A-Fa-f]+)/m.exec(text);
+      if (!pid) throw new Error(`${series}/${variant}/${conf}: no CONFIG_USB_DEVICE_PID`);
+      const base = conf.slice(0, -'.conf'.length);
+      shieldTable.set(Number(pid[1]), {
+        shield: `${series}/${variant}`,
+        // The B6 shields set no keyboard name; the "n" of a 2025 series folder is no part of it.
+        name: (/^\s*CONFIG_ZMK_KEYBOARD_NAME\s*=\s*"([^"]*)"/m.exec(text) || [])[1] ?? `Keychron ${series.replace(/n$/, '').toUpperCase()} Pro`,
+        overlay: path.join(dir, `${base}.overlay`),
+        keymap: path.join(dir, `${base}.keymap`),
+      });
+    }
+  }
+  return shieldTable;
+}
 
 // ---- UF2 ----
 // 512-byte blocks: magic at 0, target address at 12, payload size at 16, payload at 32.
@@ -241,26 +268,43 @@ function findKeymap(image, base, count, expected, T) {
   return { ...best, total: expected.length, record };
 }
 
-// One firmware file decoded: { pid, file, layers } with layers[l]["row,col"] = VIA code for
-// every matrix position the overlay places a key at. Throws when the keymap is not found.
+// The letters and digits on the source keymap's base layers, Mac (0) and Windows (2), as
+// [layer, position, code]: what the firmware's keymap must hold for it to be found. A
+// binding's parameters never hold "&", so the n-th "&" of a layer starts its n-th binding.
+function sourceLetters(file, count) {
+  const text = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const keymap = text.slice(text.indexOf('"zmk,keymap"'));
+  const layers = [...keymap.matchAll(/bindings\s*=\s*<([^>]*)>/g)]
+    .map(m => m[1].split('&').slice(1).map(b => b.trim().split(/\s+/)));
+  const usage = name => {
+    if (/^[A-Z]$/.test(name)) return 0x04 + name.charCodeAt(0) - 0x41;   // A = 0x04
+    if (/^N[0-9]$/.test(name)) return name === 'N0' ? 0x27 : 0x1D + Number(name[1]);   // 1 = 0x1E
+    return null;
+  };
+  const expected = [];
+  for (const l of [0, 2]) {
+    if (layers[l]?.length !== count) throw new Error(`${file}: layer ${l} has ${layers[l]?.length} bindings for ${count} positions`);
+    layers[l].forEach(([behavior, param, ...rest], pos) => {
+      const code = behavior === 'kp' && !rest.length ? usage(param) : null;
+      if (code !== null) expected.push([l, pos, code]);
+    });
+  }
+  return expected;
+}
+
+// One firmware file decoded: { pid, file, layers, rows, cols, positions } with
+// layers[l]["row,col"] = VIA code for every matrix position the overlay places a key at,
+// and positions the overlay's [row, col] by key position. Throws when the keymap is not
+// found.
 export function decodeFirmware(file, T = keychronTables()) {
   const { image, base } = readUf2(path.join(BIN_DIR, file));
-  const pids = imagePids(image).filter(p => p in ZMK_BOARDS);
-  if (pids.length !== 1) throw new Error(`${file}: product ID not one of ZMK_BOARDS (${imagePids(image).map(hex).join(', ')})`);
+  const pids = imagePids(image).filter(p => shields().has(p));
+  if (pids.length !== 1) throw new Error(`${file}: product ID not one shield's (${imagePids(image).map(hex).join(', ')})`);
   const pid = pids[0];
-  const { rows, cols, positions } = overlayPositions(path.join(SHIELDS, ZMK_BOARDS[pid]));
+  const shield = shields().get(pid);
+  const { rows, cols, positions } = overlayPositions(shield.overlay);
 
-  // Letters and digits, which every layout has on both base layers, Mac (0) and Windows (2).
-  const { KEYCHRON_LAYOUTS, KEYBOARD_DB, LABEL_TO_KEYCODE } = appTables();
-  const layout = KEYBOARD_DB[pid] && KEYCHRON_LAYOUTS[KEYBOARD_DB[pid].layoutId];
-  if (!layout) throw new Error(`${file}: ${hex(pid)} has no KeyAble layout to find the keymap by`);
-  const ref = layout.keys;
-  const expected = [];
-  for (const key of ref) {
-    if (!/^[A-Z0-9]$/.test(key.label)) continue;
-    const pos = positions.findIndex(([r, c]) => r === key.row && c === key.col);
-    if (pos >= 0) for (const l of [0, 2]) expected.push([l, pos, LABEL_TO_KEYCODE[key.label]]);
-  }
+  const expected = sourceLetters(shield.keymap, positions.length);
   if (expected.length < 40) throw new Error(`${file}: too few known keys to find the keymap by (${expected.length})`);
 
   const found = findKeymap(image, base, positions.length, expected, T);
@@ -277,11 +321,69 @@ export function decodeFirmware(file, T = keychronTables()) {
     });
     layers.push(out);
   }
-  return { pid, file, layers };
+  return { pid, file, layers, rows, cols, positions };
+}
+
+// ---- Key names ----
+// Keys LABEL_TO_KEYCODE does not name, mostly Keychron's own, by their name in keycodes.h
+// or launcher.h, named as the app names the same key on the QMK boards (the V6 Max calls
+// the Siri / Cortana key "Voice Assistant").
+// A name missing from a branch's headers is skipped.
+const KEYCHRON_KEY_NAMES = {
+  RGB_MODE_FORWARD: 'RGB Mode',
+  UC_SIRI: 'Voice Assistant',
+  UC_CORTANA: 'Voice Assistant',
+  UC_LOCK: 'Lock Screen',
+  MAC_SCRN_LOCK: 'Lock Screen',
+  KC_CALCULATOR: 'Calculator',
+  UC_TASK_VIEW: 'Task View',
+  UC_SWITCH_DESKTOP_LEFT: 'Previous Desktop',
+  UC_SWITCH_DESKTOP_RIGHT: 'Next Desktop',
+};
+
+// The layout entry for a ZMK board, keys in transform order. `board` is { pid, rows, cols,
+// keys: [{ row, col }], layers, roles: { mac, win, macFn, winFn }, knob }, knob being one of
+// keys or null; `v` is the branch's keycode enum values.
+// - a plain key (LABEL_TO_KEYCODE) is named by its Windows code, then by its Mac code;
+// - the Fn key, macro keys and Keychron's own keys are named by what they do;
+// - two keys with one name, as the two B keys of an Alice layout, are told apart as left
+//   and right.
+// `board.keys` must be in transform order.
+export function zmkLayout(board, v, { LABEL_TO_KEYCODE }) {
+  const labelOf = {};
+  for (const [label, code] of Object.entries(LABEL_TO_KEYCODE)) labelOf[code] ??= label;
+  const byCode = {};
+  for (const [name, label] of Object.entries(KEYCHRON_KEY_NAMES)) if (name in v) byCode[v[name]] = label;
+  const { mac, win, macFn, winFn } = board.roles;
+  const at = (l, k) => board.layers[l][`${k.row},${k.col}`];
+  const nameOf = code => {
+    if (labelOf[code]) return labelOf[code];
+    if (code === (v.QK_MOMENTARY | macFn) || code === (v.QK_MOMENTARY | winFn)) return 'Fn';
+    if ((code & ~0xFF) === v.QK_MACRO) return `M${code & 0xFF}`;
+    return byCode[code];
+  };
+  const keys = board.keys.map(k => {
+    if (k === board.knob) return { label: 'Knob (press)', row: k.row, col: k.col, isEncoder: true };
+    const label = nameOf(at(win, k)) || nameOf(at(mac, k));
+    if (!label) throw new Error(`${hex(board.pid)}: no name for (${k.row},${k.col}), Windows ${hex(at(win, k))}, Mac ${hex(at(mac, k))}`);
+    return { label, row: k.row, col: k.col };
+  });
+  // Transform order is reading order, so of two keys the first is the left one. Matrix
+  // columns are not: the B Pro boards' are scattered.
+  const byLabel = Map.groupBy(keys, k => k.label);
+  for (const [label, same] of byLabel) {
+    if (same.length === 1) continue;
+    if (same.length > 2) throw new Error(`${hex(board.pid)}: ${same.length} keys named ${label}`);
+    same[0].label = `${label} (left)`;
+    same[1].label = `${label} (right)`;
+  }
+  return { rows: board.rows, cols: board.cols, keys };
 }
 
 // ---- Commands ----
-const versionKey = file => (/_v(\d+(?:\.\d+)*)_(\d+)\.uf2$/i.exec(file) || []).slice(1).join('.').split('.').map(Number);
+// Version, then build date: zmk_b6pro_uk_v1.33_2508211148.uf2. Some names carry a further
+// _suffix after the date.
+const versionKey = file => (/_v(\d+(?:\.\d+)*)_(\d+)(?:_[^.]*)?\.uf2$/i.exec(file) || []).slice(1).join('.').split('.').map(Number);
 const newer = (a, b) => versionNewer(versionKey(a), versionKey(b));
 
 function show(file) {
@@ -292,8 +394,10 @@ function show(file) {
   });
 }
 
-// Newest firmware per product ID, decoded.
+// Newest firmware per product ID, decoded. Read once.
+let newestTable = null;
 function newestDecoded() {
+  if (newestTable) return newestTable;
   const T = keychronTables();
   const newest = new Map();
   for (const file of existsSync(BIN_DIR) ? readdirSync(BIN_DIR).filter(f => f.endsWith('.uf2')) : []) {
@@ -302,8 +406,23 @@ function newestDecoded() {
     const held = newest.get(decoded.pid);
     if (!held || newer(file, held.file)) newest.set(decoded.pid, decoded);
   }
-  return newest;
+  return (newestTable = newest);
 }
+
+// Every B Pro board with decodable firmware, by product ID, in the form zmkLayout takes,
+// plus { shield, name, file, positions }: keys are the VIA-reachable positions in transform
+// order. The B Pro keymaps keep Keychron's layer order: Mac, Mac Fn, Windows, Windows Fn.
+export function bproBoards() {
+  const out = new Map();
+  for (const d of newestDecoded().values()) {
+    const { shield, name } = shields().get(d.pid);
+    const keys = d.positions.map(([row, col]) => ({ row, col })).filter(k => k.row < d.rows && k.col < d.cols);
+    out.set(d.pid, { ...d, shield, name, keys, roles: { mac: 0, macFn: 1, win: 2, winFn: 3 }, knob: null });
+  }
+  return out;
+}
+
+export const bproLayout = (board, tables) => zmkLayout(board, keychronTables().v, tables);
 
 // The factory layers of each ZMK board KeyAble knows, from its newest firmware, as a Map
 // of pid to { file, layers }. Reports the keys the board has that its KeyAble layout
@@ -323,10 +442,42 @@ export function zmkEntries() {
   return out;
 }
 
+function list() {
+  const T = keychronTables();
+  for (const file of existsSync(BIN_DIR) ? readdirSync(BIN_DIR).filter(f => f.endsWith('.uf2')).sort() : []) {
+    try {
+      const { pid, layers } = decodeFirmware(file, T);
+      const s = shields().get(pid);
+      console.log(`${file}: ${hex(pid)} ${s.name} (${s.shield}), ${layers.length} layers, ${Object.keys(layers[0]).length} keys`);
+    } catch (err) {
+      console.log(`${file}: ERROR ${err.message}`);
+    }
+  }
+}
+
+function entry(pid, id) {
+  const b = bproBoards().get(pid);
+  if (!b) throw new Error(`${hex(pid)}: no firmware for it decodes`);
+  const outside = b.positions.length - b.keys.length;
+  console.log(renderLayoutEntry([
+    `${b.name} (${b.shield}). Generated by DevTools/zmk-firmware.mjs: positions from the`,
+    `overlay's transform in Keychron/zmk keychron_bpro, app/boards/shields/keychron/${b.shield};`,
+    `names from the factory keymap in ${b.file}.`,
+    ...(outside ? [`The ${outside} switch positions are outside the VIA matrix.`] : []),
+  ], id, bproLayout(b, appTables())));
+}
+
 // Run as a command only, so build-factory-dataset.mjs can import from it.
 if (runAsCommand(import.meta.url)) {
   const [mode, ...args] = process.argv.slice(2);
-  if (mode === 'fetch' && args.length) await downloadLinkedFiles(args, BIN_DIR, ['uf2']);
-  else if (mode === 'show' && args.length) show(args[0]);
-  else { console.error('usage: fetch <page url> [...] | show <uf2 file>'); process.exit(1); }
+  try {
+    if (mode === 'fetch' && args.length) await downloadLinkedFiles(args, BIN_DIR, ['uf2']);
+    else if (mode === 'list') list();
+    else if (mode === 'show' && args.length) show(args[0]);
+    else if (mode === 'entry' && args.length === 2) entry(Number(args[0]), args[1]);
+    else { console.error('usage: fetch <page url> [...] | list | show <uf2 file> | entry <pid> <layoutId>'); process.exitCode = 1; }
+  } catch (err) {
+    console.error(`ERROR: ${err.message}`);
+    process.exitCode = 1;
+  }
 }

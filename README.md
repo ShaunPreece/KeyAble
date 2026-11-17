@@ -56,7 +56,7 @@ browser; nothing is sent anywhere over the internet.
 
 ## Supported keyboards
 
-48 Keychron models across the Q, V, K, S, and B series (114 variants once you count
+49 Keychron models across the Q, V, K, S, and B series (121 variants once you count
 each ANSI, ISO, knob, and non-knob version separately). The full list is inside
 the app under Help, "Supported Keyboards".
 
@@ -111,7 +111,7 @@ Copyright (c) 2026 Shaun Preece.
 KeyAble is by Shaun Preece and Steven Scott, and stands on open work by others:
 
 - **QMK firmware** - the open keyboard firmware most Keychron boards run on.
-- **ZMK firmware** - the open firmware the B6 Pro and the Ultra 8K models
+- **ZMK firmware** - the open firmware the B Pro and the Ultra 8K models
   run on, with Keychron's VIA support added.
 - **VIA** - the open protocol (and configurator) used to read and write key
   assignments over USB.
