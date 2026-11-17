@@ -12823,6 +12823,13 @@ const KBD_VALUE_SWITCH_MATRIX = 0x03;  // id_switch_matrix_state: which switches
 const CMD_GET_KEY      = 0x04;   // VIA id_dynamic_keymap_get_keycode
 const CMD_SET_KEY      = 0x05;
 const CMD_DYNAMIC_KEYMAP_RESET = 0x06;   // VIA id_dynamic_keymap_reset - rewrites every key in the dynamic keymap with firmware defaults; takes effect immediately (id_eeprom_reset 0x0A only invalidates EEPROM until next reboot)
+// The encoder commands are 0x14 and 0x15. 0x0C and 0x0D are the macro count and
+// buffer size: sent for an encoder, they answer OK but touch macros instead. QMK
+// quantum/via.h enum order: protocol = 0x01, get_kc = 0x04, set_kc = 0x05,
+// reset = 0x06, custom_set/get/save = 0x07-0x09, eeprom_reset = 0x0A,
+// bootloader = 0x0B, macro_get_count = 0x0C, macro_buffer_size = 0x0D,
+// macro_get_buf = 0x0E, macro_set_buf = 0x0F, macro_reset = 0x10,
+// layer_count = 0x11, buffer ops = 0x12-0x13, encoder = 0x14-0x15.
 const CMD_GET_ENCODER  = 0x14;   // VIA id_dynamic_keymap_get_encoder  args: [layer, encoder_id, clockwise]
 const CMD_SET_ENCODER  = 0x15;   // VIA id_dynamic_keymap_set_encoder  args: [layer, encoder_id, clockwise, kch, kcl]
 // Lighting. Before protocol 11 the same numbers are id_lighting_set/get_value and
@@ -12951,15 +12958,6 @@ function keycodesForBoard(entry, version) {
   return version >= VIA_PROTOCOL_11 ? KEYCODES_PROTOCOL_11 : KEYCODES_PROTOCOL_9;
 }
 
-// IMPORTANT: 0x0C / 0x0D are id_dynamic_keymap_macro_get_count / _buffer_size
-// in the VIA protocol - using those for encoder ops returns OK status but
-// touches macros instead of the encoder. The encoder commands are 0x14
-// (get_encoder) / 0x15 (set_encoder). QMK quantum/via.h
-// enum order: protocol = 0x01, get_kc = 0x04, set_kc = 0x05, reset = 0x06,
-// custom_set/get/save = 0x07-0x09, eeprom_reset = 0x0A, bootloader = 0x0B,
-// macro_get_count = 0x0C, macro_buffer_size = 0x0D, macro_get_buf = 0x0E,
-// macro_set_buf = 0x0F, macro_reset = 0x10, layer_count = 0x11, buffer ops
-// = 0x12-0x13, encoder = 0x14-0x15.
 const REPORT_LEN       = 32;
 
 // ---- Per-model layer map -------------------------------------------------
@@ -17958,8 +17956,8 @@ async function executeResetAll() {
 const KEYABLE_VERSION       = '1.3';
 const KEYABLE_RELEASE_DATE  = '2026-11-10';   // ISO yyyy-mm-dd
 
-// The human-friendly version string, e.g. "Version 1.2, released
-// 8 October 2026". Falls back to just the version if the date cannot be parsed.
+// The human-friendly version string, e.g. "Version 1.3, released
+// 10 November 2026". Falls back to just the version if the date cannot be parsed.
 function appVersionText() {
   const d = new Date(KEYABLE_RELEASE_DATE + 'T00:00:00');
   if (isNaN(d.getTime())) return `Version ${KEYABLE_VERSION}`;
@@ -18357,8 +18355,8 @@ function startProgress(id, text) {
       lastSpoken = now;
       announce(line);
     },
-    // Callers move focus back to a button straight after, so the result waits
-    // for that focus read rather than being cut off by it.
+    // Backup and restore move focus back to their button straight after, so the
+    // result waits for that focus read rather than being cut off by it.
     finish(line) {
       box.textContent = line;
       announce(line, ANNOUNCE_AFTER_FOCUS_MS);
@@ -19604,6 +19602,7 @@ async function writeMacroSlot(slotIdx, newBytes) {
 // A macro is an ordered list of steps. Each step is one of:
 //   { type: 'text',  text: string }
 //   { type: 'key',   keycode: number /* HID 0x04..0xFF */, mods: { ctrl, shift, alt, gui } }
+//   { type: 'media' | 'system', code: number /* modifier bits and key, up to 0x1FFF */, label: string }
 //   { type: 'pause', ms: number }
 //
 // stepsToBytes flattens the list to the QMK SEND_STRING byte stream the
