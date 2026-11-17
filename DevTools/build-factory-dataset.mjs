@@ -136,7 +136,7 @@ function tableSpan(html) {
 // Each entry's text in a rendered table, by pid, for comparing entry by entry.
 function entryTexts(table) {
   const out = new Map();
-  for (const m of table.matchAll(/(?:  \/\/ Shipped firmware: [^\n]*\n)?  (0x[0-9A-F]{4}): \{\n[\s\S]*?\n  \},\n/g)) {
+  for (const m of table.matchAll(/(?: {2}\/\/ Shipped firmware: [^\n]*\n)? {2}(0x[0-9A-F]{4}): \{\n[\s\S]*?\n {2}\},\n/g)) {
     out.set(Number(m[1]), m[0]);
   }
   return out;

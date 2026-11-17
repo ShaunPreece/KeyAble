@@ -88,7 +88,6 @@ function expand(tokens, defs, disabled = new Set()) {
 function evaluate(tokens, where) {
   const name = tokens.find(t => /^[A-Za-z_"]/.test(t));
   if (name) throw new Error(`${where}: unknown name ${name}`);
-  // eslint-disable-next-line no-new-func
   return new Function(`return (${tokens.join(' ')});`)() >>> 0;
 }
 
@@ -420,7 +419,7 @@ export function ultraBoards() {
             codes[pos] = keyCode(layer.keys[k.pos], T);
             const typed = codes[pos] === 0 && unreportedCode(layer.keys[k.pos], T);
             if (typed) { codes[pos] = typed; reportsNone.push(`${l}:${pos}`); }
-          } catch (err) { throw new Error(`${layer.name} position ${k.pos}: ${err.message}`); }
+          } catch (err) { throw new Error(`${layer.name} position ${k.pos}: ${err.message}`, { cause: err }); }
         }
         return codes;
       });

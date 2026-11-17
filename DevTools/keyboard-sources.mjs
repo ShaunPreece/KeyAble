@@ -42,7 +42,6 @@ export function appTables(html = readFileSync(APP, 'utf8')) {
     const start = html.indexOf(`const ${name} = {`);
     const end   = html.indexOf('\n};', start);
     if (start < 0 || end < 0) throw new Error(`${name} not found in KeyAble.html`);
-    // eslint-disable-next-line no-new-func
     return new Function(`return (${html.slice(start + `const ${name} = `.length, end + 2)});`)();
   };
   return {
