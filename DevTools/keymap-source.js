@@ -61,4 +61,4 @@ function expandDefines(token, defs) {
   return t;
 }
 
-module.exports = { stripComments, splitTopLevel, layerBlocks, defines, expandDefines };
+module.exports = { stripComments, layerBlocks, defines, expandDefines };

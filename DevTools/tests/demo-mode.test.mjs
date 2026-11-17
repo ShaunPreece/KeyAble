@@ -7,7 +7,8 @@
    sendVIA, CMD_GET_PROTOCOL, CMD_GET_KEY, CMD_KEYMAP_GET_BUFFER, VIA_UNHANDLED,
    inDemoMode, scanChangedKeys, captureSession, writeKeyCodeOnLayer, restoreFileChosen,
    macroKeycode, offeredSystemKeys, codeName, LIST_STEP_TYPES, writeTarget:writable,
-   readKeyCodeOnLayer, decodeAction, layerActionChanged, resetValueForLayer */
+   readKeyCodeOnLayer, decodeAction, layerActionChanged, resetValueForLayer,
+   CMD_DYNAMIC_KEYMAP_RESET */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -150,6 +151,36 @@ test('Review Changes in demo finds base and Fn changes, and factory reset clears
   await page.evaluate(() => executeResetAll());
   await page.waitForFunction(() => hidDevice.keymap.every((c, i) => c === new DemoKeyboard(hidDevice.productId).keymap[i]));
   assert.deepEqual(await rows(), [], 'factory reset restored every key');
+  await page.close();
+});
+
+test('a factory reset the keyboard does not handle is reported as failed', async () => {
+  const page = await demoPage();
+  await page.evaluate(() => {
+    const answer = hidDevice.answer.bind(hidDevice);
+    hidDevice.answer = d => {
+      if (d[0] === CMD_DYNAMIC_KEYMAP_RESET) { d[0] = VIA_UNHANDLED; return d; }
+      return answer(d);
+    };
+  });
+  await page.evaluate(() => executeResetAll());
+  assert.match(await page.locator('#reset-progress').textContent(),
+    /^Reset failed\. This keyboard does not accept a reset from KeyAble\..*Fn \+ J \+ Z/);
+  await page.close();
+});
+
+test('a factory reset with no reply is checked against the keys themselves', async () => {
+  const page = await demoPage();
+  await page.evaluate(async () => {
+    const R = activeLayerRoles();
+    await writeKeyCodeOnLayer(R.win, activeLayout().keys.find(k => k.label === 'B'), 0x007F);
+    const send = hidDevice.sendReport.bind(hidDevice);
+    hidDevice.sendReport = async (id, data) => {   // the reset is lost: no reply, nothing reset
+      if (data[0] !== CMD_DYNAMIC_KEYMAP_RESET) await send(id, data);
+    };
+  });
+  await page.evaluate(() => executeResetAll());
+  assert.match(await page.locator('#reset-progress').textContent(), /^Reset failed\. 1 key still changed\./);
   await page.close();
 });
 

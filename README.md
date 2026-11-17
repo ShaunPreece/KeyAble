@@ -111,8 +111,8 @@ Copyright (c) 2026 Shaun Preece.
 KeyAble is by Shaun Preece and Steven Scott, and stands on open work by others:
 
 - **QMK firmware** - the open keyboard firmware most Keychron boards run on.
-- **ZMK firmware** - the open firmware the B6 Pro runs on, with Keychron's
-  VIA support added.
+- **ZMK firmware** - the open firmware the B6 Pro and the Ultra 8K models
+  run on, with Keychron's VIA support added.
 - **VIA** - the open protocol (and configurator) used to read and write key
   assignments over USB.
 - **Keychron** - their public firmware source, released firmware and VIA JSON

@@ -53,6 +53,23 @@ export function appTables(html = readFileSync(APP, 'utf8')) {
   };
 }
 
+// One KEYCHRON_LAYOUTS entry as the app's source text, for pasting into KeyAble.html.
+// `headerLines` are its comment lines, without the `// `; `layout` is
+// { rows, cols, keys: [{ label, row, col, isEncoder }] }.
+export function renderLayoutEntry(headerLines, id, layout) {
+  const quote = s => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+  return [
+    ...headerLines.map(line => `  // ${line}`),
+    `  ${quote(id)}: {`,
+    `    rows: ${layout.rows},`,
+    `    cols: ${layout.cols},`,
+    '    keys: [',
+    ...layout.keys.map(k => `      { label: ${quote(k.label)}, row: ${k.row}, col: ${k.col}${k.isEncoder ? ', isEncoder: true' : ''} },`),
+    '    ],',
+    '  },',
+  ].join('\n');
+}
+
 // Files that exist but could not be parsed, path relative to FW -> parse error. A board
 // or VIA definition whose file is listed here is missing from the index, and callers
 // report the list.
@@ -90,7 +107,7 @@ function walkFiles(dir, out = []) {
 
 // A plain HID key's code (0x02 to 0xFF), or undefined for layers, Keychron customs,
 // lighting and media keys, which are compared by position only.
-export function standardCode(token, defs = {}) {
+function standardCode(token, defs = {}) {
   const code = resolveToken(expandDefines(token, defs));
   return Number.isInteger(code) && code > 0x0001 && code <= 0xFF ? code : undefined;
 }
@@ -199,10 +216,11 @@ export function firmwareBoard(pid) {
 }
 
 // ---- VIA definitions by product ID ----
-// Matrix keys only: encoders (legend 10 starting "e"), decals and layout options other
-// than the default are left out.
-function viaKeys(json) {
-  const out = []; let y = -1;
+// A VIA definition's KLE keymap as { keys: [{ pos, x, y }], knobs }: the matrix keys,
+// each with its centre, and the number of knobs (legend 10 starting "e"). Decals and
+// layout options other than the default are left out of both.
+export function viaKeys(json) {
+  const keys = []; let knobs = 0, y = -1;
   for (const row of json.layouts.keymap) {
     y += 1; let x = 0, w = 1, decal = false;
     for (const item of row) {
@@ -212,11 +230,13 @@ function viaKeys(json) {
       const m = lines[0].replace(/\s/g, '').match(/^(\d+),(\d+)$/);
       const encoder = lines[9] && /^e/.test(lines[9]);
       const nonDefault = /^\d+,\d+$/.test(option) && !/,0$/.test(option);
-      if (m && !decal && !encoder && !nonDefault) out.push({ pos: `${m[1]},${m[2]}`, x: x + w / 2, y });
+      const shown = !decal && !nonDefault;
+      if (shown && encoder) knobs++;
+      else if (shown && m) keys.push({ pos: `${m[1]},${m[2]}`, x: x + w / 2, y });
       x += w; w = 1; decal = false;
     }
   }
-  return out;
+  return { keys, knobs };
 }
 
 let viaIndex = null;
@@ -231,7 +251,7 @@ export function viaBoards(pid) {
         if (!j || !j.productId || !j.layouts || !j.layouts.keymap) continue;
         const p = parseInt(j.productId, 16);
         if (!viaIndex.has(p)) viaIndex.set(p, []);
-        viaIndex.get(p).push({ source: path.relative(FW, f).replace(/\\/g, '/'), matrix: j.matrix, keys: viaKeys(j) });
+        viaIndex.get(p).push({ source: path.relative(FW, f).replace(/\\/g, '/'), matrix: j.matrix, keys: viaKeys(j).keys });
       }
     }
   }

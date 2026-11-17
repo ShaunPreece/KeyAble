@@ -2105,7 +2105,7 @@
         </p>
         <ul>
           <li><strong>QMK</strong>, the open keyboard firmware that most Keychron boards run on.</li>
-          <li><strong>ZMK</strong>, the open firmware the B6 Pro runs on, with Keychron's VIA support added.</li>
+          <li><strong>ZMK</strong>, the open firmware the B6 Pro and the Ultra 8K models run on, with Keychron's VIA support added.</li>
           <li><strong>VIA</strong>, the open protocol used to read and write key assignments over USB.</li>
           <li><strong>Keychron</strong>, whose public firmware and layout files were the source of the
             keyboard data KeyAble relies on.</li>
@@ -15580,12 +15580,10 @@ function loadStep2() {
   if (!layout) {
     $('step2-content').hidden = true;
     $('step2-no-layout').hidden = false;
-    if (activeKbd) {
-      announce(
-        `No key layout available for ${displayKbdName(activeKbd.name)}. ` +
-        `Japanese (JIS) layouts are not supported yet.`
-      );
-    }
+    announce(
+      `No key layout available for ${displayKbdName(activeKbd.name)}. ` +
+      `Japanese (JIS) layouts are not supported yet.`
+    );
     return;
   }
 
@@ -16522,9 +16520,6 @@ async function openChangedKeys() {
     announce('No keyboard layout is available yet. Please connect a supported keyboard first.');
     return;
   }
-  // The user may open this without ever entering Step 2, so make sure stepKeys
-  // reflects the connected model.
-  if (!stepKeys.length) stepKeys = getStepKeys(layout);
 
   const opener = $('btn-changed-keys');
   $('changed-keys-count').textContent = '';
@@ -16551,8 +16546,9 @@ async function openChangedKeys() {
 }
 
 // Read the current view's base and Fn layers and collect every key that differs
-// from its factory default. `failed` is set when either layer could not be read,
-// because an unread layer would otherwise list as having no changes.
+// from its factory default. `failed` is set when either layer could not be read, or
+// the model has no layout, because an unread layer would otherwise list as having
+// no changes.
 async function scanChangedKeys() {
   const view      = currentViewOS();               // 'mac' | 'windows'
   const R         = activeLayerRoles();
@@ -16560,6 +16556,10 @@ async function scanChangedKeys() {
   const fnLayer   = fnLayerFor(baseLayer);
   const rows      = [];
 
+  const layout = activeLayout();
+  if (!layout) return { failed: true, rows, baseLayer, fnLayer, view };
+  // Step 2 builds stepKeys, and this can run before Step 2 is ever opened.
+  if (!stepKeys.length) stepKeys = getStepKeys(layout);
   const keys      = stepKeys;
   const baseCodes = await readLayerKeys(baseLayer, keys);
   const fnCodes   = baseCodes && await readLayerKeys(fnLayer, keys);
@@ -17900,24 +17900,27 @@ async function executeResetAll() {
     // The firmware echo can arrive several seconds after the command - give it
     // 7 s before giving up.
     const reply = await sendVIA([CMD_DYNAMIC_KEYMAP_RESET], 7000);
-    let acknowledged = !!(reply && reply[0] === CMD_DYNAMIC_KEYMAP_RESET);
-
-    // If the echo did not arrive in time, probe the keyboard to see whether it
-    // is still alive and responsive. If it answers GET_PROTOCOL the reset
-    // almost certainly went through - the firmware was just slow to reply.
-    if (!acknowledged) {
-      const probe = await sendVIA([CMD_GET_PROTOCOL], 2000);
-      if (probe && probe[0] === CMD_GET_PROTOCOL) {
-        acknowledged = true;
-      }
+    const emergencyReset = 'To reset it on the keyboard itself, hold Fn + J + Z for 4 seconds, ' +
+      'as Emergency Reset in Help describes.';
+    if (reply && reply[0] === VIA_UNHANDLED) {
+      playChirp(false);
+      progress.finish(`Reset failed. This keyboard does not accept a reset from KeyAble. ${emergencyReset}`);
+      return;
     }
 
-    if (!acknowledged) {
-      playChirp(false);
-      progress.finish(
-        'Reset failed. The keyboard did not acknowledge the command. ' +
-        'You can also use the hardware reset shortcut shown in the Help section.');
-      return;
+    // No echo in time does not mean no reset: the keys are read back instead, since
+    // a keyboard that answers other commands may still have refused or lost this one.
+    if (!reply) {
+      progress.update('Checking that every key is back to its default. Please wait.');
+      const scan = await scanChangedKeys();
+      if (scan.failed || scan.rows.length) {
+        playChirp(false);
+        progress.finish(
+          (scan.failed
+            ? 'Reset not confirmed. The keyboard did not answer. '
+            : `Reset failed. ${plural(scan.rows.length, 'key')} still changed. `) + emergencyReset);
+        return;
+      }
     }
 
     currentKeymap = new Map();   // every position is back to factory default
@@ -20507,7 +20510,7 @@ function renderMacroBuilder() {
       if (li === document.activeElement) li.after(here);
       else list.insertBefore(li, here);
     }
-    const text = `Step ${idx + 1}: ${describeStepAction(step)}`;
+    const text = describeStep(step, idx);
     if (li.textContent !== text) li.textContent = text;
     const selected = step.id === macroSelectedId;
     li.setAttribute('aria-selected', String(selected));

@@ -68,6 +68,15 @@ function datasetNote(pid, board) {
   return extra || missing || codes ? `factory dataset differs: ${extra} extra, ${missing} missing, ${codes} codes` : null;
 }
 
+// Sets r.verdict from its layout problems and its VIA definitions, and notes a board
+// that has none.
+function recordVerdict(r, vias, viaAgrees) {
+  if (!vias.length) r.notes.push('no VIA definition');
+  if (r.problems.length) r.verdict = 'LAYOUT WRONG';
+  else if (!vias.length) r.verdict = 'FIRMWARE ONLY';
+  else r.verdict = viaAgrees ? 'VERIFIED' : 'SOURCES DISAGREE';
+}
+
 // An Ultra 8K board (ZMK): its layout and factory dataset against what zmk-source.mjs reads
 // from Keychron's ZMK source, and the source against Keychron's VIA definitions, which
 // leave out the knob press.
@@ -107,10 +116,7 @@ function checkUltra(r, pid, layout) {
         `firmware-only ${fwOnly.join(' ') || 'none'}, knobs ${v.knobs} in VIA, ${b.knob ? 1 : 0} in the firmware`);
     }
   }
-  if (!vias.length) r.notes.push('no VIA definition');
-  if (r.problems.length) r.verdict = 'LAYOUT WRONG';
-  else if (!vias.length) r.verdict = 'FIRMWARE ONLY';
-  else r.verdict = viaAgrees ? 'VERIFIED' : 'SOURCES DISAGREE';
+  recordVerdict(r, vias, viaAgrees);
 }
 
 const results = [];
@@ -139,11 +145,7 @@ for (const [pidText, entry] of Object.entries(KEYBOARD_DB)) {
         `firmware-only ${c.fwOnly.join(' ') || 'none'}${c.sameOrder ? '' : ', physical order differs'}`);
     }
   }
-  if (!vias.length) r.notes.push('no VIA definition');
-
-  if (r.problems.length) r.verdict = 'LAYOUT WRONG';
-  else if (!vias.length) r.verdict = 'FIRMWARE ONLY';
-  else r.verdict = viaAgrees ? 'VERIFIED' : 'SOURCES DISAGREE';
+  recordVerdict(r, vias, viaAgrees);
 }
 
 results.sort((a, b) => a.verdict.localeCompare(b.verdict) || a.pid - b.pid);
