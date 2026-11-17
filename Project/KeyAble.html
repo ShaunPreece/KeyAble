@@ -1688,7 +1688,21 @@
       <!-- Each release adds its version above the previous one. -->
       <div class="card">
         <h3 style="border-left:none;padding-left:0;margin-bottom:.6rem">What's New.</h3>
-        <h4 style="margin-top:.5rem">Version 1.3, 10th November 2026</h4>
+        <h4 style="margin-top:.5rem">Version 1.4, 17th November 2026</h4>
+        <ul style="margin:.3rem 0 0 1.25rem;padding:0;line-height:1.55">
+          <li>Backups now save the whole keyboard: every key on every layer, the knob, macros,
+            lighting and Keychron's own settings. Restoring changes only what differs from the
+            backup. Backups made by version 1.3 or earlier cannot be restored.</li>
+          <li>Nine HE (Hall Effect) models: the Q1, Q3, Q5, Q6, K2, K4, K6, K8 and K10 HE. Their
+            actuation point and rapid trigger still need Keychron's Launcher.</li>
+          <li>The B1 Pro, and the B6 Pro in its US layout. Both work in their original and 2025
+            versions.</li>
+          <li>RGB Lighting saves each setting before changing the next, so the keyboard keeps all
+            of them.</li>
+          <li>Reset Keyboard to Default Settings no longer reports success when the keyboard
+            refuses the reset.</li>
+        </ul>
+        <h4 style="margin-top:1rem">Version 1.3, 10th November 2026</h4>
         <ul style="margin:.3rem 0 0 1.25rem;padding:0;line-height:1.55">
           <li>Three new models: the K3 Max, K5 Max and S1.</li>
           <li>17 Ultra 8K models, built from Keychron's firmware source. None has been tested on
@@ -18783,8 +18797,8 @@ async function executeResetAll() {
 // Bump KEYABLE_VERSION by hand at a real release (MAJOR.MINOR.PATCH: a small
 // fix is a PATCH, a new feature a MINOR); update KEYABLE_RELEASE_DATE (ISO)
 // to that day. showAppVersion writes it under the page title and the Help page.
-const KEYABLE_VERSION       = '1.3';
-const KEYABLE_RELEASE_DATE  = '2026-11-10';   // ISO yyyy-mm-dd
+const KEYABLE_VERSION       = '1.4';
+const KEYABLE_RELEASE_DATE  = '2026-11-17';   // ISO yyyy-mm-dd
 
 // The human-friendly version string, e.g. "Version 1.3, released
 // 10 November 2026". Falls back to just the version if the date cannot be parsed.
