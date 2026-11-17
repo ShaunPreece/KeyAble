@@ -766,7 +766,7 @@
 </dialog>
 
 <!-- "Review Changes on This Keyboard" list. A real modal <dialog> so Escape closes it and
-     focus is trapped, matching the other dialogs. An inline panel could not be
+     focus is trapped, matching the other dialogs. An inline panel cannot be
      closed with Escape from NVDA browse mode. Opened by openChangedKeys(). -->
 <dialog id="changed-keys-panel"
         class="choice-card"
@@ -774,7 +774,7 @@
   <!-- Dialog name is the fixed aria-label above. The heading carries the live
        RESULT summary and is the autofocus target, so on open the screen reader
        says the short dialog name once, then reads the result once. The list is
-       intentionally NOT labelled by the heading (that caused a third read). -->
+       NOT labelled by the heading, which would make a third read. -->
   <h3 id="changed-keys-heading" tabindex="-1" autofocus>Changed keys</h3>
   <p id="changed-keys-count" aria-live="polite"></p>
   <ul id="changed-keys-list" class="changed-keys-list"></ul>
@@ -2227,9 +2227,10 @@
 <script>
 // Keychron keyboard layouts: the matrix position and name of every key.
 // Each layout matches its keyboard's own firmware (Keychron's QMK fork, branch
-// wireless_playground, and mainline QMK for the wired Q and V boards), which
-// DevTools/verify-keyboards.mjs checks; DevTools/layout-from-firmware.mjs writes new
-// entries. The B6 Pro runs Keychron's ZMK firmware instead: see its entry.
+// wireless_playground; its hall_effect_playground branch for the HE boards; mainline
+// QMK for the wired Q and V boards), which DevTools/verify-keyboards.mjs checks;
+// DevTools/layout-from-firmware.mjs writes new entries. The B6 Pro and the Ultra 8K
+// boards run Keychron's ZMK firmware instead: see their entries.
 //
 // Each layout entry:
 //   rows/cols - the firmware's matrix size; whole-layer reads place keys by it
@@ -2491,13 +2492,13 @@ const KEYCHRON_LAYOUTS = {
   // VIA JSON: keychron/v6_max/via_json/v6_max_ansi_encoder.json
   // keymap.c: keychron/v6_max/ansi_encoder/keymaps/default/keymap.c
   // matrix: rows=6, cols=21  PID: 0x0960
-  // LAYOUT_ansi_109 - confirmed from official Keychron wireless_playground branch
+  // LAYOUT_ansi_109, Keychron wireless_playground branch
   // Rows 0 cols 17-20: F13-F16 on Mac / unassigned on Win - physical keys, can be remapped
   // Numpad + at (3,20) and Numpad Enter at (5,20) are 2U tall keys
   // ============================================================
   // Right Shift (4,12) and Numpad 0 (5,17) follow the firmware's LAYOUT_ansi_109, which the
   // V6 Max ISO firmware shares. Keychron's VIA file puts them at (4,13) and (5,18), the
-  // Q6 Max ANSI's positions, where KeyAble had them before 1.3.
+  // Q6 Max ANSI's positions.
   'v6_max_ansi_knob': {
     rows: 6,
     cols: 21,
@@ -3180,7 +3181,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // Q1 ISO no knob  (75%, 83 keys, wired)
-  // VIA JSON: qmk/qmk_firmware:keychron/q1v1/iso/keyboard.json  PID: 0x0102
+  // Firmware: qmk/qmk_firmware:keychron/q1v1/iso/keyboard.json  PID: 0x0102
   // matrix: rows=6, cols=15  LAYOUT_iso_83
   // Q1 has F-row gaps at col 1 (Esc->F1). Delete key at (4,14) cross-row.
   // Up Arrow at (3,12), Down Arrow at (4,12) - both cross-row positions.
@@ -3277,7 +3278,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // Q1 ISO with Knob  (75%, 83 keys, wired)
-  // VIA JSON: qmk/qmk_firmware:keychron/q1v1/iso_encoder/keyboard.json  PID: 0x0103
+  // Firmware: qmk/qmk_firmware:keychron/q1v1/iso_encoder/keyboard.json  PID: 0x0103
   // Identical matrix to q1_iso except (0,14) is Knob press (KC_MUTE) instead of Insert.
   // ============================================================
   'q1_iso_knob': {
@@ -3372,7 +3373,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // Q6 ISO no knob  (100% full-size + numpad, 109 keys, wired)
-  // VIA JSON: keychron/q6/iso/info.json (playground branch)  PID: 0x0162
+  // Firmware: keychron/q6/iso/info.json (playground branch)  PID: 0x0162
   // matrix: rows=6, cols=20  LAYOUT_iso_109
   // Q6 wired and V6 wired share identical matrix for ISO 109-key layout.
   // Top-right F13-F16 strip cross-wired into rows 0-3 col 19 (KC_NO by default).
@@ -3495,7 +3496,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // Q6 ISO with Knob  (100% full-size + numpad, 110 keys, wired)
-  // VIA JSON: keychron/q6/iso_encoder/info.json (playground branch)  PID: 0x0163
+  // Firmware: keychron/q6/iso_encoder/info.json (playground branch)  PID: 0x0163
   // Identical to q6_iso except adds Knob press at (4,19) - cross-row.
   // ============================================================
   'q6_iso_knob': {
@@ -4160,7 +4161,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V1 ISO no knob  (75%, 83 keys)
-  // VIA JSON: keychron/v1/iso/info.json (playground branch)
+  // Firmware: keychron/v1/iso/info.json (playground branch)
   // keymap.c:  keychron/v1/iso/keymaps/default/keymap.c
   // matrix: rows=6, cols=16  PID: 0x0312  LAYOUT_iso_83
   // ISO deltas from v1_ansi:
@@ -4261,7 +4262,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V1 ISO with Knob  (75%, 82 keys + encoder)
-  // VIA JSON: keychron/v1/iso_encoder/info.json (playground branch)
+  // Firmware: keychron/v1/iso_encoder/info.json (playground branch)
   // keymap.c:  keychron/v1/iso_encoder/keymaps/default/keymap.c
   // matrix: rows=6, cols=16  PID: 0x0313  LAYOUT_iso_83
   // Identical matrix to v1_iso except (0,15) = Knob press (KC_MUTE) instead of Insert.
@@ -4437,7 +4438,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V2 ISO no knob  (65%, 68 keys, wired)
-  // VIA JSON: keychron/v2/iso/info.json (playground branch)  PID: 0x0322
+  // Firmware: keychron/v2/iso/info.json (playground branch)  PID: 0x0322
   // matrix: rows=5, cols=15  LAYOUT_iso_68
   // V2 quirks (shared with V2 wired ANSI):
   //   - Down Arrow at matrix (2,12) - cross-row, physically in row 4 nav cluster
@@ -4521,7 +4522,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V2 ISO with Knob  (65%, 67 keys + encoder, wired)
-  // VIA JSON: keychron/v2/iso_encoder/info.json (playground branch)  PID: 0x0323
+  // Firmware: keychron/v2/iso_encoder/info.json (playground branch)  PID: 0x0323
   // Matrix identical to v2_iso except (0,14) is Knob press (KC_MUTE) instead of Insert.
   // ============================================================
   'v2_iso_knob': {
@@ -4601,7 +4602,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V2 ANSI with Knob  (65%, 67 keys + encoder, wired)
-  // VIA JSON: keychron/v2/ansi_encoder/info.json (playground branch)  PID: 0x0321
+  // Firmware: keychron/v2/ansi_encoder/info.json (playground branch)  PID: 0x0321
   // matrix: rows=5, cols=15  LAYOUT_ansi_67
   // ANSI differences from v2_iso_knob:
   //   - (1,13) Backslash (single-row 1.5u, NOT L-shape Enter)
@@ -4886,7 +4887,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V3 ISO no knob  (TKL 80%, 88 keys, wired)
-  // VIA JSON: keychron/v3/iso/info.json (playground branch)  PID: 0x0332
+  // Firmware: keychron/v3/iso/info.json (playground branch)  PID: 0x0332
   // matrix: rows=6, cols=16  LAYOUT_tkl_iso
   // V3 wired nav cluster uses cross-row wiring:
   //   - RGB Mode at (3,14) - top right of nav cluster
@@ -4992,7 +4993,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V3 ISO with Knob  (TKL 80%, 88 keys + encoder, wired)
-  // VIA JSON: keychron/v3/iso_encoder/info.json (playground branch)  PID: 0x0333
+  // Firmware: keychron/v3/iso_encoder/info.json (playground branch)  PID: 0x0333
   // matrix: rows=6, cols=16  LAYOUT_tkl_f13_iso
   // Identical to v3_iso except adds Knob press at (0,13).
   // ============================================================
@@ -5094,7 +5095,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V5 ISO no knob  (96% compact, 101 keys, wired)
-  // VIA JSON: keychron/v5/iso/info.json (playground branch)  PID: 0x0352
+  // Firmware: keychron/v5/iso/info.json (playground branch)  PID: 0x0352
   // matrix: rows=6, cols=18  LAYOUT_iso_101
   // V5 wired no-knob has CONSECUTIVE F-row (cols 1-12, no gaps) - different from V5 Max
   // and V5 wired Knob versions which have gaps at cols 1 and 6.
@@ -5215,7 +5216,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V5 ISO with Knob  (96% compact, 99 keys, wired)
-  // VIA JSON: keychron/v5/iso_encoder/info.json (playground branch)  PID: 0x0353
+  // Firmware: keychron/v5/iso_encoder/info.json (playground branch)  PID: 0x0353
   // matrix: rows=6, cols=18  LAYOUT_iso_99
   // V5 wired Knob version has FEWER keys than no-knob (no PGUP/PGDN/RGB Mode in
   // F-row stripe; encoder replaces those). F-row has GAPS at cols 1 and 6.
@@ -5330,7 +5331,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V6 ISO no knob  (100% full-size + numpad, 109 keys, wired)
-  // VIA JSON: keychron/v6/iso/info.json (playground branch)  PID: 0x0362
+  // Firmware: keychron/v6/iso/info.json (playground branch)  PID: 0x0362
   // matrix: rows=6, cols=20  LAYOUT_iso_109
   // V6 wired has F-row at cols 1-12 (gaps at col 0=Esc-only and visual gap between F4/F5/F8/F9).
   // Top-right F13-F16 strip cross-wired into rows 0-3 col 19 (left at KC_NO/_______ by default).
@@ -5457,7 +5458,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V6 ISO with Knob  (100% full-size + numpad, 110 keys, wired)
-  // VIA JSON: keychron/v6/iso_encoder/info.json (playground branch)  PID: 0x0363
+  // Firmware: keychron/v6/iso_encoder/info.json (playground branch)  PID: 0x0363
   // matrix: rows=6, cols=20  LAYOUT_iso_110
   // Identical to v6_iso (no-knob) except adds Knob press at (4,19) - cross-row,
   // visually positioned at top of nav cluster between F12 and PrtScr.
@@ -5581,7 +5582,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V5 ANSI no knob  (96% compact, 100 keys, wired)
-  // VIA JSON: keychron/v5/ansi/info.json (playground branch)  PID: 0x0350
+  // Firmware: keychron/v5/ansi/info.json (playground branch)  PID: 0x0350
   // matrix: rows=6, cols=18  LAYOUT_ansi_100
   // V5 wired ANSI no-knob has consecutive F-row (cols 1-12, no gaps).
   // Numpad uses same cross-row pattern as v5_iso:
@@ -5696,7 +5697,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V5 ANSI with Knob  (96% compact, 98 keys, wired)
-  // VIA JSON: keychron/v5/ansi_encoder/info.json (playground branch)  PID: 0x0351
+  // Firmware: keychron/v5/ansi_encoder/info.json (playground branch)  PID: 0x0351
   // matrix: rows=6, cols=18  LAYOUT_ansi_98
   // V5 wired Knob has F-row gaps at cols 1 and 6 (like V5 Max).
   // Knob press at (3,12) cross-row, replaces PGUP/PGDN/RGB Mode of no-knob.
@@ -5809,7 +5810,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V6 ANSI no knob  (100% full-size + numpad, 108 keys, wired)
-  // VIA JSON: keychron/v6/ansi/info.json (playground branch)  PID: 0x0360
+  // Firmware: keychron/v6/ansi/info.json (playground branch)  PID: 0x0360
   // matrix: rows=6, cols=20  LAYOUT_ansi_108
   // V6 wired ANSI has F-row gap between Esc and F1 (col 0 -> col 1 spans x=0..2).
   // Top-right F13-F16 strip cross-wired into rows 0-3 col 19 (KC_NO by default).
@@ -5931,7 +5932,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V6 ANSI with Knob  (100% full-size + numpad, 109 keys, wired)
-  // VIA JSON: keychron/v6/ansi_encoder/info.json (playground branch)  PID: 0x0361
+  // Firmware: keychron/v6/ansi_encoder/info.json (playground branch)  PID: 0x0361
   // matrix: rows=6, cols=20  LAYOUT_ansi_109
   // Identical to v6_ansi except adds Knob press at (4,19) - cross-row, between F12 and PrtScr.
   // ============================================================
@@ -6053,7 +6054,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V1 Max ISO with Knob  (75%, 83 keys, wireless)
-  // VIA JSON: keychron/v1_max/iso_encoder/info.json (wireless_playground branch)
+  // Firmware: keychron/v1_max/iso_encoder/info.json (wireless_playground branch)
   // keymap.c:  keychron/v1_max/iso_encoder/keymaps/default/keymap.c
   // matrix: rows=6, cols=16  PID: 0x0914  LAYOUT_iso_83
   // NOTE: V1 Max ISO matrix differs from V1 wired ISO Knob (v1_iso_knob):
@@ -6153,7 +6154,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V2 Max ISO with Knob  (65%, 68 keys, wireless)
-  // VIA JSON: keychron/v2_max/iso_encoder/info.json (wireless_playground branch)
+  // Firmware: keychron/v2_max/iso_encoder/info.json (wireless_playground branch)
   // keymap.c:  keychron/v2_max/iso_encoder/keymaps/default/keymap.c
   // matrix: rows=5, cols=16  PID: 0x0921  LAYOUT_iso_68
   // V2 has no F-row - number row is row 0, Esc at (0,0).
@@ -6237,7 +6238,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V3 Max ISO with Knob  (80% TKL, 89 keys, wireless)
-  // VIA JSON: keychron/v3_max/iso_encoder/info.json (wireless_playground branch)
+  // Firmware: keychron/v3_max/iso_encoder/info.json (wireless_playground branch)
   // keymap.c:  keychron/v3_max/iso_encoder/keymaps/default/keymap.c
   // matrix: rows=6, cols=17  PID: 0x0934  LAYOUT_tkl_iso
   // ISO L-shape Enter at (2,13) (spans rows 2-3 visually) - same convention as V wired.
@@ -6341,7 +6342,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V1 Max ANSI with Knob  (75%, 82 keys, wireless)
-  // VIA JSON: keychron/v1_max/ansi_encoder/info.json (wireless_playground branch)
+  // Firmware: keychron/v1_max/ansi_encoder/info.json (wireless_playground branch)
   // matrix: rows=6, cols=16  PID: 0x0913  LAYOUT_ansi_82
   // NOTE: V1 Max ANSI differs from V1 wired ANSI Knob at Right Shift only:
   //   Max has Right Shift at (4,12); wired has it at (4,13). Otherwise identical.
@@ -6437,7 +6438,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V2 Max ANSI with Knob  (65%, 67 keys, wireless)
-  // VIA JSON: keychron/v2_max/ansi_encoder/info.json (wireless_playground branch)
+  // Firmware: keychron/v2_max/ansi_encoder/info.json (wireless_playground branch)
   // matrix: rows=5, cols=16  PID: 0x0920  LAYOUT_ansi_67
   // V2 has no F-row - number row is row 0. ANSI Enter at (2,12) w=2.25 (single-row).
   // TWO Fn keys at (4,11) and (4,12) - Fn1 and Fn2.
@@ -6518,7 +6519,7 @@ const KEYCHRON_LAYOUTS = {
 
   // ============================================================
   // V3 Max ANSI with Knob  (80% TKL, 88 keys, wireless)
-  // VIA JSON: keychron/v3_max/ansi_encoder/info.json (wireless_playground branch)
+  // Firmware: keychron/v3_max/ansi_encoder/info.json (wireless_playground branch)
   // matrix: rows=6, cols=17  PID: 0x0933  LAYOUT_tkl_ansi
   // Full F-row + encoder + nav cluster. Enter at (3,12) (V3 Max ANSI has no row 3 col 13+).
   // ============================================================
@@ -11066,7 +11067,7 @@ const KEYCHRON_LAYOUTS = {
       { label: 'Numpad Enter', row: 5, col: 18 },
     ],
   },
-  // keychron-he/keyboards/keychron/q1_he/ansi_encoder. Generated by DevTools/layout-from-firmware.mjs from
+  // Keychron Q1 HE ANSI Knob. Generated by DevTools/layout-from-firmware.mjs from
   // keychron-he/keyboards/keychron/q1_he/ansi_encoder (LAYOUT_ansi_82); agrees with q1_he_ansi_encoder_v1.0.json.
   'q1_he_ansi': {
     rows: 6,
@@ -11156,7 +11157,7 @@ const KEYCHRON_LAYOUTS = {
       { label: 'Right Arrow', row: 5, col: 14 },
     ],
   },
-  // keychron-he/keyboards/keychron/q1_he/iso_encoder. Generated by DevTools/layout-from-firmware.mjs from
+  // Keychron Q1 HE ISO Knob. Generated by DevTools/layout-from-firmware.mjs from
   // keychron-he/keyboards/keychron/q1_he/iso_encoder (LAYOUT_iso_83); agrees with q1_he_iso_encoder_v1.0.json.
   'q1_he_iso': {
     rows: 6,
@@ -11247,7 +11248,7 @@ const KEYCHRON_LAYOUTS = {
       { label: 'Right Arrow', row: 5, col: 14 },
     ],
   },
-  // keychron-he/keyboards/keychron/q3_he/ansi_encoder. Generated by DevTools/layout-from-firmware.mjs from
+  // Keychron Q3 HE ANSI Knob. Generated by DevTools/layout-from-firmware.mjs from
   // keychron-he/keyboards/keychron/q3_he/ansi_encoder (LAYOUT_ansi_87); agrees with q3_he_ansi_encoder_v1.0.json.
   'q3_he_ansi': {
     rows: 6,
@@ -11343,7 +11344,7 @@ const KEYCHRON_LAYOUTS = {
       { label: 'Right Arrow', row: 5, col: 15 },
     ],
   },
-  // keychron-he/keyboards/keychron/q3_he/iso_encoder. Generated by DevTools/layout-from-firmware.mjs from
+  // Keychron Q3 HE ISO Knob. Generated by DevTools/layout-from-firmware.mjs from
   // keychron-he/keyboards/keychron/q3_he/iso_encoder (LAYOUT_iso_88); no VIA definition exists.
   'q3_he_iso': {
     rows: 6,
@@ -11440,7 +11441,7 @@ const KEYCHRON_LAYOUTS = {
       { label: 'Right Arrow', row: 5, col: 15 },
     ],
   },
-  // keychron-he/keyboards/keychron/q5_he/ansi_encoder. Generated by DevTools/layout-from-firmware.mjs from
+  // Keychron Q5 HE ANSI Knob. Generated by DevTools/layout-from-firmware.mjs from
   // keychron-he/keyboards/keychron/q5_he/ansi_encoder (LAYOUT_ansi_101); agrees with q5_he_ansi_encoder_v1.0.json.
   'q5_he_ansi': {
     rows: 6,
@@ -11550,7 +11551,7 @@ const KEYCHRON_LAYOUTS = {
       { label: 'Numpad Enter', row: 4, col: 18 },
     ],
   },
-  // keychron-he/keyboards/keychron/q6_he/ansi_encoder. Generated by DevTools/layout-from-firmware.mjs from
+  // Keychron Q6 HE ANSI Knob. Generated by DevTools/layout-from-firmware.mjs from
   // keychron-he/keyboards/keychron/q6_he/ansi_encoder (LAYOUT_ansi_108); agrees with q6_he_ansi_encoder_v1.0.json.
   'q6_he_ansi': {
     rows: 6,
@@ -11667,7 +11668,7 @@ const KEYCHRON_LAYOUTS = {
       { label: 'Numpad .', row: 5, col: 18 },
     ],
   },
-  // keychron-he/keyboards/keychron/q6_he/iso_encoder. Generated by DevTools/layout-from-firmware.mjs from
+  // Keychron Q6 HE ISO Knob. Generated by DevTools/layout-from-firmware.mjs from
   // keychron-he/keyboards/keychron/q6_he/iso_encoder (LAYOUT_iso_109); agrees with q6_he_iso_encoder_v1.0.json.
   'q6_he_iso': {
     rows: 6,
@@ -11785,7 +11786,7 @@ const KEYCHRON_LAYOUTS = {
       { label: 'Numpad .', row: 5, col: 18 },
     ],
   },
-  // keychron-he/keyboards/keychron/k2_he/ansi_rgb. Generated by DevTools/layout-from-firmware.mjs from
+  // Keychron K2 HE ANSI. Generated by DevTools/layout-from-firmware.mjs from
   // keychron-he/keyboards/keychron/k2_he/ansi_rgb (LAYOUT_ansi_84); agrees with k2_he_ansi_rgb.json.
   'k2_he_ansi': {
     rows: 6,
@@ -11877,7 +11878,7 @@ const KEYCHRON_LAYOUTS = {
       { label: 'Right Arrow', row: 5, col: 14 },
     ],
   },
-  // keychron-he/keyboards/keychron/k2_he/iso_rgb. Generated by DevTools/layout-from-firmware.mjs from
+  // Keychron K2 HE ISO. Generated by DevTools/layout-from-firmware.mjs from
   // keychron-he/keyboards/keychron/k2_he/iso_rgb (LAYOUT_iso_85); agrees with k2_he_iso_rgb.json.
   'k2_he_iso': {
     rows: 6,
@@ -11970,7 +11971,7 @@ const KEYCHRON_LAYOUTS = {
       { label: 'Right Arrow', row: 5, col: 14 },
     ],
   },
-  // keychron-he/keyboards/keychron/k4_he/ansi. Generated by DevTools/layout-from-firmware.mjs from
+  // Keychron K4 HE ANSI. Generated by DevTools/layout-from-firmware.mjs from
   // keychron-he/keyboards/keychron/k4_he/ansi (LAYOUT_ansi_100); agrees with k4_he_ansi.json.
   'k4_he_ansi': {
     rows: 6,
@@ -12078,7 +12079,7 @@ const KEYCHRON_LAYOUTS = {
       { label: 'Numpad .', row: 5, col: 17 },
     ],
   },
-  // keychron-he/keyboards/keychron/k4_he/iso. Generated by DevTools/layout-from-firmware.mjs from
+  // Keychron K4 HE ISO. Generated by DevTools/layout-from-firmware.mjs from
   // keychron-he/keyboards/keychron/k4_he/iso (LAYOUT_iso_101); agrees with k4_he_iso.json.
   'k4_he_iso': {
     rows: 6,
@@ -12187,7 +12188,7 @@ const KEYCHRON_LAYOUTS = {
       { label: 'Numpad .', row: 5, col: 17 },
     ],
   },
-  // keychron-he/keyboards/keychron/k6_he/ansi. Generated by DevTools/layout-from-firmware.mjs from
+  // Keychron K6 HE ANSI. Generated by DevTools/layout-from-firmware.mjs from
   // keychron-he/keyboards/keychron/k6_he/ansi (LAYOUT_ansi_68); agrees with k6_he_ansi.json.
   'k6_he_ansi': {
     rows: 5,
@@ -12263,7 +12264,7 @@ const KEYCHRON_LAYOUTS = {
       { label: 'Right Arrow', row: 4, col: 14 },
     ],
   },
-  // keychron-he/keyboards/keychron/k8_he/ansi. Generated by DevTools/layout-from-firmware.mjs from
+  // Keychron K8 HE ANSI. Generated by DevTools/layout-from-firmware.mjs from
   // keychron-he/keyboards/keychron/k8_he/ansi (LAYOUT_ansi_87); agrees with k8_he_ansi.json.
   'k8_he_ansi': {
     rows: 6,
@@ -12358,7 +12359,7 @@ const KEYCHRON_LAYOUTS = {
       { label: 'Right Arrow', row: 5, col: 15 },
     ],
   },
-  // keychron-he/keyboards/keychron/k8_he/iso. Generated by DevTools/layout-from-firmware.mjs from
+  // Keychron K8 HE ISO. Generated by DevTools/layout-from-firmware.mjs from
   // keychron-he/keyboards/keychron/k8_he/iso (LAYOUT_iso_88); agrees with k8_he_iso.json.
   'k8_he_iso': {
     rows: 6,
@@ -12454,7 +12455,7 @@ const KEYCHRON_LAYOUTS = {
       { label: 'Right Arrow', row: 5, col: 15 },
     ],
   },
-  // keychron-he/keyboards/keychron/k10_he/ansi. Generated by DevTools/layout-from-firmware.mjs from
+  // Keychron K10 HE ANSI. Generated by DevTools/layout-from-firmware.mjs from
   // keychron-he/keyboards/keychron/k10_he/ansi (LAYOUT_104_ansi); agrees with k10_he_ansi.json.
   'k10_he_ansi': {
     rows: 6,
@@ -12566,7 +12567,7 @@ const KEYCHRON_LAYOUTS = {
       { label: 'Numpad .', row: 5, col: 19 },
     ],
   },
-  // keychron-he/keyboards/keychron/k10_he/iso. Generated by DevTools/layout-from-firmware.mjs from
+  // Keychron K10 HE ISO. Generated by DevTools/layout-from-firmware.mjs from
   // keychron-he/keyboards/keychron/k10_he/iso (LAYOUT_105_iso); agrees with k10_he_iso.json.
   'k10_he_iso': {
     rows: 6,
@@ -12834,7 +12835,7 @@ const CMD_CUSTOM_SAVE  = 0x09;   // VIA id_custom_save       args: [channel]
 // column (QMK quantum/dynamic_keymap.h).
 const CMD_KEYMAP_GET_BUFFER = 0x12;
 
-// VIA dynamic macro buffer commands (verified against qmk/quantum/via.h).
+// VIA dynamic macro buffer commands (QMK quantum/via.h).
 // Macros are stored as a single concatenated byte stream in a fixed-size
 // buffer; each macro ends with 0x00. Macro N starts after the Nth 0x00
 // (counting from offset 0). Empty slots are just 0x00. To edit slot N,
@@ -12953,7 +12954,7 @@ function keycodesForBoard(entry, version) {
 // IMPORTANT: 0x0C / 0x0D are id_dynamic_keymap_macro_get_count / _buffer_size
 // in the VIA protocol - using those for encoder ops returns OK status but
 // touches macros instead of the encoder. The encoder commands are 0x14
-// (get_encoder) / 0x15 (set_encoder). Cross-referenced QMK quantum/via.h
+// (get_encoder) / 0x15 (set_encoder). QMK quantum/via.h
 // enum order: protocol = 0x01, get_kc = 0x04, set_kc = 0x05, reset = 0x06,
 // custom_set/get/save = 0x07-0x09, eeprom_reset = 0x0A, bootloader = 0x0B,
 // macro_get_count = 0x0C, macro_buffer_size = 0x0D, macro_get_buf = 0x0E,
@@ -17727,16 +17728,16 @@ async function identifyKeyboard(vid, pid, protocolVersion) {
     const modeLabel = osModeLabel(currentOSMode);
     // setStatus + the kbd-os-mode live region already announce the success
     // and slide-switch state; focus moves into the identified section
-    // afterwards. A separate announce() here just duplicated all three.
+    // afterwards, so a separate announce() here would say all three twice.
     if (currentOSMode === 'unknown') {
       $('kbd-os-mode').textContent = 'OS slide-switch position: could not detect.';
     } else {
       $('kbd-os-mode').textContent = `OS slide-switch position: ${modeLabel}${inDemoMode() ? ', simulated' : ''}.`;
     }
     // Land focus on the revealed panel's heading, not the status box above it.
-    // Parking focus above the newly-shown panel let NVDA's buffer refresh read
-    // stray content below (e.g. the backup button's description) after the
-    // native HID dialog closed.
+    // With focus above the newly shown panel, NVDA's buffer refresh reads stray
+    // content below it (such as the backup button's description) after the
+    // browser's HID chooser closes.
     moveFocus('h-identified');
   } else {
     playChirp(false);
@@ -18775,7 +18776,7 @@ async function executeSettingsRestore(file, same) {
 //     GET: [CMD_CUSTOM_GET, channel, value_id]  ->  reply [echo cmd, channel, value_id, ...data]
 //     SAVE (commit to EEPROM): [CMD_CUSTOM_SAVE, channel]
 //
-// Verified against QMK firmware quantum/via.h:
+// From QMK quantum/via.h:
 //   id_custom_set_value = 0x07, get = 0x08, save = 0x09 (CMD_CUSTOM_*, with the other commands)
 //   id_qmk_backlight_channel = 1   (monochrome)
 //   id_qmk_rgblight_channel  = 2   (single-strip RGB - unused by Keychron Max boards)
@@ -18821,7 +18822,7 @@ function lightingRequest(cmd, channel, valueId) {
 // can still pick something sensible-sounding for a sighted observer. Names
 // match the upstream QMK rgb_matrix_animations enum order. Keychron firmware
 // usually enables only a subset (typical V5/V6 Max ships ~24 of these), but
-// the file we read back gives us the effect *index*, so showing the standard
+// the keyboard reports only the effect *index*, so showing the standard
 // QMK names is the most useful fallback. Unknown indices read as
 // "Effect N - name unknown" and are still preserved.
 const RGB_MATRIX_EFFECT_NAMES = [
@@ -19207,7 +19208,7 @@ async function onLightingEffectChange(value) {
 const MACRO_PER_SLOT_CHAR_LIMIT = 200;   // soft cap; the firmware buffer is the hard limit
 const MACRO_CHUNK_SIZE          = 28;    // 32-byte HID report - 1 cmd - 2 offset - 1 size
 
-// QMK SEND_STRING escape format (verified from quantum/send_string/send_string_keycodes.h
+// QMK SEND_STRING escape format (quantum/send_string/send_string_keycodes.h
 // and the loop in send_string.c). Every escape is TWO bytes: the prefix 0x01,
 // then a sub-code. Anything that follows the sub-code depends on which one:
 //   0x01 0x01 keycode          -> tap that key
@@ -19533,7 +19534,7 @@ function detectMacroDelay(slot) {
   return null;
 }
 
-// Decode existing slot bytes back into a JS string for the textarea. Strips
+// Decode existing slot bytes back into a JS string for a Text step. Strips
 // out embedded escape sequences. Every escape begins with SS_QMK_PREFIX (0x01)
 // followed by a sub-code; SS_TAP/DOWN/UP consume one keycode byte, SS_DELAY
 // consumes ASCII digits then a non-digit terminator. Anything we don't
@@ -19606,10 +19607,8 @@ async function writeMacroSlot(slotIdx, newBytes) {
 //   { type: 'pause', ms: number }
 //
 // stepsToBytes flattens the list to the QMK SEND_STRING byte stream the
-// firmware understands. The single-textarea path is just a macro with one
-// Text step. Pauses BETWEEN steps come from explicit Pause steps; the
-// existing speed slider's delayMs only applies BETWEEN characters inside
-// text steps (matches today's behaviour).
+// firmware understands. Pauses BETWEEN steps come from explicit Pause steps;
+// the speed slider's delayMs applies only BETWEEN characters inside Text steps.
 
 // HID usage codes for the left-hand modifiers - used inside SS_DOWN/UP
 // escapes when emitting a Key Press step with a modifier combo.
@@ -20229,9 +20228,9 @@ function selectDisableAction() {
 // the encoder). State managed locally:
 //   macroEditingIdx      - which step the open editor is editing (-1 = new)
 //   macroOpenEditor      - 'text' | 'key' | 'media' | 'system' | 'pause' | null
-//   macroSlotIsOpaque    - true when the existing slot contains content this
-//                          version can't round-trip (multi-step from prior
-//                          session). The user must opt-in to overwrite.
+//   macroSlotIsOpaque    - true when the existing slot holds key-press or
+//                          modifier escapes, which slotToSteps cannot load.
+//                          The user must opt in to overwrite.
 let macroEditingIdx      = -1;
 let macroOpenEditor      = null;
 let macroSlotIsOpaque    = false;

@@ -2,7 +2,7 @@
 // Builds FACTORY_KEYMAPS, the factory keymap of every keyboard KeyAble has a layout for,
 // and writes it into KeyAble.html between the two GENERATED FACTORY_KEYMAPS markers.
 //
-// Each entry comes from one of three places, best first:
+// Each entry comes from one of four places, best first:
 // - ZMK boards (the B6 Pro): their shipped .uf2 firmware (zmk-firmware.mjs).
 // - ZMK Ultra 8K boards: Keychron's ZMK source (zmk-source.mjs), translated as the keyboard
 //   translates it for VIA on first boot.

@@ -1,5 +1,4 @@
 /*
- * token-keycodes.js
  * Source-derived QMK/Keychron token -> 16-bit keycode table.
  *
  * Every value mirrors the pinned firmware sources (docs/KEYBOARD-DATA.txt):
