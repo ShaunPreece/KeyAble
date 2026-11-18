@@ -950,17 +950,21 @@
            hidden>
         <h3 id="h-unsupported" tabindex="-1">Keyboard Not Supported.</h3>
         <p>
-          Your keyboard connected successfully but is not currently supported by KeyAble.
-          To safely remap keys, KeyAble needs to know your keyboard's exact layout. Without
-          this information it cannot proceed, as writing to the wrong key position could silently
-          remap a different key.
+          KeyAble does not recognise this device. To remap keys safely, KeyAble needs to know
+          your keyboard's exact layout. Without it, writing to the wrong key position could
+          silently remap a different key.
+        </p>
+        <p>
+          If your keyboard is on Bluetooth or 2.4 GHz, the device you chose may be the wireless
+          receiver rather than the keyboard. Set the connection switch on the keyboard to cable,
+          plug in the USB cable, choose Disconnect and Go Back, and connect again.
         </p>
         <div class="pid-box" aria-live="polite">
-          <strong>Your keyboard's ID - please include this when reporting:</strong>
+          <strong>The device ID - please include this when reporting:</strong>
           <span class="pid-value" id="unsupported-pid-value"></span>
         </div>
         <p>
-          If you believe this is a Keychron keyboard that should be supported, please use the
+          If the keyboard is already on cable and you still see this message, please use the
           button below to send a report. Include the ID shown above and your keyboard model if
           you know it.
         </p>
@@ -1941,9 +1945,9 @@
           so keep checking the Connect button in the browser dialog.
         </p>
         <p>
-          If the list shows Keychron Link, that is the 2.4 GHz wireless receiver, not your
-          keyboard, and KeyAble cannot use it. Set the switch to cable and choose the keyboard
-          by its own name instead.
+          The list can also show the 2.4 GHz wireless receiver, often named Keychron Link. That
+          is not your keyboard, and KeyAble cannot use it. Set the switch to cable and choose the
+          keyboard by its own name instead.
         </p>
 
         <h4 style="margin-top:1.25rem">What is VIA, and do I need to turn it on?</h4>
@@ -18269,11 +18273,20 @@ const DEMO_COMMANDS = {
 const inDemoMode = () => hidDevice instanceof DemoKeyboard;
 
 // - Previously-permitted device check -
-// Keychron's 2.4 GHz receiver ("Keychron Link") shares the keyboards' vendor ID
-// and exposes the same raw HID channel, so the browser lists it beside the
-// keyboard. It does not answer VIA, so it is recognised by name and turned away.
+// Keychron's 2.4 GHz receivers share the keyboards' vendor ID and expose the
+// same raw HID channel, so the browser lists them beside the keyboard. A
+// receiver can relay VIA to the keyboard behind it, so answering VIA does not
+// prove a device is a keyboard: receivers are recognised by name or by a
+// confirmed product ID and turned away. Only IDs seen from a real receiver go in
+// this set; an unknown ID reaches the "not supported" panel, which tells the
+// user to switch to cable.
+const WIRELESS_RECEIVER_PIDS = new Set([
+  0xD027,   // the receiver paired with a B6 Pro
+]);
+
 function isWirelessReceiver(device) {
-  return /keychron\s*link/i.test(device.productName || '');
+  return (device.vendorId === VIA_VID && WIRELESS_RECEIVER_PIDS.has(device.productId))
+      || /keychron\s*link/i.test(device.productName || '');
 }
 
 function deviceFriendlyName(device) {
@@ -18472,7 +18485,7 @@ async function connectKeyboard() {
     if (isWirelessReceiver(hidDevice)) {
       playChirp(false);
       setStatus(
-        'You chose Keychron Link, which is the wireless receiver, not the keyboard. ' +
+        'You chose the Keychron wireless receiver, not the keyboard. ' +
         'Set the connection switch on the keyboard to cable and plug in the USB cable. ' +
         'Then press Connect again and choose the keyboard by its own name.',
         'error'
@@ -18580,12 +18593,13 @@ async function identifyKeyboard(vid, pid, protocolVersion) {
     moveFocus('h-identified');
   } else {
     playChirp(false);
-    setStatus('Keyboard not supported. This keyboard is not currently in the KeyAble database.', 'error');
+    setStatus('Keyboard not supported. This device is not in the KeyAble database.', 'error');
     $('unsupported-pid-value').textContent = idStr;
     $('sec-unsupported').hidden = false;
     announce(
-      `Keyboard not supported. Your keyboard ID is ${idStr}. ` +
-      `You can report this ID using the button below to have it added in a future update.`
+      `Keyboard not supported. The device ID is ${idStr}. ` +
+      `If your keyboard is on Bluetooth or 2.4 GHz, set its switch to cable and connect again. ` +
+      `If it is already on cable, you can report this ID using the button below.`
     );
     moveFocus('h-unsupported');
   }
