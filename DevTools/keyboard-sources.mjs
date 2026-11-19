@@ -47,6 +47,7 @@ export function appTables(html = readFileSync(APP, 'utf8')) {
     KEYBOARD_DB:      grab('KEYBOARD_DB'),
     FACTORY_KEYMAPS:  grab('FACTORY_KEYMAPS'),
     LABEL_TO_KEYCODE: grab('LABEL_TO_KEYCODE'),
+    HARDWARE_TESTED_BOARDS: grab('HARDWARE_TESTED_BOARDS'),
   };
 }
 

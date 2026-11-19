@@ -6,7 +6,8 @@
 // model is a board's name without its variant words (layout, knob and backlight), and
 // a revision ("Q1 Version 2", "B6 Pro 2025") is listed under its model. A model with no
 // ISO board is marked "ANSI only", and one with no ANSI board "ISO only". Help says JIS
-// layouts are not supported, so a JIS board with a layout stops the script.
+// layouts are not supported, so a JIS board with a layout stops the script. The list ends
+// with the boards tested on real hardware, from HARDWARE_TESTED_BOARDS.
 //
 // Usage:
 //   node DevTools/supported-keyboards.mjs check
@@ -29,8 +30,9 @@ const LINES  = ['', 'Plus', 'Pro', 'Pro SE', 'Max', 'HE', 'Ultra 8K'];
 
 const VARIANT_WORDS = /( (ANSI|ISO|JIS|Knob|RGB|White|Red|Non-Light))+$/;
 
-// { name, notes } per model, grouped by series in Help's order, and the number of boards.
-export function supportedModels({ KEYBOARD_DB, KEYCHRON_LAYOUTS }) {
+// { name, notes } per model, grouped by series in Help's order, the number of boards, and
+// the names of the boards tested on real hardware.
+export function supportedModels({ KEYBOARD_DB, KEYCHRON_LAYOUTS, HARDWARE_TESTED_BOARDS }) {
   const models = new Map();
   let boards = 0;
   for (const entry of Object.values(KEYBOARD_DB)) {
@@ -60,7 +62,12 @@ export function supportedModels({ KEYBOARD_DB, KEYCHRON_LAYOUTS }) {
       return `${versions.length === 1 && versions[0] > 1 ? `${m.name} Version ${versions[0]}` : m.name}${notes.length ? ` (${notes.join('; ')})` : ''}`;
     }),
   })).filter(s => s.models.length);
-  return { series, modelCount: models.size, boards };
+  const tested = Object.keys(HARDWARE_TESTED_BOARDS).map(pid => {
+    const entry = KEYBOARD_DB[pid];
+    if (!entry || !KEYCHRON_LAYOUTS[entry.layoutId]) throw new Error(`tested board ${pid} has no supported entry in KEYBOARD_DB`);
+    return entry.name.replace(/^Keychron /, '').replace(/ Knob$/, '');
+  });
+  return { series, modelCount: models.size, boards, tested };
 }
 
 // Words joined by `sep` into lines no longer than `width`, each starting with `indent`.
@@ -75,7 +82,7 @@ function wrap(words, width, indent = '', sep = ' ') {
   return lines;
 }
 
-function renderHelp({ series, modelCount }) {
+function renderHelp({ series, modelCount, tested }) {
   const lines = [
     `        <!-- ${BEGIN} -->`,
     '        <p>',
@@ -88,6 +95,10 @@ function renderHelp({ series, modelCount }) {
       ...wrap(s.models.map(m => `<li>${m}</li>`), 96, '          ', ''),
       '        </ul>');
   }
+  const testedList = `${tested.slice(0, -1).join(', ')} and ${tested.at(-1)}`;
+  lines.push('        <p style="margin-top:.85rem">',
+    ...wrap(`We have tested the ${testedList} on real hardware. The rest are built from Keychron's own firmware data and should work. When one connects, Step 1 shows a Tell Us How It Went button: please use it, whether it works or not. If your keyboard connects but is not recognised, Step 1 shows a keyboard ID and a Report This Keyboard ID button so we can add it.`.split(' '), 92, '          '),
+    '        </p>');
   lines.push(`        <!-- ${END} -->`);
   return lines.join('\n') + '\n';
 }

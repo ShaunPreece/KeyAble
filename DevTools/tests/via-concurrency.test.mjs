@@ -3,7 +3,7 @@
 // headless Edge against the simulated keyboard in fake-keychron.js. Run with `npm test`
 // in DevTools.
 // The page's own names, used inside page.evaluate:
-/* global KEYBOARD_DB, KEYCHRON_LAYOUTS, CMD_GET_KEY, activeLayout, changedKeysScan,
+/* global HARDWARE_TESTED_BOARDS, KEYBOARD_DB, KEYCHRON_LAYOUTS, CMD_GET_KEY, activeLayout, changedKeysScan,
    currentKeymap, decodeAction, keymapBufferState, lightingState, sendVIA, stepKeys,
    setLightingValue, flushLightingSave */
 import { test } from 'node:test';
@@ -25,11 +25,13 @@ const REMAPS = [
 ];
 
 // A fresh page with the remaps applied and the keyboard connected. `bufferMode` is
-// how the simulated keyboard answers the keymap buffer command.
-async function connectedPage(bufferMode = 'normal') {
+// how the simulated keyboard answers the keymap buffer command; `tested` adds the
+// simulated board to the hardware-tested list.
+async function connectedPage(bufferMode = 'normal', { tested = false } = {}) {
   const page = await newPage();
   await page.goto(APP_URL);
   await page.evaluate(mode => window.__fakeKeychron.setBufferMode(mode), bufferMode);
+  if (tested) await page.evaluate(() => { HARDWARE_TESTED_BOARDS[window.__fakeKeychron.PID] = true; });
   await page.evaluate(remaps => {
     const layout = KEYCHRON_LAYOUTS[KEYBOARD_DB[window.__fakeKeychron.PID].layoutId];
     for (const [layer, label, code] of remaps) {
@@ -238,4 +240,16 @@ test('RGB Lighting saves one value before setting another', async () => {
     .filter(r => r[0] === 0x07 || r[0] === 0x09).map(r => (r[0] === 0x07 ? `set ${r[2]}` : 'save')), from);
   assert.deepEqual(sent, ['set 1', 'set 1', 'save', 'set 2', 'save']);
   await page.close();
+});
+
+test('an untested board shows the Tell Us How It Went note, and a tested one does not', async () => {
+  for (const tested of [false, true]) {
+    const page = await connectedPage('normal', { tested });
+    const note = page.locator('#untested-note');
+    assert.equal(await note.isVisible(), !tested, `note visible when tested is ${tested}`);
+    const status = await page.locator('#status-text').textContent();
+    assert.equal(status.includes('not yet been tested'), !tested, status);
+    if (!tested) await page.getByRole('button', { name: 'Tell Us How It Went' }).waitFor();
+    await page.close();
+  }
 });
