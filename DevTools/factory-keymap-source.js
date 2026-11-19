@@ -67,15 +67,16 @@ function deriveRoles(blocks, idx, defs) {
 
 // `keymapSource` is keymap.c's text; `layouts` maps each LAYOUT macro name to its
 // [row, col] list; `lockOpts` is { winLock, macLock }, the board's lock-screen build
-// flags, which shift Keychron's own keycodes.
+// flags, which shift Keychron's own keycodes; `headerDefines` are the #defines of the
+// board's own header files, which keymap.c's own #defines override.
 // Returns { layers, encoders, roles }: layers[l]["row,col"] and encoders[l][knob] =
 // { ccw, cw } at each layer's device index, and roles only when the layer order is not
 // the canonical Mac, Mac Fn, Windows, Windows Fn (null otherwise).
-export function factoryKeymap(keymapSource, layouts, lockOpts = {}) {
+export function factoryKeymap(keymapSource, layouts, lockOpts = {}, headerDefines = {}) {
   const src = stripComments(keymapSource);
   const { names, idx } = parseLayerEnum(src);
   const blocks = layerBlocks(src);
-  const defs = defines(src);
+  const defs = { ...headerDefines, ...defines(src) };
   if (!blocks.length) throw new Error('no LAYOUT layer blocks in keymap.c');
   const macro = blocks[0].macro;
   if (!blocks.every(b => b.macro === macro)) throw new Error(`mixed LAYOUT macros: ${blocks.map(b => b.macro).join(', ')}`);
