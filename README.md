@@ -56,9 +56,11 @@ browser; nothing is sent anywhere over the internet.
 
 ## Supported keyboards
 
-49 Keychron models across the Q, V, K, S, and B series (121 variants once you count
-each ANSI, ISO, knob, and non-knob version separately). The full list is inside
-the app under Help, "Supported Keyboards".
+<!-- BEGIN GENERATED SUPPORTED KEYBOARDS: DevTools/supported-keyboards.mjs write -->
+109 Keychron models across the Q, V, K, S, C, and B series (280 variants once you count
+each ANSI, ISO, knob, and backlight version separately). The full list is inside the app
+under Help, "Supported Keyboards".
+<!-- END GENERATED SUPPORTED KEYBOARDS -->
 
 - Tested on real hardware: V5 Max, V6 Max, Q6 Max, and B6 Pro. The others are
   built from Keychron's own firmware data.

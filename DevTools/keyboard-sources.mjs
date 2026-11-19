@@ -47,6 +47,7 @@ export function appTables(html = readFileSync(APP, 'utf8')) {
     KEYBOARD_DB:      grab('KEYBOARD_DB'),
     FACTORY_KEYMAPS:  grab('FACTORY_KEYMAPS'),
     LABEL_TO_KEYCODE: grab('LABEL_TO_KEYCODE'),
+    HARDWARE_TESTED_BOARDS: grab('HARDWARE_TESTED_BOARDS'),
   };
 }
 
@@ -127,6 +128,31 @@ function configMatrixSize(dir) {
   return rows && cols ? { rows, cols } : null;
 }
 
+// A board header's keycode names, as #defines: its own #defines, plus each enum member
+// given an explicit value that resolves (c3_pro.h has KC_OS_SWITCH = QK_KB_11). Members
+// inside #if blocks are left out, since which branch compiles is not known here (k10_pro.h
+// sets BT_HST1 = KC_TRNS only when Bluetooth is off), as are members numbered implicitly.
+function headerKeycodes(text) {
+  const src = stripComments(text);
+  const out = defines(src);
+  for (const body of src.matchAll(/\benum\b[^{;]*\{([^}]*)\}/g)) {
+    let depth = 0;
+    for (const line of body[1].split('\n')) {
+      const directive = /^\s*#\s*(\w+)/.exec(line);
+      if (directive) {
+        if (/^if/.test(directive[1])) depth++;
+        else if (directive[1] === 'endif') depth--;
+        continue;
+      }
+      if (depth) continue;
+      for (const m of line.matchAll(/\b([A-Za-z_]\w*)\s*=\s*([A-Za-z_]\w*)/g)) {
+        if (resolveToken(expandDefines(m[2], out)) !== null) out[m[1]] = m[2];
+      }
+    }
+  }
+  return out;
+}
+
 let firmwareIndex = null;
 function indexFirmware() {
   if (firmwareIndex) return firmwareIndex;
@@ -159,16 +185,23 @@ function indexFirmware() {
         return existsSync(file) && new RegExp(`^\\s*#define\\s+${name}\\b`, 'm').test(readFileSync(file, 'utf8'));
       });
       const lockOpts = { winLock: lockFlag('WIN_LOCK_SCREEN_ENABLE'), macLock: lockFlag('MAC_LOCK_SCREEN_ENABLE') };
+      // QMK includes each folder's <folder>.h, and some keymaps use keycodes defined
+      // there (k10_pro.h defines KC_MICT as QK_KB_0); nearer folders win.
+      const headerDefines = {};
+      for (const d of chain) {
+        const file = path.join(d, `${path.basename(d)}.h`);
+        if (existsSync(file)) Object.assign(headerDefines, headerKeycodes(readFileSync(file, 'utf8')));
+      }
       const pid = parseInt(pidText, 16);
       if (!firmwareIndex.has(pid)) firmwareIndex.set(pid, []);
-      firmwareIndex.get(pid).push({ repo, dir, layouts, matrixSize, lockOpts, source: `${repo}/${path.relative(path.join(FW, repo), dir).replace(/\\/g, '/')}` });
+      firmwareIndex.get(pid).push({ repo, dir, layouts, matrixSize, lockOpts, headerDefines, source: `${repo}/${path.relative(path.join(FW, repo), dir).replace(/\\/g, '/')}` });
     }
   }
   return firmwareIndex;
 }
 
 // The source a board's factory data is read from: { source, layouts, matrixSize,
-// lockOpts, keymapFile }, or { error }. Wired boards are read from mainline QMK, with its
+// lockOpts, headerDefines, keymapFile }, or { error }. Wired boards are read from mainline QMK, with its
 // default keymap; Max and Pro boards from Keychron's fork, and HE boards from its HE
 // branch, each with its via keymap.
 export function firmwareSource(pid) {
@@ -190,7 +223,7 @@ export function firmwareBoard(pid) {
   const { keymapFile } = src;
   const code    = stripComments(readFileSync(keymapFile, 'utf8'));
   const blocks  = layerBlocks(code);
-  const defs    = defines(code);
+  const defs    = { ...src.headerDefines, ...defines(code) };
   const winBase = blocks.find(b => /WIN_BASE/.test(b.layer));
   if (!winBase) return { error: 'NO WINDOWS LAYER IN FIRMWARE', source: src.source };
   const { macro, tokens } = winBase;
@@ -213,15 +246,20 @@ export function firmwareBoard(pid) {
 }
 
 // ---- VIA definitions by product ID ----
-// A VIA definition's KLE keymap as { keys: [{ pos, x, y }], knobs }: the matrix keys,
-// each with its centre, and the number of knobs (legend 10 starting "e"). Decals and
-// layout options other than the default are left out of both.
+// A VIA definition's KLE keymap as { keys: [{ pos, x, y }], knobs, rotated }: the matrix
+// keys, each with its centre, the number of knobs (legend 10 starting "e"), and whether
+// any keys are drawn rotated (KLE's "r"), as an Alice board's two halves are. Centres
+// ignore rotation. Decals and layout options other than the default are left out.
 export function viaKeys(json) {
-  const keys = []; let knobs = 0, y = -1;
+  const keys = []; let knobs = 0, y = -1, rotated = false;
   for (const row of json.layouts.keymap) {
     y += 1; let x = 0, w = 1, decal = false;
     for (const item of row) {
-      if (typeof item === 'object') { x += item.x || 0; y += item.y || 0; if (item.w) w = item.w; decal = !!item.d; continue; }
+      if (typeof item === 'object') {
+        x += item.x || 0; y += item.y || 0; if (item.w) w = item.w; decal = !!item.d;
+        if (item.r) rotated = true;
+        continue;
+      }
       const lines = item.split('\n');
       const option = (lines[3] || '').replace(/\s/g, '');
       const m = lines[0].replace(/\s/g, '').match(/^(\d+),(\d+)$/);
@@ -233,7 +271,7 @@ export function viaKeys(json) {
       x += w; w = 1; decal = false;
     }
   }
-  return { keys, knobs };
+  return { keys, knobs, rotated };
 }
 
 let viaIndex = null;
@@ -248,7 +286,7 @@ export function viaBoards(pid) {
         if (!j || !j.productId || !j.layouts || !j.layouts.keymap) continue;
         const p = parseInt(j.productId, 16);
         if (!viaIndex.has(p)) viaIndex.set(p, []);
-        viaIndex.get(p).push({ source: path.relative(FW, f).replace(/\\/g, '/'), matrix: j.matrix, keys: viaKeys(j).keys });
+        viaIndex.get(p).push({ source: path.relative(FW, f).replace(/\\/g, '/'), matrix: j.matrix, ...viaKeys(j) });
       }
     }
   }
@@ -258,8 +296,10 @@ export function viaBoards(pid) {
 // How a VIA definition compares with the firmware: positions only one of them has
 // (an encoder press is left out of VIA's list, so firmware-only knob presses are
 // expected), and whether the physical reading order of the shared positions matches,
-// allowing one key drawn at a different row, such as a tall ISO Enter. `agrees` when
-// neither has a position the other lacks, but for the knob press, and the order matches.
+// allowing one key drawn at a different row, such as a tall ISO Enter. A rotated VIA
+// layout's rows do not line up with the firmware's flat ones, so its order is not
+// compared and sameOrder is null. `agrees` when neither has a position the other
+// lacks, but for the knob press, and the order matches or is not compared.
 export function compareViaWithFirmware(board, via) {
   const fwKeys = board.keys;
   const fwSet = new Set(fwKeys.map(k => k.pos)), viaSet = new Set(via.keys.map(k => k.pos));
@@ -270,9 +310,9 @@ export function compareViaWithFirmware(board, via) {
   const a = order(fwKeys.filter(k => common.has(k.pos)).map(k => ({ pos: k.pos, x: k.x + k.w / 2, y: k.y })));
   const b = order(via.keys.filter(k => common.has(k.pos)));
   const same = (s, t) => s.length === t.length && s.every((p, i) => p === t[i]);
-  let sameOrder = same(a, b);
-  if (!sameOrder) sameOrder = [...common].some(p => same(a.filter(x => x !== p), b.filter(x => x !== p)));
-  const agrees = !viaOnly.length && fwOnly.length <= (board.hasEncoder ? 1 : 0) && sameOrder;
+  let sameOrder = via.rotated ? null : same(a, b);
+  if (sameOrder === false) sameOrder = [...common].some(p => same(a.filter(x => x !== p), b.filter(x => x !== p)));
+  const agrees = !viaOnly.length && fwOnly.length <= (board.hasEncoder ? 1 : 0) && sameOrder !== false;
   return { viaOnly, fwOnly, sameOrder, agrees };
 }
 
@@ -349,6 +389,16 @@ export function keyNaming(tables, boardFor = firmwareBoard) {
       if (printed) return { label: printed };
       const before = i > 0 ? nameOf(board, i - 1) : null;
       return { label: before && before.label ? `Unassigned Key (after ${before.label})` : 'Unassigned Key' };
+    }
+    // Keychron's macro keys, numbered as Keychron numbers them (MC_1 is M1).
+    const macro = /^MC_(\d+)$/.exec(k.token);
+    if (macro) return { label: `Macro ${macro[1]} Key` };
+    // A layer key no matching board names: Fn2 when both base layers reach the same
+    // layer through it beside an OS-specific Fn key, as on the K6 Pro, and Fn otherwise.
+    if (/^MO\(\s*\w+\s*\)$/.test(k.token)) {
+      const shared = o => o.macToken === o.token;
+      const osFnKey = board.keys.some(o => /^MO\(/.test(o.token) && !shared(o));
+      return { label: shared(k) && osFnKey ? 'Fn2' : 'Fn' };
     }
     return { error: `no name for ${k.token} at (${k.pos})` };
   }

@@ -21,7 +21,10 @@ import { bproBoards, bproLayout, LAUNCHER as BPRO_LAUNCHER } from './zmk-firmwar
 // gets any other verdict fails the run, so the entry is revisited.
 const KNOWN = {
   0x0960: { verdict: 'SOURCES DISAGREE', reason: 'Keychron\'s VIA JSON has Right Shift and Numpad 0 one column right of the firmware' },
-  0x076C: { verdict: 'SOURCES DISAGREE', reason: 'Keychron\'s b6pro_uk_25k VIA file has (1,1) twice and no (1,0), where the firmware and the US file have the 1 key' },
+  0x0206: { verdict: 'SOURCES DISAGREE', reason: 'Keychron\'s VIA JSON has Right Shift and Numpad 0 one column right of the firmware and the shipped binary' },
+  0x0209: { verdict: 'SOURCES DISAGREE', reason: 'Keychron\'s VIA JSON has Right Shift and Numpad 0 one column right of the firmware and the shipped binary' },
+  0x0122: { verdict: 'SOURCES DISAGREE', reason: 'Keychron\'s VIA JSON has a key at (0,13), where the firmware and the shipped binary have none' },
+  0x0382: { verdict: 'SOURCES DISAGREE', reason: 'Keychron\'s VIA JSON has no H key (2,6) and a key at (2,12), where the firmware and the shipped binary have none' },  0x076C: { verdict: 'SOURCES DISAGREE', reason: 'Keychron\'s b6pro_uk_25k VIA file has (1,1) twice and no (1,0), where the firmware and the US file have the 1 key' },
   0x0C10: { verdict: 'SOURCES DISAGREE', reason: 'Keychron\'s app/src/launcher/v1_ultra.json holds the ISO layout under the ANSI ID; its other two V1 Ultra ANSI files agree with the source' },
   0x0A54: { verdict: 'LAYOUT WRONG', reason: 'the source keymap is a copy of the ANSI one; the released binary holds the ISO layout, which the app uses' },
 };
@@ -150,7 +153,9 @@ for (const [pidText, entry] of Object.entries(KEYBOARD_DB)) {
     if (!c.agrees) {
       viaAgrees = false;
       r.notes.push(`VIA ${v.source} disagrees with the firmware: VIA-only ${c.viaOnly.join(' ') || 'none'}, ` +
-        `firmware-only ${c.fwOnly.join(' ') || 'none'}${c.sameOrder ? '' : ', physical order differs'}`);
+        `firmware-only ${c.fwOnly.join(' ') || 'none'}${c.sameOrder === false ? ', physical order differs' : ''}`);
+    } else if (c.sameOrder === null) {
+      r.notes.push(`VIA ${v.source} is drawn rotated, so its keys are compared but not their order`);
     }
   }
   recordVerdict(r, vias, viaAgrees);

@@ -37,8 +37,8 @@ Object.assign(STD, {
   // Source: quantum/keymap_extras/keymap_us.h (pinned commit). Used by the
   // 5-layer boards (V2 Max, K6 Pro, wired V2).
   KC_TILD:0x0235, KC_TILDE:0x0235,
-  KC_PSCR:0x46, KC_SCRL:0x47, KC_PAUS:0x48, KC_INS:0x49, KC_HOME:0x4A, KC_PGUP:0x4B, KC_DEL:0x4C,
-  KC_END:0x4D, KC_PGDN:0x4E, KC_RGHT:0x4F, KC_LEFT:0x50, KC_DOWN:0x51, KC_UP:0x52, KC_NUM:0x53,
+  KC_PSCR:0x46, KC_SCRL:0x47, KC_SCROLL_LOCK:0x47, KC_PAUS:0x48, KC_PAUSE:0x48, KC_INS:0x49, KC_HOME:0x4A, KC_PGUP:0x4B, KC_DEL:0x4C,
+  KC_END:0x4D, KC_PGDN:0x4E, KC_RGHT:0x4F, KC_RIGHT:0x4F, KC_LEFT:0x50, KC_DOWN:0x51, KC_UP:0x52, KC_NUM:0x53,
   KC_PSLS:0x54, KC_PAST:0x55, KC_PMNS:0x56, KC_PPLS:0x57, KC_PENT:0x58,
   KC_P0:0x62, KC_PDOT:0x63, KC_NUBS:0x64, KC_APP:0x65,
   // Modifiers, incl. Keychron's Mac aliases that resolve to standard GUI/ALT.
@@ -48,13 +48,14 @@ Object.assign(STD, {
   KC_LCMD:0xE3, KC_RCMD:0xE7,               // Mac Command aliases of KC_LEFT_GUI / KC_RIGHT_GUI
   KC_LOPT:0xE2, KC_ROPT:0xE6,               // Mac Option aliases of KC_LEFT_ALT / KC_RIGHT_ALT (wired boards)
   // Consumer / media (basic range).
+  KC_SYSTEM_SLEEP:0x00A6, KC_SLEP:0x00A6,
   KC_MUTE:0x00A8, KC_VOLU:0x00A9, KC_VOLD:0x00AA,
   KC_MNXT:0x00AB, KC_MPRV:0x00AC, KC_MPLY:0x00AE,
   KC_BRIU:0x00BD, KC_BRID:0x00BE,
   KC_MISSION_CONTROL:0x00C1, KC_MCTL:0x00C1,   // macOS Mission Control
   KC_LAUNCHPAD:0x00C2,       KC_LPAD:0x00C2,   // macOS Launchpad
   // Magic.
-  NK_TOGG:0x7013,
+  GU_TOGG:0x700B, NK_TOGG:0x7013,
   // Single-colour backlight (0x7800 block) - White (non-RGB) board variants.
   BL_ON:0x7800, BL_OFF:0x7801, BL_TOGG:0x7802, BL_DOWN:0x7803, BL_UP:0x7804,
   BL_STEP:0x7805, BL_BRTG:0x7806,
@@ -93,6 +94,7 @@ const QK_MOMENTARY = 0x5220;                 // MO(layer) = QK_MOMENTARY | (laye
 // MAC_LOCK_SCREEN_ENABLE is defined, so both collapse and BT_HST1 = QK_KB_0+11.
 // Pass {winLock, macLock} true for models that enable them.
 const QK_KB_0 = 0x7E00;
+const QK_MACRO_0 = 0x7700;
 function customKeycodes(opts = {}) {
   const t = {};
   let n = QK_KB_0;
@@ -130,6 +132,10 @@ export function resolveToken(token, opts = {}) {
   if (Object.hasOwn(STD, token)) return STD[token];
   const custom = customKeycodes(opts);
   if (Object.hasOwn(custom, token)) return custom[token];
+  const mc = token.match(/^(?:MC|QK_MACRO)_(\d+)$/);   // QMK's macro keys, MC_0 to MC_31
+  if (mc && Number(mc[1]) < 32) return QK_MACRO_0 + Number(mc[1]);
+  const kb = token.match(/^QK_KB_(\d+)$/);   // QMK's per-keyboard range, QK_KB_0 to QK_KB_31
+  if (kb && Number(kb[1]) < 32) return QK_KB_0 + Number(kb[1]);
   const mo = token.match(/^MO\(\s*([A-Za-z0-9_]+)\s*\)$/);
   if (mo) {
     const layerMap = opts.layerIndex || LAYER_INDEX;

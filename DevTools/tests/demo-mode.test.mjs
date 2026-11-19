@@ -219,6 +219,22 @@ test('the Macro tab opens for a key set to a macro past the keyboard\'s slots', 
   await page.close();
 });
 
+// A key bound to an empty macro, as Keychron's M1 to M5 keys are, keeps its slot.
+test('a new macro skips an empty slot that another key plays', async () => {
+  const page = await demoPage();
+  await page.evaluate(async () => {
+    const key = activeLayout().keys.find(k => k.label === 'J');
+    await writeKeyCodeOnLayer(activeLayerRoles().mac, key, macroKeycode(0));   // macro 1, empty
+  });
+  await startCapture(page);
+  await page.keyboard.press('KeyH');
+  await page.locator('#h-key-selected', { hasText: 'H' }).waitFor();
+  await page.locator('#btn-remap-key').click();
+  await page.locator('#at-text').click();
+  await page.locator('#text-slot-info', { hasText: 'Using macro slot 2 of 16' }).waitFor();
+  await page.close();
+});
+
 // Every B Pro board: Fn+1 is Bluetooth 1 in Keychron's ZMK list, not the QMK boards'.
 for (const pid of B_PRO_BOARDS) {
   test(`the ZMK B Pro ${pid.toString(16)} names its own Keychron keys and starts with no changes`, async () => {

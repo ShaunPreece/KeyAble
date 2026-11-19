@@ -194,11 +194,14 @@ At a high level, adding a model is a data task, in this order:
          and converts it to its numeric keycode. It stops on any token it
          cannot convert, and writes nothing.
        - lays the codes from the newest downloaded binary over the source's,
-         marking the entry "Shipped firmware". It finds the keymap table in
-         the binary from the shape the source predicts. A binary with a key
-         outside the layout, a different knob map, or no table that matches
-         is reported and left for a person to look at: firmware-binaries.mjs
-         check --details lists every difference.
+         marking the entry "Shipped firmware". It finds the keymap table and
+         the knob map in the binary from the shape the source predicts, by
+         their plain keys, which every keycode numbering shares. A binary with
+         a key outside the layout, or no keymap table or knob map that
+         matches, is reported and left for a person to look at:
+         firmware-binaries.mjs check --details lists every difference.
+         Some boards define keycodes in their own header file
+         (k10_pro/k10_pro.h); the build reads those too.
        - for a ZMK board, takes the whole entry from its firmware, and lists
          any key the board has that the layout lacks.
        - for an Ultra 8K board, takes the whole entry from its ZMK source.
@@ -213,7 +216,12 @@ At a high level, adding a model is a data task, in this order:
      ProjectAssets/keychron-firmware-src (see the comment at the top of
      DevTools/keyboard-sources.mjs).
 
-  6. Verify against hardware: connect the real board, confirm keys are named
+  6. Update Help's Supported Keyboards list and the README's model count:
+       node DevTools/supported-keyboards.mjs write
+     Both are generated from the app's keyboard list; the tests fail when
+     they are out of date.
+
+  7. Verify against hardware: connect the real board, confirm keys are named
      correctly, remap one key and reset it, and confirm a full factory reset
      restores the true original values on both the Mac and Windows sides.
 

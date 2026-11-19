@@ -58,7 +58,7 @@ function buildEntries() {
       if (src.error) throw new Error(src.error);
       const layouts = Object.fromEntries(Object.entries(src.layouts)
         .map(([name, def]) => [name, (def.layout || []).map(k => k.matrix)]));
-      fromSource[pid] = factoryKeymap(readFileSync(src.keymapFile, 'utf8'), layouts, src.lockOpts);
+      fromSource[pid] = factoryKeymap(readFileSync(src.keymapFile, 'utf8'), layouts, src.lockOpts, src.headerDefines);
     } catch (err) {
       failures.push(`${hex(pid)} ${KEYBOARD_DB[pid].name}: ${err.message}${src.source ? ` (${src.source})` : ''}`);
     }
@@ -72,7 +72,7 @@ function buildEntries() {
     if (!bin && POSITIONS_FROM[pid]) {
       throw new Error(`${hex(pid)} ${KEYBOARD_DB[pid].name}: takes its positions from ${hex(POSITIONS_FROM[pid])}, so needs its own binary`);
     }
-    entries.set(pid, bin ? { ...entry, layers: bin.layers, file: bin.file } : entry);
+    entries.set(pid, bin ? { ...entry, layers: bin.layers, encoders: bin.encoders, file: bin.file } : entry);
   }
   const zmk = zmkEntries();
   for (const pid of pids.filter(p => KEYBOARD_DB[p].firmware === 'zmk')) {

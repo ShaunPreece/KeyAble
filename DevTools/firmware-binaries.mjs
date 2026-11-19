@@ -124,10 +124,11 @@ function newestBinaries() {
   return newestFor;
 }
 
-// One board's factory keymap as shipped: { file, layers } with layers[l]["row,col"] for
-// every position in FACTORY_KEYMAPS, plus `diffs` against it, `extra`, the matrix
-// positions outside our layout that hold a key in the binary, and `knobMatches`, whether
-// the binary holds our knob map. Or { error }.
+// One board's factory keymap as shipped: { file, layers, encoders } with
+// layers[l]["row,col"] for every position in FACTORY_KEYMAPS and encoders[l][knob] =
+// { ccw, cw }, plus `diffs` against it, `extra`, the matrix positions outside our layout
+// that hold a key in the binary, and `knobMatches`, whether the binary's knob map was
+// found. Or { error }.
 function shipped(pid, fk, file) {
   const board = firmwareBoard(pid);
   if (!board.matrixSize) return { error: board.error || 'NO MATRIX SIZE' };
@@ -157,11 +158,40 @@ function shipped(pid, fk, file) {
     return out;
   });
   const enc = fk.encoders.flatMap(e => e.flatMap(x => [x.cw, x.ccw]));
+  const knob = findKnobMap(bin, enc, /\.hex$/i.test(file) ? 1 : 2);
+  const knobMatches = !!knob;
+  let encoders = fk.encoders;
+  if (!knob) diffs.push('knob map not found');
+  else {
+    let i = 0;
+    encoders = fk.encoders.map((knobs, l) => knobs.map((x, k) => {
+      const cw = knob[i++], ccw = knob[i++];
+      if (cw !== x.cw || ccw !== x.ccw) diffs.push(`knob ${k} layer ${l} ours ${hex(x.cw)}/${hex(x.ccw)} shipped ${hex(cw)}/${hex(ccw)}`);
+      return { ccw, cw };
+    }));
+  }
+  return { file, layers, encoders, diffs, extra, knobMatches };
+}
+
+// The shipped knob map whose layout `enc` gives, as the list of codes in the same order,
+// or null. The source's exact codes are tried first. Failing that, the map is found by
+// its plain keys (volume and the like, 0x04 to 0xFF) and its empty entries, which every
+// keycode numbering shares, as the keymap table is; it must be the only such place in
+// the binary, since a few codes can match by chance.
+function findKnobMap(bin, enc, step) {
+  if (!enc.length) return [];
   const needle = Buffer.alloc(enc.length * 2);
   enc.forEach((v, i) => needle.writeUInt16LE(v, i * 2));
-  const knobMatches = !enc.length || bin.indexOf(needle) >= 0;
-  if (!knobMatches) diffs.push('knob map not found as ours');
-  return { file, layers, diffs, extra, knobMatches };
+  const at = bin.indexOf(needle);
+  const readAt = off => enc.map((_, i) => bin.readUInt16LE(off + i * 2));
+  if (at >= 0) return readAt(at);
+  const fixed = enc.map((v, i) => [i, v]).filter(([, v]) => v === 0 || (v >= 0x04 && v <= 0xFF));
+  if (fixed.filter(([, v]) => v).length < 2) return null;
+  const hits = [];
+  for (let off = 0; off + enc.length * 2 <= bin.length && hits.length < 2; off += step) {
+    if (fixed.every(([i, v]) => bin.readUInt16LE(off + i * 2) === v)) hits.push(off);
+  }
+  return hits.length === 1 ? readAt(hits[0]) : null;
 }
 
 // Calls each(pid, label, shipped) for every board in `factoryKeymaps` that has a layout.
@@ -189,10 +219,10 @@ function check(details) {
   for (const [v, n] of Object.entries(counts)) console.log(`${v}: ${n}`);
 }
 
-// The shipped layers for each board in `factoryKeymaps` that has a binary, as a Map of
-// pid to { file, layers }. Positions, roles and knob maps stay as the source gives them,
-// so a board whose knob map differs, or whose binary holds keys outside our layout, is
-// left out and reported for a person to look at. So is a board whose binary could not be
+// The shipped layers and knob maps for each board in `factoryKeymaps` that has a binary,
+// as a Map of pid to { file, layers, encoders }. Positions and roles stay as the source
+// gives them, so a board whose knob map is not found, or whose binary holds keys outside
+// our layout, is left out and reported for a person to look at. So is a board whose binary could not be
 // read: its codes then come from the source, which the binary exists to correct.
 export function shippedEntries(factoryKeymaps) {
   const out = new Map();
@@ -206,7 +236,7 @@ export function shippedEntries(factoryKeymaps) {
       console.log(`NOT FROM BINARY ${label}: needs a look (firmware-binaries.mjs check --details)`);
       return;
     }
-    out.set(pid, { file: s.file, layers: s.layers });
+    out.set(pid, { file: s.file, layers: s.layers, encoders: s.encoders });
   });
   return out;
 }
