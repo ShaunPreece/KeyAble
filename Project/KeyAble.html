@@ -361,6 +361,22 @@
   }
   .lighting-row .hint { margin-top: .35rem; margin-bottom: 0; }
 
+  /* - Keyboard Settings - */
+  .setting-uses { margin: .5rem 0 .85rem 1.25rem; padding: 0; line-height: 1.55; }
+  .setting-now { font-weight: 700; margin: .85rem 0; }
+  .lighting-row select,
+  .lighting-row input[type="number"] {
+    font: inherit;
+    padding: .45rem .6rem;
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+  }
+  .lighting-row input[type="number"] { width: 8rem; }
+  .lighting-row input[aria-invalid="true"] { border: 2px solid var(--err-border); }
+  .field-error { color: var(--err-text); font-weight: 700; margin: .4rem 0 0; }
+
 
   /* - Key names in text - */
   kbd {
@@ -829,6 +845,21 @@
   </div>
 </dialog>
 
+<!-- Shown by applyDebounce for a time that turns debounce off or is long enough to
+     drop fast presses. Cancel has autofocus so the safe choice is the default. -->
+<dialog id="debounce-confirm"
+        class="danger-card"
+        role="alertdialog"
+        aria-labelledby="h-debounce-confirm"
+        aria-describedby="debounce-confirm-desc">
+  <h3 id="h-debounce-confirm" tabindex="-1">Check This Debounce Time.</h3>
+  <p id="debounce-confirm-desc" style="margin-bottom:.85rem"></p>
+  <div class="btn-row" style="margin-top:0">
+    <button id="btn-debounce-cancel" autofocus data-action="cancelDebounceConfirm">Cancel</button>
+    <button id="btn-debounce-confirm" class="danger" data-action="confirmDebounce">Apply Anyway</button>
+  </div>
+</dialog>
+
 <!-- Write-target dialog, opened from the Step 3 summary line. Native radios are
      safe here: arrowing changes the selection, but nothing is applied until Save. -->
 <dialog id="wt-dialog"
@@ -893,7 +924,8 @@
       <li><a    class="navlink" href="#/step2"    data-route="step2"    aria-keyshortcuts="Alt+2">Step 2. Choose a Key to Customize.</a></li>
       <li><a    class="navlink" href="#/step3"    data-route="step3"    aria-keyshortcuts="Alt+3">Step 3. Choose an Action for Selected Key.</a></li>
       <li><a    class="navlink" href="#/lighting" data-route="lighting" aria-keyshortcuts="Alt+4">RGB Lighting.</a></li>
-      <li><a    class="navlink" href="#/help"     data-route="help"     aria-keyshortcuts="Alt+5">Help.</a></li>
+      <li><a    class="navlink" href="#/settings" data-route="settings" aria-keyshortcuts="Alt+5">Keyboard Settings.</a></li>
+      <li><a    class="navlink" href="#/help"     data-route="help"     aria-keyshortcuts="Alt+6">Help.</a></li>
     </ul>
   </div>
 </nav>
@@ -1033,6 +1065,7 @@
             <button data-action="reportUntestedKeyboard">Tell Us How It Went</button>
           </div>
         </div>
+        <p id="settings-hint" hidden></p>
         <p>Your keyboard is ready. What would you like to do?</p>
 
         <div class="action-menu">
@@ -1670,7 +1703,7 @@
         your keyboard and screen reader alone. This guide covers how to get started, what is
         new in this version, which keyboards are supported, what KeyAble cannot do yet, the emergency reset shortcut if
         anything ever goes wrong, and answers to the questions we are asked most often. In
-        KeyAble, Alt plus a number, 1 through 5, returns you to any step at any time.
+        KeyAble, Alt plus a number, 1 through 6, returns you to any step at any time.
       </p>
 
       <div class="card">
@@ -1825,9 +1858,9 @@
         </p>
         <!-- END GENERATED SUPPORTED KEYBOARDS -->
         <p>
-          On the HE (Hall Effect) models, KeyAble does everything it does on other keyboards.
-          Their own settings, such as the actuation point and rapid trigger, still need
-          Keychron's Launcher.
+          On the HE (Hall Effect) models, KeyAble does everything it does on other keyboards,
+          and sets their actuation point in Keyboard Settings. Rapid trigger and their other
+          settings still need Keychron's Launcher.
         </p>
         <p>
           Not supported: the HE and Ultra 8K models not listed here, such as the Q0 HE, the HE
@@ -1854,9 +1887,10 @@
             controllable from the RGB Lighting section.</li>
           <li>Keychron's Bluetooth, 2.4 GHz and battery check keys.</li>
           <li>Japanese and Korean input keys, and Japanese (JIS) keyboard layouts.</li>
-          <li>Keyboard-wide settings such as debounce and polling rate.</li>
-          <li>Settings of HE (Hall Effect) keyboards, such as the actuation point and rapid
-            trigger.</li>
+          <li>Keyboard-wide settings other than debounce and the wireless sleep times, such as
+            polling rate.</li>
+          <li>Settings of HE (Hall Effect) keyboards other than one actuation point for every
+            key, such as rapid trigger and an actuation point for each key.</li>
           <li>The HE and Ultra 8K keyboards not in Supported Keyboards, such as the Q0 HE, the HE
             8K models and the V2 Ultra 8K.</li>
         </ul>
@@ -1907,9 +1941,10 @@
         <p>
           The HE (Hall Effect) models in Supported Keyboards work like any other: remapping,
           macros, lighting and backups. They are built from Keychron's released firmware, like
-          most models. Their magnetic switches also have settings of their own, such as the
-          actuation point and rapid trigger, which use Keychron commands KeyAble does not
-          support yet, so set those with Keychron's Launcher. Some HE models are not supported
+          most models. Their magnetic switches also have settings of their own. KeyAble sets
+          one actuation point for every key, in Keyboard Settings; rapid trigger, an actuation
+          point for each key and the other HE settings still need Keychron's Launcher. Some HE
+          models are not supported
           yet, such as the Q0 HE and the HE 8K models. Keyboards KeyAble does not support can be
           set up with Keychron's own Launcher.
         </p>
@@ -2083,6 +2118,19 @@
           Go to the RGB Lighting section, Alt plus 4, and use the Turn Backlighting Off button.
           On wireless keyboards this noticeably extends battery life. The same section also has
           brightness, colour, and effect controls if you want them.
+        </p>
+
+        <h4 style="margin-top:1.25rem">What can I change in Keyboard Settings?</h4>
+        <p data-nav-keys>
+          Keyboard Settings, Alt plus 5, shows the settings your keyboard's firmware has: the
+          actuation point on HE keyboards, and debounce and the wireless sleep times on
+          keyboards with recent Keychron firmware. Each setting says what it does and when it
+          helps, and changes only when you press its Apply button. If your keyboard has none
+          of them, the page says so.
+        </p>
+        <p>
+          The actuation point is set for every key at once, in the profile the keyboard is
+          using. It is not saved in a setup file yet.
         </p>
 
         <h4 style="margin-top:1.25rem">Is there a light theme?</h4>
@@ -2264,6 +2312,107 @@
                    min="0" max="100" step="5" value="100"
                    aria-valuetext="100 percent">
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================
+         SECTION: Keyboard Settings
+         Each setting shows only when the keyboard answers for it (loadSettings),
+         and each applies with its own button, never as a control changes.
+    ======================================================== -->
+    <section id="sec-settings" hidden>
+      <h2 id="h-settings" tabindex="-1">Keyboard Settings.</h2>
+
+      <div id="settings-not-connected" hidden>
+        <div class="status-box" role="status" aria-live="polite" aria-atomic="true">
+          <span class="status-icon" aria-hidden="true">○</span>
+          <span>Connect a keyboard from Step 1 to change its settings.</span>
+        </div>
+        <div class="section-footer">
+          <button data-action="goToSection" data-section="connect">Return to Step 1. Connect Keyboard. (Alt+1)</button>
+        </div>
+      </div>
+
+      <!-- Not a live region: loadSettings announces the one result that needs it. -->
+      <div id="settings-status" class="status-box" hidden>
+        <span class="status-icon" aria-hidden="true">○</span>
+        <span id="settings-status-text"></span>
+      </div>
+
+      <div id="setting-actuation" class="card" hidden>
+        <h3>Actuation Point.</h3>
+        <p>
+          How far down you press a key before it types. It can be set from 0.1 to 3.9
+          millimetres; Keychron's usual is 2.0 millimetres.
+        </p>
+        <ul class="setting-uses">
+          <li>Deeper, such as 3.0 millimetres: a key you brush or rest a finger on does not
+            type. This helps with a tremor, or if you rest your hands on the keys.</li>
+          <li>Shallower, such as 1.0 millimetre: a light touch types. This helps if pressing
+            keys down is tiring or painful.</li>
+        </ul>
+        <p id="actuation-now" class="setting-now"></p>
+        <div class="lighting-row">
+          <label for="actuation-point">Actuation point:</label>
+          <input type="range" id="actuation-point" min="1" max="39" step="1" value="20"
+                 aria-valuetext="2.0 millimetres">
+        </div>
+        <div class="btn-row">
+          <button id="btn-apply-actuation" class="primary" data-action="applyActuation">Apply Actuation Point</button>
+        </div>
+      </div>
+
+      <div id="setting-debounce" class="card" hidden>
+        <h3>Debounce.</h3>
+        <p>
+          How long the keyboard waits for a key's switch to settle before it counts the
+          press. Keychron's usual is 5 milliseconds.
+        </p>
+        <ul class="setting-uses">
+          <li>Longer, such as 15 milliseconds: stops a worn or bouncy key typing its letter
+            twice.</li>
+          <li>Shorter: fast presses of the same key are never missed.</li>
+        </ul>
+        <p>
+          Debounce does not stop keys pressed by accident or held too long, as with a tremor.
+          Filter Keys in Windows and Slow Keys on a Mac are made for that.
+        </p>
+        <p id="debounce-now" class="setting-now"></p>
+        <div class="lighting-row">
+          <label for="debounce-ms">Debounce, in milliseconds from 0 to 255:</label>
+          <input type="number" id="debounce-ms" min="0" max="255" step="1" inputmode="numeric"
+                 aria-describedby="debounce-error">
+          <p id="debounce-error" class="field-error" hidden></p>
+        </div>
+        <div class="btn-row">
+          <button id="btn-apply-debounce" class="primary" data-action="applyDebounce">Apply Debounce</button>
+        </div>
+      </div>
+
+      <div id="setting-sleep" class="card" hidden>
+        <h3>Wireless Sleep Times.</h3>
+        <p>
+          Used only on Bluetooth or 2.4 GHz, to save battery. When you stop typing, the
+          backlight turns off after the first time and the keyboard sleeps after the second.
+          Pressing a key wakes it.
+        </p>
+        <ul class="setting-uses">
+          <li>Longer: the keyboard stays awake through long pauses, such as while you listen
+            to a long document read aloud.</li>
+          <li>Shorter: the battery lasts longer between charges.</li>
+        </ul>
+        <p id="sleep-now" class="setting-now"></p>
+        <div class="lighting-row">
+          <label for="sleep-backlight">Backlight off after:</label>
+          <select id="sleep-backlight"></select>
+        </div>
+        <div class="lighting-row">
+          <label for="sleep-keyboard">Keyboard sleeps after:</label>
+          <select id="sleep-keyboard"></select>
+        </div>
+        <div class="btn-row">
+          <button id="btn-apply-sleep" class="primary" data-action="applySleepTimes">Apply Sleep Times</button>
         </div>
       </div>
     </section>
@@ -21275,6 +21424,7 @@ const CMD_MACRO_SET_BUFFER      = 0x0F;   // args: [offset_hi, offset_lo, size, 
 const CMD_KC_FIRMWARE_VERSION = 0xA1;   // reply: the build's text from byte 1, e.g. "v1.1.1 2026-01-15-09:56:47"
 const CMD_KC_MISC = 0xA7;               // language, debounce, Snap Click, wireless sleep
 const CMD_KC_RGB  = 0xA8;               // indicators, per-key colours, effect regions and lists
+const CMD_KC_ANALOG = 0xA9;             // HE boards' analog matrix: actuation, rapid trigger, profiles
 
 // - Keycode numbering -
 // Keychron firmware comes in three keycode numberings, told apart by the VIA protocol
@@ -26406,9 +26556,10 @@ const SECTION_TITLES = {
   step3:    'Step 3. Choose an Action for Selected Key - KeyAble',
   help:     'Help - KeyAble',
   lighting: 'RGB Lighting - KeyAble',
+  settings: 'Keyboard Settings - KeyAble',
 };
 
-const SECTIONS = ['connect', 'step2', 'step3', 'help', 'lighting'];
+const SECTIONS = ['connect', 'step2', 'step3', 'help', 'lighting', 'settings'];
 
 // - Saved settings -
 // Every name KeyAble saves in the browser's site storage. The head script reads the
@@ -26482,7 +26633,7 @@ function navKeyHint(n) {
 function applyPlatformShortcutLabels() {
   if (!isMacPlatform()) return;
 
-  // Spoken-form wording ("Alt plus 1 to 5") in any element marked
+  // Spoken-form wording ("Alt plus 4") in any element marked
   // data-nav-keys (Help text).
   document.querySelectorAll('[data-nav-keys]').forEach(el => {
     el.textContent = el.textContent.replace(/Alt plus/g, 'Option plus');
@@ -26510,7 +26661,8 @@ const NAV_SHORTCUT_MAP = {
   Digit2: 'step2',
   Digit3: 'step3',
   Digit4: 'lighting',
-  Digit5: 'help',
+  Digit5: 'settings',
+  Digit6: 'help',
 };
 
 function bindNavShortcuts() {
@@ -26529,7 +26681,7 @@ function bindNavShortcuts() {
   });
 }
 
-// Fold each nav item's position ("Help, 5 of 5") into a visually-hidden
+// Fold each nav item's position ("Help, 6 of 6") into a visually-hidden
 // span. Screen readers expose list position in browse mode but not on Tab in
 // focus mode; the span makes it announce in every mode. The count is read
 // from the list, so it cannot go stale.
@@ -26626,6 +26778,7 @@ function goToSection(id, focusHeading = true) {
   if (id === 'step2')    loadStep2();
   if (id === 'step3')    loadStep3();
   if (id === 'lighting') loadLighting();
+  if (id === 'settings') loadSettings();
   if (!focusHeading) return;
   const heading = document.querySelector(`#sec-${id} > h2[tabindex="-1"]`);
   if (heading) moveFocus(heading);
@@ -28311,6 +28464,7 @@ const VIA_ECHO_LENGTH = {
   [CMD_KEYMAP_GET_BUFFER]: 4,                         // offset, size
   [CMD_GET_ENCODER]: 4, [CMD_SET_ENCODER]: 6,         // layer, encoder, direction (+ value)
   [CMD_KC_MISC]: 2, [CMD_KC_RGB]: 2,                  // sub-command; byte 2 is the status
+  [CMD_KC_ANALOG]: 2,                                 // sub-command
 };
 const VIA_UNHANDLED = 0xFF;   // VIA's reply byte 0 for a command the firmware does not handle
 
@@ -28437,11 +28591,15 @@ class DemoKeyboard extends EventTarget {
     this.macros   = new Uint8Array(DEMO_MACRO_BYTES);
     // The Max boards' QMK firmware reports its build and has Keychron's own settings
     // (debounce and wireless sleep times here) and, on RGB models, Keychron's lighting.
-    // Older and ZMK firmware answers none of these.
+    // Older and ZMK firmware answers none of these. Keychron's HE source reports its
+    // build and has the analog matrix instead of the settings and lighting.
     const isMax = keycodesForBoard(entry, this.protocolVersion) === KEYCODES_PROTOCOL_12;
-    this.keychron = isMax ? { debounce: [0, 5], wirelessSleep: [0x58, 0x02, 0x20, 0x1C] } : null;
+    const isHE  = /\bHE\b/.test(entry.name);
+    this.reportsBuild = isMax;
+    this.keychron = isMax && !isHE ? { debounce: [0, 5], wirelessSleep: [0x58, 0x02, 0x20, 0x1C] } : null;
+    this.analog = isHE ? new DemoAnalogMatrix(this.layout) : null;
     const leds = this.layout.keys.length;
-    this.keychronRgb = isMax && this.lightingChannel === LIGHTING_CH_RGB_MATRIX ? {
+    this.keychronRgb = isMax && !isHE && this.lightingChannel === LIGHTING_CH_RGB_MATRIX ? {
       leds, indicators: new Uint8Array(4), perKeyType: 0,
       colours: new Uint8Array(3 * leds), regions: new Uint8Array(leds),
       effects: new Uint8Array(DEMO_RGB_REGIONS * DEMO_RGB_EFFECTS_PER_REGION * KC_RGB_EFFECT_BYTES),
@@ -28601,7 +28759,7 @@ class DemoKeyboard extends EventTarget {
   }
 
   answerFirmwareVersion(d) {
-    if (!this.keychron) { d[0] = VIA_UNHANDLED; return; }
+    if (!this.reportsBuild) { d[0] = VIA_UNHANDLED; return; }
     d.fill(0, 1);
     for (let i = 0; i < DEMO_FIRMWARE_VERSION.length; i++) d[1 + i] = DEMO_FIRMWARE_VERSION.charCodeAt(i);
   }
@@ -28648,6 +28806,67 @@ class DemoKeyboard extends EventTarget {
   }
 }
 
+// The analog matrix of an HE board, answering 0xA9 as Keychron's HE firmware does:
+// three profiles at Keychron's factory travel settings, the first in use. Each profile
+// is laid out as readActuation reads it.
+const DEMO_ANALOG_VERSION = 4;
+
+class DemoAnalogMatrix {
+  constructor(layout) {
+    this.layout  = layout;
+    this.current = 0;
+    // AMC_MODE is defined later in the script, so it is read here, not at load.
+    this.profiles = [AMC_MODE.REGULAR, AMC_MODE.RAPID, AMC_MODE.RAPID].map(mode => {
+      const p = new Uint8Array(AMC_CONFIG_BYTES * (1 + layout.rows * layout.cols));
+      DemoAnalogMatrix.setTravel(p, 0, { mode, point: ACTUATION_USUAL,
+        sens: RAPID_TRIGGER_USUAL_SENSITIVITY, releaseSens: RAPID_TRIGGER_USUAL_SENSITIVITY });
+      return p;
+    });
+  }
+
+  // Writes the travel fields of one analog_key_config_t, keeping its advanced mode.
+  static setTravel(bytes, at, { mode, point, sens, releaseSens }) {
+    const advanced = bytes[at + 2] & 0xF0;
+    const v = mode | (point << 2) | (sens << 8) | (releaseSens << 14);
+    bytes[at]     = v & 0xFF;
+    bytes[at + 1] = (v >> 8) & 0xFF;
+    bytes[at + 2] = advanced | ((v >> 16) & 0x0F);
+  }
+
+  // Tests use this to play a key given its own point in Keychron's Launcher.
+  keyAt(row, col) { return AMC_CONFIG_BYTES * (1 + row * this.layout.cols + col); }
+
+  answer(d) {
+    const p = this.profiles[d[2]];
+    switch (d[1]) {
+      case AMC.GET_VERSION:       d[2] = DEMO_ANALOG_VERSION; break;
+      case AMC.GET_PROFILES_INFO: d[2] = this.current; d[3] = this.profiles.length; break;
+      case AMC.GET_PROFILE_RAW: {
+        const at = d[3] | (d[4] << 8);
+        for (let i = 0; i < d[5]; i++) d[AMC_RAW_DATA_AT + i] = (p && p[at + i]) || 0;
+        break;
+      }
+      case AMC.SET_TRAVEL: {
+        const [mode, point, sens, releaseSens, whole] = [d[3], d[4], d[5], d[6], d[7]];
+        const valid = p && mode <= AMC_MODE.RAPID && point <= ACTUATION_MAX && !(whole && mode === AMC_MODE.GLOBAL);
+        if (valid && whole) DemoAnalogMatrix.setTravel(p, 0, { mode, point, sens, releaseSens });
+        if (valid && !whole) {
+          for (let r = 0; r < this.layout.rows; r++) {
+            const mask = d[AMC_ROW_MASKS_AT + 3 * r] | (d[AMC_ROW_MASKS_AT + 3 * r + 1] << 8) | (d[AMC_ROW_MASKS_AT + 3 * r + 2] << 16);
+            for (let c = 0; c < this.layout.cols; c++) {
+              if (mask & (1 << c)) DemoAnalogMatrix.setTravel(p, this.keyAt(r, c), { mode, point, sens, releaseSens });
+            }
+          }
+        }
+        d[2] = valid ? 0 : 1;
+        break;
+      }
+      case AMC.SAVE_PROFILE: d[2] = p ? 0 : 1; break;
+      default: break;   // the firmware returns any other request unchanged
+    }
+  }
+}
+
 // Big-endian 16-bit values in a report, as VIA sends them.
 const u16At = (d, at) => (d[at] << 8) | d[at + 1];
 const put16At = (d, at, v) => { d[at] = (v >> 8) & 0xFF; d[at + 1] = v & 0xFF; };
@@ -28686,6 +28905,7 @@ const DEMO_COMMANDS = {
   [CMD_KC_FIRMWARE_VERSION]: (kb, d) => kb.answerFirmwareVersion(d),
   [CMD_KC_MISC]: (kb, d) => kb.answerKeychronMisc(d),
   [CMD_KC_RGB]:  (kb, d) => kb.answerKeychronRgb(d),
+  [CMD_KC_ANALOG]: (kb, d) => (kb.analog ? kb.analog.answer(d) : (d[0] = VIA_UNHANDLED)),
 };
 
 const inDemoMode = () => hidDevice instanceof DemoKeyboard;
@@ -28997,6 +29217,7 @@ async function identifyKeyboard(vid, pid, protocolVersion) {
     deviceLayerCount = await detectLayerCount();
     currentOSMode = await detectOSMode();
     followSwitchForWriteTarget();
+    await showSettingsHint();
     const modeLabel = osModeLabel(currentOSMode);
     // setStatus + the kbd-os-mode live region already announce the success
     // and slide-switch state; focus moves into the identified section
@@ -29118,6 +29339,9 @@ async function disconnectKeyboard(
   lightingState       = null;
   lightingLastOnLevel = LIGHTING_DEFAULT_ON_LEVEL;
   lightingLastEffect  = LIGHTING_DEFAULT_ON_EFFECT;
+  settingsState     = null;
+  pendingDebounceMs = null;
+  settingsLoadToken++;   // drop any settings read still running for the old keyboard
   deviceLayerCount = null;
   viaProtocolVersion = null;
   deviceKeycodes = KEYCODES_PROTOCOL_12;
@@ -29433,6 +29657,117 @@ async function writeKeychronSetting(name, value) {
       await askKeychron(CMD_KC_MISC, set, start, chunk.length, ...chunk.flatMap(e => [...fromHex(e)]));
     }
     await askKeychron(CMD_KC_MISC, KC_SNAP_CLICK_SAVE);
+  }
+}
+
+// Wireless sleep times as [backlight off, sleep] in seconds, from and to the two
+// little-endian 16-bit counts the firmware sends.
+const sleepSecondsFromBytes = b => [b[0] | (b[1] << 8), b[2] | (b[3] << 8)];
+const sleepBytesFromSeconds = ([backlight, sleep]) =>
+  [backlight & 0xFF, backlight >> 8, sleep & 0xFF, sleep >> 8];
+
+// Debounce as [type, milliseconds] and the sleep times, each null when the build does
+// not report it or will not read it. Keychron's source sets the sleep-times bit under
+// one build option and handles the command under another, so a board can report a
+// setting it then refuses.
+async function readMiscSettingsForPage() {
+  const out = { debounce: null, sleep: null };
+  const info = await keychronInfo(CMD_KC_MISC);
+  if (!info) return out;
+  const read = async name => {
+    if (!(info[5] & KC_MISC_SETTINGS[name].flag)) return null;
+    try { return await askKeychron(CMD_KC_MISC, KC_MISC_SETTINGS[name].get); } catch { return null; }
+  };
+  const debounce = await read('debounce');
+  if (debounce) out.debounce = [debounce[4], debounce[5]];
+  const sleep = await read('wirelessSleep');
+  if (sleep) out.sleep = sleepSecondsFromBytes(sleep.subarray(3, 7));
+  return out;
+}
+
+// - HE analog matrix (0xA9, Keychron's HE firmware) -
+// A board holds several profiles and uses one. A profile is a whole-keyboard travel
+// setting followed by one per matrix key, row by row, 4 bytes each; a key whose travel
+// fields are all 0 follows the whole-keyboard setting. The getters' replies carry no
+// status byte. A board without the analog matrix answers unhandled (QMK) or returns
+// the request unchanged (ZMK), so version 0 means none.
+const AMC = { GET_VERSION: 0x01, GET_PROFILES_INFO: 0x10, GET_PROFILE_RAW: 0x12, SET_TRAVEL: 0x14, SAVE_PROFILE: 0x1F };
+const AMC_MODE = { GLOBAL: 0, REGULAR: 1, RAPID: 2 };
+const AMC_CONFIG_BYTES = 4;
+const AMC_RAW_DATA_AT = 6;                      // after GET_PROFILE_RAW's request bytes
+const AMC_RAW_PER_REQUEST = REPORT_LEN - AMC_RAW_DATA_AT;
+const AMC_ROW_MASKS_AT = 8;                     // SET_TRAVEL's per-row key masks, 3 bytes each
+// Actuation in tenths of a millimetre. SET_TRAVEL refuses above 39, and 0 would count
+// every key as pressed at rest.
+const ACTUATION_MIN = 1;
+const ACTUATION_MAX = 39;
+const ACTUATION_USUAL = 20;
+const RAPID_TRIGGER_USUAL_SENSITIVITY = 4;
+
+async function analogMatrixVersion() {
+  const reply = await sendVIA([CMD_KC_ANALOG, AMC.GET_VERSION]);
+  return reply && reply[0] === CMD_KC_ANALOG ? reply[2] : 0;
+}
+
+// `size` bytes of one profile from `offset`, or null when the board does not answer.
+async function readAnalogProfile(profile, offset, size) {
+  const out = new Uint8Array(size);
+  for (let done = 0; done < size; done += AMC_RAW_PER_REQUEST) {
+    const n = Math.min(AMC_RAW_PER_REQUEST, size - done);
+    const at = offset + done;
+    const request = [CMD_KC_ANALOG, AMC.GET_PROFILE_RAW, profile, at & 0xFF, at >> 8, n];
+    const reply = await sendVIA(request, undefined, request.length);
+    if (!reply || reply[0] !== CMD_KC_ANALOG) return null;
+    out.set(reply.subarray(AMC_RAW_DATA_AT, AMC_RAW_DATA_AT + n), done);
+  }
+  return out;
+}
+
+// One analog_key_config_t. GCC packs its bitfields upward from bit 0 of a little-endian
+// 24-bit value: mode 2 bits, actuation 6, rapid trigger press and release sensitivity
+// 6 each, advanced mode 4. A fourth byte holds advanced-mode data.
+function analogTravelAt(bytes, at) {
+  const v = bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16);
+  return { mode: v & 0x3, point: (v >> 2) & 0x3F, sens: (v >> 8) & 0x3F, releaseSens: (v >> 14) & 0x3F };
+}
+
+// The profile in use, its whole-keyboard travel setting, and how many of the layout's
+// keys have travel settings of their own (set in Keychron's Launcher); null when the
+// board has no analog matrix.
+async function readActuation(layout) {
+  if (!await analogMatrixVersion()) return null;
+  const info = await sendVIA([CMD_KC_ANALOG, AMC.GET_PROFILES_INFO]);
+  if (!info || info[0] !== CMD_KC_ANALOG) return null;
+  const [profile, profiles] = [info[2], info[3]];
+  if (profile >= profiles) return null;
+  const bytes = await readAnalogProfile(profile, 0, AMC_CONFIG_BYTES * (1 + layout.rows * layout.cols));
+  if (!bytes) return null;
+  const ownKeys = layout.keys.filter(k => {
+    const t = analogTravelAt(bytes, AMC_CONFIG_BYTES * (1 + k.row * layout.cols + k.col));
+    return t.mode || t.point || t.sens || t.releaseSens;
+  }).length;
+  return { profile, profiles, ...analogTravelAt(bytes, 0), ownKeys };
+}
+
+// Gives every key one actuation point in the profile in use, keeping the profile's
+// mode and rapid trigger sensitivities, and saves the profile. SET_TRAVEL for the whole
+// keyboard stores the setting without applying it: keys take it up only when the
+// firmware rebuilds them, at power-on. So a second SET_TRAVEL, with every key in its
+// mask, sets each key back to following the whole-keyboard setting, which rebuilds it.
+async function writeActuation(current, point) {
+  const sens = current.sens || RAPID_TRIGGER_USUAL_SENSITIVITY;
+  const requests = [
+    [CMD_KC_ANALOG, AMC.SET_TRAVEL, current.profile, current.mode || AMC_MODE.REGULAR, point,
+      sens, current.releaseSens || sens, 1],
+    [CMD_KC_ANALOG, AMC.SET_TRAVEL, current.profile, AMC_MODE.GLOBAL, 0, 0, 0, 0,
+      ...new Array(REPORT_LEN - AMC_ROW_MASKS_AT).fill(0xFF)],
+    [CMD_KC_ANALOG, AMC.SAVE_PROFILE, current.profile],
+  ];
+  for (const request of requests) {
+    const reply = await sendVIA(request);
+    if (!reply || reply[0] !== CMD_KC_ANALOG || reply[2] !== 0) {
+      throw new Error('The keyboard did not accept the actuation point.');
+    }
   }
 }
 
@@ -30488,6 +30823,269 @@ async function onLightingEffectChange(value) {
   updateLightingStatusText();
   updateLightingToggleButton();
   announce(`Effect changed to ${lightingEffectName(idx)}.`);
+}
+
+// - Keyboard Settings -
+// Read on every visit, and each setting shown only if the keyboard answers for it:
+// what a board has depends on its firmware build, not its model.
+
+// Presets in seconds, within the firmware's limits: it refuses a backlight time under
+// 5 seconds or a sleep time under 60, and 16 bits of seconds cap both near 18 hours.
+const SLEEP_BACKLIGHT_CHOICES = [5, 10, 30, 60, 120, 300, 600, 900, 1800, 3600];
+const SLEEP_KEYBOARD_CHOICES  = [60, 300, 600, 900, 1800, 3600, 7200, 14400, 28800, 43200, 64800];
+const SLEEP_USUAL = [600, 7200];
+const DEBOUNCE_USUAL_MS = 5;
+const DEBOUNCE_MAX_MS = 255;
+const DEBOUNCE_WARN_ABOVE_MS = 50;
+const KEYCHRON_USUAL = "Keychron's usual";
+
+let settingsState     = null;   // { actuation, debounce, sleep }, each null when the board lacks it
+let settingsLoadToken = 0;      // increments per load and on disconnect; a stale load drops its result
+let pendingDebounceMs = null;   // the time waiting on the debounce warning dialog
+
+const millimetresText = tenths => `${(tenths / 10).toFixed(1)} millimetres`;
+const usualSuffix = (value, usual) => (value === usual ? ` (${KEYCHRON_USUAL})` : '');
+
+function durationText(seconds) {
+  if (seconds % 3600 === 0) return plural(seconds / 3600, 'hour');
+  if (seconds % 60 === 0)   return plural(seconds / 60, 'minute');
+  if (seconds > 60)         return `${plural(Math.floor(seconds / 60), 'minute')} ${plural(seconds % 60, 'second')}`;
+  return plural(seconds, 'second');
+}
+
+function showSettingsStatus(text) {
+  $('settings-status-text').textContent = text;
+  $('settings-status').hidden = !text;
+}
+
+async function loadSettings() {
+  const token = ++settingsLoadToken;
+  ['setting-actuation', 'setting-debounce', 'setting-sleep'].forEach(id => { $(id).hidden = true; });
+  $('settings-not-connected').hidden = true;
+  showSettingsStatus('');
+
+  if (!hidDevice || !activeKbd) {
+    settingsState = null;
+    $('settings-not-connected').hidden = false;
+    return;
+  }
+
+  showSettingsStatus("Reading this keyboard's settings...");
+  const layout    = activeLayout();
+  const actuation = layout ? await readActuation(layout) : null;
+  const misc      = await readMiscSettingsForPage();
+  if (token !== settingsLoadToken) return;
+
+  settingsState = { actuation, ...misc };
+  if (!actuation && !misc.debounce && !misc.sleep) {
+    const none = "This keyboard's firmware has no settings KeyAble can change.";
+    showSettingsStatus(none);
+    announce(none);
+    return;
+  }
+  showSettingsStatus('');
+  showActuation();
+  showDebounce();
+  showSleep();
+}
+
+function setActuationSliderText(tenths) {
+  $('actuation-point').setAttribute('aria-valuetext',
+    millimetresText(tenths) + (tenths === ACTUATION_USUAL ? `, ${KEYCHRON_USUAL}` : ''));
+}
+
+function showActuation() {
+  const a = settingsState.actuation;
+  $('setting-actuation').hidden = !a;
+  if (!a) return;
+  const slider = $('actuation-point');
+  slider.min = String(ACTUATION_MIN);
+  slider.max = String(ACTUATION_MAX);
+  slider.value = String(a.point);
+  setActuationSliderText(a.point);
+
+  let now = `Now ${millimetresText(a.point)}${usualSuffix(a.point, ACTUATION_USUAL)}. ` +
+    `This changes profile ${a.profile + 1} of ${a.profiles}, the one the keyboard is using.`;
+  if (a.mode === AMC_MODE.RAPID) now += ' Rapid Trigger is on in this profile, and KeyAble leaves it as it is.';
+  if (a.ownKeys) {
+    now += ` ${plural(a.ownKeys, 'key')} ${a.ownKeys === 1 ? 'has its' : 'have their'} own settings ` +
+      "from Keychron's Launcher. Applying replaces them, so every key uses the new point.";
+  }
+  $('actuation-now').textContent = now;
+}
+
+function showDebounce() {
+  const d = settingsState.debounce;
+  $('setting-debounce').hidden = !d;
+  if (!d) return;
+  const ms = d[1];
+  $('debounce-ms').value = String(ms);
+  setDebounceError('');
+  $('debounce-now').textContent = `Now ${plural(ms, 'millisecond')}${usualSuffix(ms, DEBOUNCE_USUAL_MS)}.`;
+}
+
+// The preset times, plus the board's own time when it is not one of them.
+function fillSleepSelect(id, presets, current, usual) {
+  const times = presets.includes(current) ? presets : [...presets, current].sort((a, b) => a - b);
+  $(id).replaceChildren(...times.map(t => new Option(durationText(t) + usualSuffix(t, usual), String(t))));
+  $(id).value = String(current);
+}
+
+function showSleep() {
+  const s = settingsState.sleep;
+  $('setting-sleep').hidden = !s;
+  if (!s) return;
+  fillSleepSelect('sleep-backlight', SLEEP_BACKLIGHT_CHOICES, s[0], SLEEP_USUAL[0]);
+  fillSleepSelect('sleep-keyboard',  SLEEP_KEYBOARD_CHOICES,  s[1], SLEEP_USUAL[1]);
+  $('sleep-now').textContent = `Now the backlight turns off after ${durationText(s[0])}, ` +
+    `and the keyboard sleeps after ${durationText(s[1])}.`;
+}
+
+// Re-reads one of the Keychron settings after a write and shows it, leaving the other
+// card as the user has it.
+async function rereadMiscSetting(name) {
+  const misc = await readMiscSettingsForPage();
+  if (!settingsState) return;
+  settingsState[name] = misc[name];
+  if (name === 'debounce') showDebounce();
+  else showSleep();
+}
+
+// Writes one setting with its Apply button busy, reads it back, and says whether the
+// keyboard kept it. The button keeps the focus, so the result is spoken there.
+async function applySetting(buttonId, { write, reread, kept, done, failed }, announceDelay) {
+  const btn    = $(buttonId);
+  const device = hidDevice;
+  setButtonBusy(btn, true);
+  let wrote = true;
+  try { await write(); } catch { wrote = false; }
+  if (hidDevice === device) await reread();
+  setButtonBusy(btn, false);
+  if (hidDevice !== device) return;   // unplugged meanwhile, and disconnect has said so
+  const ok = wrote && kept();
+  playChirp(ok);
+  announce(ok ? done : failed, announceDelay);
+}
+
+async function applyActuation() {
+  const a = settingsState && settingsState.actuation;
+  if (!a) return;
+  const point = Number($('actuation-point').value);
+  if (point === a.point && !a.ownKeys) {
+    announce(`The actuation point is already ${millimetresText(point)}.`);
+    return;
+  }
+  await applySetting('btn-apply-actuation', {
+    write:  () => writeActuation(a, point),
+    reread: async () => {
+      const now = await readActuation(activeLayout());
+      if (!settingsState) return;
+      settingsState.actuation = now;
+      showActuation();
+    },
+    kept:   () => !!settingsState.actuation && settingsState.actuation.point === point &&
+                  !settingsState.actuation.ownKeys,
+    done:   `Actuation point set to ${millimetresText(point)} on every key.`,
+    failed: 'Could not set the actuation point. The keyboard did not accept it.',
+  });
+}
+
+function setDebounceError(message) {
+  const input = $('debounce-ms');
+  $('debounce-error').textContent = message;
+  $('debounce-error').hidden = !message;
+  if (message) input.setAttribute('aria-invalid', 'true');
+  else         input.removeAttribute('aria-invalid');
+}
+
+function applyDebounce() {
+  const d = settingsState && settingsState.debounce;
+  if (!d) return;
+  const text = $('debounce-ms').value.trim();
+  const ms = /^\d+$/.test(text) ? Number(text) : NaN;
+  if (!(ms <= DEBOUNCE_MAX_MS)) {
+    const error = `Enter a whole number of milliseconds from 0 to ${DEBOUNCE_MAX_MS}.`;
+    setDebounceError(error);
+    playErrorBuzz();
+    // Moving to the field reads the error as its description; from Enter in the field
+    // there is no focus move to read it.
+    if (document.activeElement === $('debounce-ms')) announce(error);
+    else moveFocus('debounce-ms');
+    return;
+  }
+  setDebounceError('');
+  if (ms === d[1]) {
+    announce(`Debounce is already ${plural(ms, 'millisecond')}.`);
+    return;
+  }
+  if (ms === 0 || ms > DEBOUNCE_WARN_ABOVE_MS) {
+    pendingDebounceMs = ms;
+    $('debounce-confirm-desc').textContent = ms === 0
+      ? 'A debounce of 0 milliseconds turns debounce off, so a worn or bouncy key may type its letter twice.'
+      : `A debounce of ${ms} milliseconds is long: a quick second press of the same key, ` +
+        'such as the double t in "letter", may be missed.';
+    openDialog('debounce-confirm');   // autofocus is Cancel
+    return;
+  }
+  writeDebounce(ms);
+}
+
+function writeDebounce(ms, announceDelay) {
+  const [type] = settingsState.debounce;   // the board's own debounce method is kept
+  return applySetting('btn-apply-debounce', {
+    write:  () => writeKeychronSetting('debounce', [type, ms]),
+    reread: () => rereadMiscSetting('debounce'),
+    kept:   () => !!settingsState.debounce && settingsState.debounce[1] === ms,
+    done:   `Debounce set to ${plural(ms, 'millisecond')}.`,
+    failed: 'Could not set debounce. The keyboard did not accept it.',
+  }, announceDelay);
+}
+
+// Closing the dialog returns focus to where it was, which reads before the result.
+function confirmDebounce() {
+  const ms = pendingDebounceMs;
+  pendingDebounceMs = null;
+  closeDialog('debounce-confirm');
+  if (ms !== null && settingsState && settingsState.debounce) writeDebounce(ms, ANNOUNCE_AFTER_FOCUS_MS);
+}
+
+function cancelDebounceConfirm() {
+  pendingDebounceMs = null;
+  closeDialog('debounce-confirm');
+  announce('Debounce not changed.', ANNOUNCE_AFTER_FOCUS_MS);
+}
+
+async function applySleepTimes() {
+  const s = settingsState && settingsState.sleep;
+  if (!s) return;
+  const want = [Number($('sleep-backlight').value), Number($('sleep-keyboard').value)];
+  if (sameValue(want, s)) {
+    announce('Those are already the sleep times.');
+    return;
+  }
+  await applySetting('btn-apply-sleep', {
+    write:  () => writeKeychronSetting('wirelessSleep', toHex(sleepBytesFromSeconds(want))),
+    reread: () => rereadMiscSetting('sleep'),
+    kept:   () => sameValue(settingsState.sleep, want),
+    done:   `Sleep times set. The backlight turns off after ${durationText(want[0])}, ` +
+            `and the keyboard sleeps after ${durationText(want[1])}.`,
+    failed: 'Could not set the sleep times. The keyboard did not accept them.',
+  });
+}
+
+// The line in Step 1 that points to Keyboard Settings, naming what the keyboard
+// reports having. loadSettings still reads each one before showing it.
+async function showSettingsHint() {
+  const names = [];
+  if (await analogMatrixVersion()) names.push('actuation point');
+  const info = await keychronInfo(CMD_KC_MISC);
+  if (info && (info[5] & KC_MISC_SETTINGS.debounce.flag)) names.push('debounce');
+  if (info && (info[5] & KC_MISC_SETTINGS.wirelessSleep.flag)) names.push('wireless sleep times');
+  const hint = $('settings-hint');
+  hint.textContent = names.length
+    ? `You can change this keyboard's ${listText(names)} in Keyboard Settings ${navKeyHint(5)}.`
+    : '';
+  hint.hidden = !names.length;
 }
 
 // - Macros -
@@ -32474,6 +33072,7 @@ const BUTTON_ACTIONS = {
     changeKeyFromConfirm, chooseADifferentKey, closeChangedKeys, confirmKeyWarning,
     confirmMacro, confirmResetAll, confirmShortcut, connectKeyboard,
     disconnectFromUnsupported, disconnectKeyboard, executeResetAll, executeRestore,
+    applyActuation, applyDebounce, applySleepTimes, cancelDebounceConfirm, confirmDebounce,
     getStartedFromWelcome, goToHelp, openChangedKeys, openWriteTargetDialog,
     reportUnknownKeyboard, reportUntestedKeyboard, resetAllChanged, resetChoiceCancel, resetSelectedKeyToDefault,
     restoreSettingsPrompt, saveStepEditor, saveWriteTargetDialog, selectDisableAction,
@@ -32508,6 +33107,8 @@ function bindFormControls() {
   for (const [id, control] of Object.entries(sliders)) {
     $(id).addEventListener('input', ev => onLightingSliderInput(ev, control));
   }
+  $('actuation-point').addEventListener('input', ev => setActuationSliderText(Number(ev.target.value)));
+  $('debounce-ms').addEventListener('keydown', ev => { if (ev.key === 'Enter') applyDebounce(); });
 }
 
 // - Initialise -
@@ -32592,6 +33193,7 @@ function bindFormControls() {
   bindDialogCancel('reset-confirm',      cancelResetAll);
   bindDialogCancel('restore-confirm',    cancelRestore);
   bindDialogCancel('wt-dialog',          cancelWriteTargetDialog);
+  bindDialogCancel('debounce-confirm',   cancelDebounceConfirm);
 
   document.addEventListener('click', busyButtonClickGuard, true);
   document.addEventListener('click', onButtonAction);

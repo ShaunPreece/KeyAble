@@ -49,6 +49,8 @@ browser; nothing is sent anywhere over the internet.
 - Multi-step macros: type text, press keys or shortcuts, use media controls
   and system actions, and pause.
 - RGB lighting control, including turning the backlight off to save battery.
+- Keyboard settings, where the firmware has them: debounce, the wireless sleep
+  times, and the actuation point of HE keyboards.
 - Review every key that differs from factory and reset any of them, reset a
   single key, or reset the whole keyboard.
 - Save the keyboard's keys, macros, lighting and settings to a file, and restore them later.
@@ -66,8 +68,9 @@ under Help, "Supported Keyboards".
   built from Keychron's own firmware data.
 - The Ultra 8K models are built from Keychron's ZMK firmware source and have
   not yet been tested on a real keyboard.
-- The HE (Hall Effect) models work like any other, but their own settings,
-  such as the actuation point and rapid trigger, still need Keychron's Launcher.
+- The HE (Hall Effect) models work like any other, and KeyAble sets their
+  actuation point. Rapid trigger and their other settings still need Keychron's
+  Launcher.
 - Not supported: JIS (Japanese) layouts, and a few HE and Ultra 8K models, such
   as the Q0 HE and the V2 Ultra 8K.
 

@@ -8,7 +8,7 @@
    inDemoMode, scanChangedKeys, captureSession, writeKeyCodeOnLayer, restoreFileChosen,
    macroKeycode, offeredSystemKeys, codeName, LIST_STEP_TYPES, writeTarget:writable,
    readKeyCodeOnLayer, decodeAction, layerActionChanged, resetValueForLayer,
-   CMD_DYNAMIC_KEYMAP_RESET */
+   CMD_DYNAMIC_KEYMAP_RESET, DemoAnalogMatrix, analogTravelAt */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -24,6 +24,7 @@ const Q1_V1_ANSI = 0x0100;    // AVR firmware, read from its .hex file: protocol
 const B_PRO_BOARDS = [0x0711, 0x0712, 0x071A, 0x071B, 0x0761, 0x0762, 0x076B, 0x076C];
 const V6_ULTRA_ANSI = 0x0C60; // Ultra 8K ZMK: 0x7E18 is Siri here, where the B6 Pro has its Keychron key
 const V6_ULTRA_ISO = 0x0C61;  // its Win+H voice key reads back as 0 (FACTORY_KEYMAPS reportsNone)
+const K2_HE_ANSI = 0x0E20;    // HE: the analog matrix, without Keychron's settings or lighting
 
 const newPage = useEdge('demo', { acceptDownloads: true });
 
@@ -612,4 +613,150 @@ test('Capture Mode reads the older switch matrix layout of protocol 9 and 11 boa
     await page.locator('#h-key-selected', { hasText: 'H' }).waitFor();
     await page.close();
   }
+});
+
+// - Keyboard Settings -
+
+async function settingsPage(pid) {
+  const page = await demoPage(pid);
+  await page.keyboard.press('Alt+5');
+  await page.locator('#setting-actuation:visible, #setting-debounce:visible').first().waitFor();
+  return page;
+}
+
+const shownSettings = page => page.evaluate(() =>
+  ['setting-actuation', 'setting-debounce', 'setting-sleep'].filter(id => !document.getElementById(id).hidden));
+
+test('Keyboard Settings asks for a keyboard when none is connected', async () => {
+  const page = await newPage();
+  await page.goto(APP_URL);
+  await page.keyboard.press('Alt+5');
+  await page.locator('#settings-not-connected:visible').waitFor();
+  assert.deepEqual(await shownSettings(page), []);
+  await page.close();
+});
+
+test('a board with no settings has no Step 1 hint, and Keyboard Settings says so', async () => {
+  const page = await demoPage(K2_PRO_ANSI);
+  assert.equal(await page.locator('#settings-hint').isVisible(), false);
+  await page.keyboard.press('Alt+5');
+  await page.locator('#settings-status-text', { hasText: "This keyboard's firmware has no settings KeyAble can change." }).waitFor();
+  assert.deepEqual(await shownSettings(page), []);
+  await page.close();
+});
+
+test('a Max board offers debounce and sleep times, and applies debounce', async () => {
+  const page = await demoPage(V6_MAX_ANSI);
+  assert.equal((await page.locator('#settings-hint').textContent()).trim(),
+    "You can change this keyboard's debounce and wireless sleep times in Keyboard Settings (Alt+5).");
+  await page.keyboard.press('Alt+5');
+  await page.locator('#setting-debounce:visible').waitFor();
+  assert.deepEqual(await shownSettings(page), ['setting-debounce', 'setting-sleep']);
+  assert.equal(await page.locator('#debounce-now').textContent(), "Now 5 milliseconds (Keychron's usual).");
+
+  await page.locator('#debounce-ms').fill('12');
+  await page.locator('#btn-apply-debounce').click();
+  await page.locator('#sr-live', { hasText: 'Debounce set to 12 milliseconds.' }).waitFor();
+  assert.deepEqual(await page.evaluate(() => hidDevice.keychron.debounce), [0, 12]);
+  assert.equal(await page.locator('#debounce-now').textContent(), 'Now 12 milliseconds.');
+  await page.close();
+});
+
+test('debounce outside 0 to 255 is refused at the field', async () => {
+  const page = await settingsPage(V6_MAX_ANSI);
+  await page.locator('#debounce-ms').fill('300');
+  await page.locator('#btn-apply-debounce').click();
+  await page.locator('#debounce-error:visible', { hasText: 'from 0 to 255' }).waitFor();
+  assert.equal(await page.locator('#debounce-ms').getAttribute('aria-invalid'), 'true');
+  assert.deepEqual(await page.evaluate(() => hidDevice.keychron.debounce), [0, 5]);
+  await page.close();
+});
+
+test('debounce of 0 or above 50 asks first; Cancel leaves it, Apply Anyway writes it', async () => {
+  const page = await settingsPage(V6_MAX_ANSI);
+  await page.locator('#debounce-ms').fill('0');
+  await page.locator('#btn-apply-debounce').click();
+  await page.locator('#debounce-confirm[open]').waitFor();
+  assert.match(await page.locator('#debounce-confirm-desc').textContent(), /turns debounce off/);
+  await page.locator('#btn-debounce-cancel').click();
+  await page.locator('#sr-live', { hasText: 'Debounce not changed.' }).waitFor();
+  assert.deepEqual(await page.evaluate(() => hidDevice.keychron.debounce), [0, 5]);
+
+  await page.locator('#debounce-ms').fill('80');
+  await page.locator('#btn-apply-debounce').click();
+  await page.locator('#debounce-confirm[open]').waitFor();
+  await page.locator('#btn-debounce-confirm').click();
+  await page.locator('#sr-live', { hasText: 'Debounce set to 80 milliseconds.' }).waitFor();
+  assert.deepEqual(await page.evaluate(() => hidDevice.keychron.debounce), [0, 80]);
+  await page.close();
+});
+
+test('sleep times apply, and a refusal says so and keeps the times', async () => {
+  const page = await settingsPage(V6_MAX_ANSI);
+  assert.equal(await page.locator('#sleep-now').textContent(),
+    'Now the backlight turns off after 10 minutes, and the keyboard sleeps after 2 hours.');
+  await page.locator('#sleep-backlight').selectOption('300');
+  await page.locator('#sleep-keyboard').selectOption('3600');
+  await page.locator('#btn-apply-sleep').click();
+  await page.locator('#sr-live', { hasText: 'Sleep times set.' }).waitFor();
+  assert.deepEqual(await page.evaluate(() => hidDevice.keychron.wirelessSleep), [0x2C, 0x01, 0x10, 0x0E]);
+
+  await page.evaluate(() => {   // the firmware refuses, as it does under 5 or 60 seconds
+    const answer = hidDevice.answerKeychronMisc.bind(hidDevice);
+    hidDevice.answerKeychronMisc = d => { if (d[1] === 0x0C) d[2] = 1; else answer(d); };
+  });
+  await page.locator('#sleep-backlight').selectOption('30');
+  await page.locator('#btn-apply-sleep').click();
+  await page.locator('#sr-live', { hasText: 'Could not set the sleep times.' }).waitFor();
+  assert.equal(await page.locator('#sleep-backlight').inputValue(), '300');
+  await page.close();
+});
+
+test('an HE board sets one actuation point for every key, replacing keys with their own', async () => {
+  const page = await demoPage(K2_HE_ANSI);
+  assert.equal((await page.locator('#settings-hint').textContent()).trim(),
+    "You can change this keyboard's actuation point in Keyboard Settings (Alt+5).");
+  await page.evaluate(() => {   // as if Keychron's Launcher had given one key its own point
+    const a = hidDevice.analog;
+    DemoAnalogMatrix.setTravel(a.profiles[0], a.keyAt(2, 1), { mode: 1, point: 5, sens: 4, releaseSens: 4 });
+  });
+  await page.keyboard.press('Alt+5');
+  await page.locator('#setting-actuation:visible').waitFor();
+  assert.deepEqual(await shownSettings(page), ['setting-actuation']);
+  const now = await page.locator('#actuation-now').textContent();
+  assert.match(now, /^Now 2\.0 millimetres \(Keychron's usual\)\. This changes profile 1 of 3/);
+  assert.match(now, /1 key has its own settings/);
+
+  const slider = page.locator('#actuation-point');
+  await slider.focus();
+  for (let i = 0; i < 10; i++) await page.keyboard.press('ArrowRight');
+  assert.equal(await slider.getAttribute('aria-valuetext'), '3.0 millimetres');
+  await page.locator('#btn-apply-actuation').click();
+  await page.locator('#sr-live', { hasText: 'Actuation point set to 3.0 millimetres on every key.' }).waitFor();
+
+  const board = await page.evaluate(() => {
+    const a = hidDevice.analog, p = a.profiles[0];
+    return { whole: analogTravelAt(p, 0), key: analogTravelAt(p, a.keyAt(2, 1)) };
+  });
+  assert.deepEqual(board.whole, { mode: 1, point: 30, sens: 4, releaseSens: 4 });
+  assert.deepEqual(board.key, { mode: 0, point: 0, sens: 0, releaseSens: 0 }, 'the key follows the whole keyboard again');
+  assert.doesNotMatch(await page.locator('#actuation-now').textContent(), /own settings/);
+  await page.close();
+});
+
+test('an HE profile with Rapid Trigger keeps it when the actuation point changes', async () => {
+  const page = await demoPage(K2_HE_ANSI);
+  await page.evaluate(() => { hidDevice.analog.current = 1; });
+  await page.keyboard.press('Alt+5');
+  await page.locator('#setting-actuation:visible').waitFor();
+  assert.match(await page.locator('#actuation-now').textContent(), /profile 2 of 3.*Rapid Trigger is on/);
+  await page.locator('#actuation-point').focus();
+  await page.keyboard.press('ArrowLeft');
+  await page.locator('#btn-apply-actuation').click();
+  await page.locator('#sr-live', { hasText: 'Actuation point set to 1.9 millimetres' }).waitFor();
+  assert.deepEqual(await page.evaluate(() => analogTravelAt(hidDevice.analog.profiles[1], 0)),
+    { mode: 2, point: 19, sens: 4, releaseSens: 4 });
+  assert.equal(await page.evaluate(() => analogTravelAt(hidDevice.analog.profiles[0], 0).point), 20,
+    'other profiles are left alone');
+  await page.close();
 });
