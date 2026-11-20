@@ -365,7 +365,8 @@
   .setting-uses { margin: .5rem 0 .85rem 1.25rem; padding: 0; line-height: 1.55; }
   .setting-now { font-weight: 700; margin: .85rem 0; }
   .lighting-row select,
-  .lighting-row input[type="number"] {
+  .lighting-row input[type="number"],
+  .lighting-row input[type="text"] {
     font: inherit;
     padding: .45rem .6rem;
     background: var(--surface2);
@@ -2130,7 +2131,9 @@
         </p>
         <p>
           The actuation point is set for every key at once, in the profile the keyboard is
-          using. It is not saved in a setup file yet.
+          using. It is not saved in a setup file yet. To help choose it, Test Key Depth plays
+          a tone that rises as you press F, clicks where the chosen point would make it type,
+          and says how deep each press went.
         </p>
 
         <h4 style="margin-top:1.25rem">Is there a light theme?</h4>
@@ -2360,6 +2363,26 @@
         </div>
         <div class="btn-row">
           <button id="btn-apply-actuation" class="primary" data-action="applyActuation">Apply Actuation Point</button>
+        </div>
+
+        <div id="depth-test">
+          <h4 style="margin-top:1.25rem">Test Key Depth.</h4>
+          <p>
+            Hear how far down you press, to choose a point that suits you. After Start, press
+            and hold F, the key with the raised bump. A tone rises as the key goes down, and a
+            click sounds where the actuation point chosen above would make it type. When you
+            let go, KeyAble says how deep the press went. Try resting a finger on F, or
+            brushing it, to find a point that ignores that.
+          </p>
+          <div class="btn-row">
+            <button id="btn-depth-test" data-action="startDepthTest">Start Depth Test</button>
+          </div>
+          <div id="depth-area" class="lighting-row" hidden>
+            <label for="depth-scratch">Depth test. F types here:</label>
+            <input type="text" id="depth-scratch" autocomplete="off" spellcheck="false"
+                   aria-describedby="depth-hint">
+            <p id="depth-hint" class="hint">Press and hold F, then let go. Escape ends the test.</p>
+          </div>
         </div>
       </div>
 
@@ -21355,6 +21378,41 @@ function playChirp(success) {
   ]);
 }
 
+// A held tone whose pitch follows a key's depth, from 220 Hz at rest to 880 Hz at
+// 4.0 millimetres, silent while the key is up.
+class DepthTone {
+  constructor() {
+    try {
+      this.ctx  = new (window.AudioContext || window.webkitAudioContext)();
+      this.osc  = this.ctx.createOscillator();
+      this.gain = this.ctx.createGain();
+      this.gain.gain.value = 0;
+      this.osc.connect(this.gain);
+      this.gain.connect(this.ctx.destination);
+      this.osc.start();
+    } catch {
+      this.ctx = null;   // no Web Audio: the spoken result still comes on release
+    }
+  }
+
+  set(tenths) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.osc.frequency.setTargetAtTime(220 * 2 ** (tenths / 20), t, 0.01);
+    this.gain.gain.setTargetAtTime(tenths > 0 ? 0.08 : 0, t, 0.01);
+  }
+
+  stop() {
+    if (this.ctx) this.ctx.close().catch(() => {});
+    this.ctx = null;
+  }
+}
+
+// The depth test's mark where the chosen actuation point is passed.
+function playDepthClick() {
+  playTones([{ freq: 1600, gain: 0.2, decay: 0.03, dur: 0.04, type: 'square' }]);
+}
+
 function playBeep() {
   playTones([{ freq: 660, gain: 0.22, decay: 0.15, dur: 0.18 }]);
 }
@@ -26779,6 +26837,7 @@ function goToSection(id, focusHeading = true) {
   if (id === 'step3')    loadStep3();
   if (id === 'lighting') loadLighting();
   if (id === 'settings') loadSettings();
+  else stopDepthTest();
   if (!focusHeading) return;
   const heading = document.querySelector(`#sec-${id} > h2[tabindex="-1"]`);
   if (heading) moveFocus(heading);
@@ -28597,7 +28656,7 @@ class DemoKeyboard extends EventTarget {
     const isHE  = /\bHE\b/.test(entry.name);
     this.reportsBuild = isMax;
     this.keychron = isMax && !isHE ? { debounce: [0, 5], wirelessSleep: [0x58, 0x02, 0x20, 0x1C] } : null;
-    this.analog = isHE ? new DemoAnalogMatrix(this.layout) : null;
+    this.analog = isHE ? new DemoAnalogMatrix(this.layout, () => this.heldSwitches) : null;
     const leds = this.layout.keys.length;
     this.keychronRgb = isMax && !isHE && this.lightingChannel === LIGHTING_CH_RGB_MATRIX ? {
       leds, indicators: new Uint8Array(4), perKeyType: 0,
@@ -28812,8 +28871,12 @@ class DemoKeyboard extends EventTarget {
 const DEMO_ANALOG_VERSION = 4;
 
 class DemoAnalogMatrix {
-  constructor(layout) {
+  // `heldSwitches` gives the demo keyboard's held switches, which read as fully
+  // pressed; tests set a depth of their own in `travel` ("row,col" -> tenths).
+  constructor(layout, heldSwitches) {
     this.layout  = layout;
+    this.heldSwitches = heldSwitches;
+    this.travel  = new Map();
     this.current = 0;
     // AMC_MODE is defined later in the script, so it is read here, not at load.
     this.profiles = [AMC_MODE.REGULAR, AMC_MODE.RAPID, AMC_MODE.RAPID].map(mode => {
@@ -28862,6 +28925,15 @@ class DemoAnalogMatrix {
         break;
       }
       case AMC.SAVE_PROFILE: d[2] = p ? 0 : 1; break;
+      case AMC.GET_REALTIME_TRAVEL: {
+        const [row, col] = [d[2], d[3]];
+        const at = `${row},${col}`;
+        d[3] = row;
+        d[4] = col;
+        d[5] = this.travel.get(at) ?? (this.heldSwitches().has(at) ? ACTUATION_MAX + 1 : 0);
+        d[2] = 0;
+        break;
+      }
       default: break;   // the firmware returns any other request unchanged
     }
   }
@@ -29342,6 +29414,7 @@ async function disconnectKeyboard(
   settingsState     = null;
   pendingDebounceMs = null;
   settingsLoadToken++;   // drop any settings read still running for the old keyboard
+  stopDepthTest();
   deviceLayerCount = null;
   viaProtocolVersion = null;
   deviceKeycodes = KEYCODES_PROTOCOL_12;
@@ -29691,7 +29764,8 @@ async function readMiscSettingsForPage() {
 // fields are all 0 follows the whole-keyboard setting. The getters' replies carry no
 // status byte. A board without the analog matrix answers unhandled (QMK) or returns
 // the request unchanged (ZMK), so version 0 means none.
-const AMC = { GET_VERSION: 0x01, GET_PROFILES_INFO: 0x10, GET_PROFILE_RAW: 0x12, SET_TRAVEL: 0x14, SAVE_PROFILE: 0x1F };
+const AMC = { GET_VERSION: 0x01, GET_PROFILES_INFO: 0x10, GET_PROFILE_RAW: 0x12, SET_TRAVEL: 0x14,
+              SAVE_PROFILE: 0x1F, GET_REALTIME_TRAVEL: 0x30 };
 const AMC_MODE = { GLOBAL: 0, REGULAR: 1, RAPID: 2 };
 const AMC_CONFIG_BYTES = 4;
 const AMC_RAW_DATA_AT = 6;                      // after GET_PROFILE_RAW's request bytes
@@ -29769,6 +29843,14 @@ async function writeActuation(current, point) {
       throw new Error('The keyboard did not accept the actuation point.');
     }
   }
+}
+
+// How far one key is pressed now, in tenths of a millimetre, or null when the board
+// does not say. The reply holds the row and column again from byte 3, then the depth.
+async function readKeyTravel(row, col) {
+  const reply = await sendVIA([CMD_KC_ANALOG, AMC.GET_REALTIME_TRAVEL, row, col], 500);
+  if (!reply || reply[0] !== CMD_KC_ANALOG || reply[2] !== 0) return null;
+  return reply[5];
 }
 
 // - Keychron lighting (0xA8, keychron_rgb.c) -
@@ -31086,6 +31168,75 @@ async function showSettingsHint() {
     ? `You can change this keyboard's ${listText(names)} in Keyboard Settings ${navKeyHint(5)}.`
     : '';
   hint.hidden = !names.length;
+}
+
+// - Key depth test -
+// Polls F's depth while the test runs. A held tone follows the depth, a click marks the
+// chosen point being passed, and the deepest point is spoken when the key comes back up.
+// F types into the test's own box meanwhile.
+const DEPTH_POLL_MS = 20;
+const DEPTH_RELEASE_POLLS = 2;   // polls at rest before a press counts as over
+
+let depthTestToken = 0;
+let depthTestRunning = false;
+
+const depthTestKey = () => {
+  const layout = activeLayout();
+  return layout ? layout.keys.find(k => k.label === 'F') : null;
+};
+
+function startDepthTest() {
+  if (depthTestRunning || !settingsState || !settingsState.actuation || !depthTestKey()) return;
+  depthTestRunning = true;
+  $('depth-scratch').value = '';
+  $('depth-area').hidden = false;
+  $('depth-scratch').focus();   // its label and hint say what to do
+  runDepthTest(++depthTestToken);
+}
+
+// Stops polling and hides the box. Safe to call when no test is running.
+function stopDepthTest() {
+  if (!depthTestRunning) return;
+  depthTestRunning = false;
+  depthTestToken++;
+  $('depth-area').hidden = true;
+}
+
+// Escape in the test box: back to the Start button, which reads before the message.
+function endDepthTest() {
+  $('btn-depth-test').focus();   // the blur stops the test
+  stopDepthTest();
+  announce('Depth test ended.', ANNOUNCE_AFTER_FOCUS_MS);
+}
+
+async function runDepthTest(token) {
+  const key  = depthTestKey();
+  const tone = new DepthTone();
+  let deepest = 0, atRest = 0, past = false;
+  while (token === depthTestToken) {
+    const depth = await readKeyTravel(key.row, key.col);
+    if (token !== depthTestToken) break;
+    if (depth === null) {
+      $('btn-depth-test').focus();
+      stopDepthTest();
+      announce('The keyboard did not say how far F is pressed, so the depth test has stopped.', ANNOUNCE_AFTER_FOCUS_MS);
+      break;
+    }
+    const point = Number($('actuation-point').value);
+    tone.set(depth);
+    if (depth >= point && !past) playDepthClick();
+    past = depth >= point;
+    if (depth > 0) {
+      deepest = Math.max(deepest, depth);
+      atRest = 0;
+    } else if (deepest > 0 && ++atRest >= DEPTH_RELEASE_POLLS) {
+      announce(`Deepest ${millimetresText(deepest)}. At ${millimetresText(point)}, ` +
+        `this press ${deepest >= point ? 'types' : 'does not type'}.`);
+      deepest = 0;
+    }
+    await new Promise(resolve => setTimeout(resolve, DEPTH_POLL_MS));
+  }
+  tone.stop();
 }
 
 // - Macros -
@@ -33073,6 +33224,7 @@ const BUTTON_ACTIONS = {
     confirmMacro, confirmResetAll, confirmShortcut, connectKeyboard,
     disconnectFromUnsupported, disconnectKeyboard, executeResetAll, executeRestore,
     applyActuation, applyDebounce, applySleepTimes, cancelDebounceConfirm, confirmDebounce,
+    startDepthTest,
     getStartedFromWelcome, goToHelp, openChangedKeys, openWriteTargetDialog,
     reportUnknownKeyboard, reportUntestedKeyboard, resetAllChanged, resetChoiceCancel, resetSelectedKeyToDefault,
     restoreSettingsPrompt, saveStepEditor, saveWriteTargetDialog, selectDisableAction,
@@ -33109,6 +33261,12 @@ function bindFormControls() {
   }
   $('actuation-point').addEventListener('input', ev => setActuationSliderText(Number(ev.target.value)));
   $('debounce-ms').addEventListener('keydown', ev => { if (ev.key === 'Enter') applyDebounce(); });
+  $('depth-scratch').addEventListener('keydown', ev => {
+    if (ev.key !== 'Escape') return;
+    ev.preventDefault();
+    endDepthTest();
+  });
+  $('depth-scratch').addEventListener('blur', () => stopDepthTest());
 }
 
 // - Initialise -

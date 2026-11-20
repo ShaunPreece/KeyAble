@@ -760,3 +760,31 @@ test('an HE profile with Rapid Trigger keeps it when the actuation point changes
     'other profiles are left alone');
   await page.close();
 });
+
+test('the depth test follows F and says how deep each press went', async () => {
+  const page = await settingsPage(K2_HE_ANSI);
+  // The heading takes focus once the page shows, which would end the test at once.
+  await page.waitForFunction(() => document.activeElement.id === 'h-settings');
+  await page.locator('#btn-depth-test').click();
+  await page.waitForFunction(() => document.activeElement.id === 'depth-scratch');
+  const press = async tenths => {
+    await page.evaluate(t => {
+      const f = activeLayout().keys.find(k => k.label === 'F');
+      hidDevice.analog.travel.set(`${f.row},${f.col}`, t);
+    }, tenths);
+    await page.waitForTimeout(150);
+  };
+
+  await press(25);
+  await press(0);
+  await page.locator('#sr-live', { hasText: 'Deepest 2.5 millimetres. At 2.0 millimetres, this press types.' }).waitFor();
+  await press(12);
+  await press(0);
+  await page.locator('#sr-live', { hasText: 'Deepest 1.2 millimetres. At 2.0 millimetres, this press does not type.' }).waitFor();
+
+  await page.keyboard.press('Escape');
+  await page.locator('#sr-live', { hasText: 'Depth test ended.' }).waitFor();
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'btn-depth-test');
+  assert.equal(await page.locator('#depth-area').isVisible(), false);
+  await page.close();
+});
