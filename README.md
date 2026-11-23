@@ -64,10 +64,10 @@ each ANSI, ISO, knob, and backlight version separately). The full list is inside
 under Help, "Supported Keyboards".
 <!-- END GENERATED SUPPORTED KEYBOARDS -->
 
-- Tested on real hardware: V5 Max, V6 Max, Q6 Max, and B6 Pro. The others are
-  built from Keychron's own firmware data.
-- The Ultra 8K models are built from Keychron's ZMK firmware source and have
-  not yet been tested on a real keyboard.
+- Tested on real hardware: V5 Max, V6 Max, Q6 Max, B6 Pro, and V6 Ultra 8K.
+  The others are built from Keychron's own firmware data.
+- The Ultra 8K models are built from Keychron's ZMK firmware source. The V6
+  Ultra 8K ISO is the one tested on a real keyboard.
 - The HE (Hall Effect) models work like any other, and KeyAble sets their
   actuation point. Rapid trigger and their other settings still need Keychron's
   Launcher.
