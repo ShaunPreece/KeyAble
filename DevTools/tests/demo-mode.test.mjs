@@ -23,7 +23,7 @@ const Q1_V1_ANSI = 0x0100;    // AVR firmware, read from its .hex file: protocol
 // ZMK firmware: protocol 12, but its own list of Keychron keys. Original and 2025 boards.
 const B_PRO_BOARDS = [0x0711, 0x0712, 0x071A, 0x071B, 0x0761, 0x0762, 0x076B, 0x076C];
 const V6_ULTRA_ANSI = 0x0C60; // Ultra 8K ZMK: 0x7E18 is Siri here, where the B6 Pro has its Keychron key
-const V6_ULTRA_ISO = 0x0C61;  // its Win+H voice key reads back as 0 (FACTORY_KEYMAPS reportsNone)
+const V6_ULTRA_ISO = 0x0C61;  // its Windows voice key is Cortana (0x7E19)
 const K2_HE_ANSI = 0x0E20;    // HE: the analog matrix, without Keychron's settings or lighting
 
 const newPage = useEdge('demo', { acceptDownloads: true });
@@ -269,22 +269,23 @@ test('the V6 Ultra names its own Keychron keys, has its knob, and starts with no
   await page.close();
 });
 
-test('the V6 Ultra ISO voice key reads as 0 but is factory, and resets to Win+H', async () => {
+test('the V6 Ultra ISO voice key is factory as Cortana, and resets to Cortana', async () => {
   const page = await demoPage(V6_ULTRA_ISO);
   await page.keyboard.press('Alt+2');
   const out = await page.evaluate(async () => {
     const { win } = activeLayerRoles();
     const key = activeLayout().keys.find(k => k.row === 0 && k.col === 15);
+    const read = await readKeyCodeOnLayer(win, key);
     const scan = await scanChangedKeys();
     return {
-      read: await readKeyCodeOnLayer(win, key),
-      shown: decodeAction(0, key, win),
+      read,
+      shown: decodeAction(read, key, win),
       changed: await layerActionChanged(win, key),
       reset: codeName(resetValueForLayer(win, key)),
       changes: scan.rows.length,
     };
   });
-  assert.deepEqual(out, { read: 0, shown: 'Default', changed: false, reset: 'Voice Typing (Win+H)', changes: 0 });
+  assert.deepEqual(out, { read: 0x7E19, shown: 'Default', changed: false, reset: 'Cortana', changes: 0 });
   await page.close();
 });
 

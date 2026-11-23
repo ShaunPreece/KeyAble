@@ -100,11 +100,10 @@ Both datasets were derived from Keychron's own public, open sources:
     (generate_launcher_keymaps in app/src/launcher/map_keycode.c). Keychron's
     VIA definitions for some of the boards, in app/src/launcher, are the
     cross-check.
-    That translation has no code for Win+H, the Windows voice typing key on
-    11 of these boards, so the keyboard reports it as 0 until the key is
-    written, while the key still types Win+H. The dataset holds Win+H there
-    and lists the key in the entry's reportsNone, so the app counts both 0
-    and Win+H as the factory setting and a reset writes Win+H.
+    The shipped firmware differs from this source on one key. The source binds
+    the Windows voice key on 11 of these boards to Win+H, but a V6 Ultra ISO
+    reports that key as Keychron's Cortana code and types Win+C, which opens
+    Copilot. The dataset holds Cortana there for all 11 boards.
 
   - Keychron's VIA JSON files (the same files the Keychron Launcher and VIA
     configurator load), from Keychron's fork (each board's via_json folder) and
