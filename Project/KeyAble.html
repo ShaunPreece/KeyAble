@@ -1888,8 +1888,8 @@
             controllable from the RGB Lighting section.</li>
           <li>Keychron's Bluetooth, 2.4 GHz and battery check keys.</li>
           <li>Japanese and Korean input keys, and Japanese (JIS) keyboard layouts.</li>
-          <li>Keyboard-wide settings other than debounce and the wireless sleep times, such as
-            polling rate.</li>
+          <li>Keyboard-wide settings other than debounce, the wireless sleep times and the Ultra
+            8K keyboards' polling rate, such as the polling rate of other keyboards.</li>
           <li>Settings of HE (Hall Effect) keyboards other than one actuation point for every
             key, such as rapid trigger and an actuation point for each key.</li>
           <li>The HE and Ultra 8K keyboards not in Supported Keyboards, such as the Q0 HE, the HE
@@ -2124,10 +2124,14 @@
         <h4 style="margin-top:1.25rem">What can I change in Keyboard Settings?</h4>
         <p data-nav-keys>
           Keyboard Settings, Alt plus 5, shows the settings your keyboard's firmware has: the
-          actuation point on HE keyboards, and debounce and the wireless sleep times on
-          keyboards with recent Keychron firmware. Each setting says what it does and when it
-          helps, and changes only when you press its Apply button. If your keyboard has none
-          of them, the page says so.
+          actuation point on HE keyboards, debounce and the wireless sleep times on keyboards
+          with recent Keychron firmware, and the polling rate on Ultra 8K keyboards. Each
+          setting says what it does and when it helps, and changes only when you press its
+          Apply button. If your keyboard has none of them, the page says so.
+        </p>
+        <p>
+          The polling rate is set separately for the cable and for 2.4 GHz wireless, from 125
+          to 8000 times a second; Bluetooth's is fixed. It is not saved in a setup file yet.
         </p>
         <p>
           The actuation point is set for every key at once, in the profile the keyboard is
@@ -2410,6 +2414,31 @@
         </div>
         <div class="btn-row">
           <button id="btn-apply-debounce" class="primary" data-action="applyDebounce">Apply Debounce</button>
+        </div>
+      </div>
+
+      <div id="setting-polling" class="card" hidden>
+        <h3>Polling Rate.</h3>
+        <p>
+          How many times a second the keyboard tells the computer which keys are down.
+          Keychron's usual is 1000.
+        </p>
+        <ul class="setting-uses">
+          <li>Higher, up to 8000: a key press reaches the computer up to a millisecond
+            sooner. This matters mostly in fast games.</li>
+          <li>Lower: on 2.4 GHz the battery lasts longer, and the computer has less to do.</li>
+        </ul>
+        <p id="polling-now" class="setting-now"></p>
+        <div id="polling-cable-row" class="lighting-row">
+          <label for="polling-cable">By cable:</label>
+          <select id="polling-cable"></select>
+        </div>
+        <div id="polling-dongle-row" class="lighting-row">
+          <label for="polling-dongle">On 2.4 GHz wireless:</label>
+          <select id="polling-dongle"></select>
+        </div>
+        <div class="btn-row">
+          <button id="btn-apply-polling" class="primary" data-action="applyPollingRate">Apply Polling Rate</button>
         </div>
       </div>
 
@@ -28630,10 +28659,15 @@ class DemoKeyboard extends EventTarget {
     // (debounce and wireless sleep times here) and, on RGB models, Keychron's lighting.
     // Older and ZMK firmware answers none of these. Keychron's HE source reports its
     // build and has the analog matrix instead of the settings and lighting.
+    // The Ultra 8K firmware answers 0xA7 in its own layout, with the values a V6 Ultra
+    // ISO gave: debounce press 0 and release 50 ms, and 1000 Hz on cable and 2.4 GHz.
     const isMax = keycodesForBoard(entry, this.protocolVersion) === KEYCODES_PROTOCOL_12;
     const isHE  = /\bHE\b/.test(entry.name);
     this.reportsBuild = isMax;
-    this.keychron = isMax && !isHE ? { debounce: [0, 5], wirelessSleep: [0x58, 0x02, 0x20, 0x1C] } : null;
+    const sleepTimes = [0x58, 0x02, 0x20, 0x1C];   // 600 and 7200 seconds
+    this.keychron = isMax && !isHE ? { debounce: [0, 5], wirelessSleep: sleepTimes } : null;
+    this.keychronUltra = entry.firmware === 'zmk-ultra'
+      ? { debounce: [0, 50], wirelessSleep: sleepTimes, polling: [3, 3] } : null;
     this.analog = isHE ? new DemoAnalogMatrix(this.layout, () => this.heldSwitches) : null;
     const leds = this.layout.keys.length;
     this.keychronRgb = isMax && !isHE && this.lightingChannel === LIGHTING_CH_RGB_MATRIX ? {
@@ -28802,6 +28836,7 @@ class DemoKeyboard extends EventTarget {
   // Keychron 0xA7 and 0xA8: arguments from byte 2, then the status over byte 2 and any
   // data from byte 3, as keychron_raw_hid.c and keychron_rgb.c answer them.
   answerKeychronMisc(d) {
+    if (this.keychronUltra) { this.answerUltraMisc(d); return; }
     const k = this.keychron;
     if (!k) { d[0] = VIA_UNHANDLED; return; }
     switch (d[1]) {
@@ -28813,6 +28848,39 @@ class DemoKeyboard extends EventTarget {
       default: d[2] = 1; return;   // a setting this build does not have
     }
     d[2] = 0;
+  }
+
+  // 0xA7 as the Ultra 8K firmware answers it: no feature flags, and a sub-command it
+  // lacks leaves the request as it is.
+  answerUltraMisc(d) {
+    const k = this.keychronUltra;
+    switch (d[1]) {
+      case 0x01: d[2] = 0; d[3] = ULTRA_SETTINGS_VERSION; d[4] = 0; break;
+      case 0x05: d.set([0, 1, ...k.debounce], 2); break;
+      case 0x06:
+        if (d[2] > 50 || d[3] > 50 || d[3] === 0) { d[2] = 1; break; }
+        k.debounce = [d[2], d[3]];
+        d[2] = 0;
+        break;
+      case 0x0B: d[2] = 0; d.set(k.wirelessSleep, 3); break;
+      case 0x0C: {
+        const [backlight, sleep] = sleepSecondsFromBytes(d.subarray(2, 6));
+        if (backlight < 5 || sleep < 60) { d[2] = 1; break; }
+        k.wirelessSleep = Array.from(d.subarray(2, 6));
+        d[2] = 0;
+        break;
+      }
+      case ULTRA_POLLING_GET: {
+        const [cable, dongle] = k.polling;
+        d.set([0, 0x40, 0x1F, 0x7F, cable, 0, 0x40, 0x1F, 0x7F, dongle, 0, 0x7D, 0, 0x40, 0x40, 1], 2);
+        break;
+      }
+      case ULTRA_POLLING_SET:
+        if (d[2] > POLLING_MAX_DIVIDER || d[3] > POLLING_MAX_DIVIDER || d[4] > POLLING_MAX_DIVIDER) { d[2] = 1; break; }
+        k.polling = [d[2], d[3]];
+        d[2] = 0;
+        break;
+    }
   }
 
   answerKeychronRgb(d) {
@@ -29715,22 +29783,68 @@ const sleepSecondsFromBytes = b => [b[0] | (b[1] << 8), b[2] | (b[3] << 8)];
 const sleepBytesFromSeconds = ([backlight, sleep]) =>
   [backlight & 0xFF, backlight >> 8, sleep & 0xFF, sleep >> 8];
 
-// Debounce as [type, milliseconds] and the sleep times, each null when the build does
-// not report it or will not read it. Keychron's source sets the sleep-times bit under
-// one build option and handles the command under another, so a board can report a
-// setting it then refuses.
+// - Keychron settings on the Ultra 8K firmware (0xA7) -
+// The Ultra 8K boards answer 0xA7 in a layout of their own, set out in
+// docs/KEYCHRON-SETTINGS.txt. Sub-command 1 carries no feature flags; its version is 3
+// on builds that set the polling rate of cable and 2.4 GHz apart, the only layout read
+// here. The sleep times are as on QMK.
+const ULTRA_SETTINGS_VERSION = 3;
+const ULTRA_POLLING_GET = 0x0D;
+const ULTRA_POLLING_SET = 0x0E;
+const POLLING_BASE_HZ   = 8000;   // a rate is POLLING_BASE_HZ >> n for its divider n
+const POLLING_MAX_DIVIDER = 6;
+const POLLING_USUAL_HZ  = 1000;
+const POLLING_LINKS     = ['cable', 'dongle', 'bluetooth'];   // the reply's entry order
+const POLLING_ENTRY_BYTES = 5;
+
+const isUltraFirmware = () => !!activeKbd && activeKbd.firmware === 'zmk-ultra';
+const pollingHz = divider => POLLING_BASE_HZ >> divider;
+
+// The 0x0D reply as { cable, dongle, bluetooth }, each { maxHz, divider, dividers,
+// readOnly }: the current divider and the ones the board allows (bit n of the mask
+// allows n). A read-only link's divider is not a divider (Bluetooth sends 0x40), so only
+// its maxHz is its rate.
+function pollingRateFromReply(reply) {
+  const out = {};
+  POLLING_LINKS.forEach((link, i) => {
+    const at = 3 + i * POLLING_ENTRY_BYTES;
+    const mask = reply[at + 2];
+    const dividers = [];
+    for (let n = 0; n <= POLLING_MAX_DIVIDER; n++) if (mask & (1 << n)) dividers.push(n);
+    out[link] = { maxHz: reply[at] | (reply[at + 1] << 8), divider: reply[at + 3], dividers, readOnly: reply[at + 4] !== 0 };
+  });
+  return out;
+}
+
+// Sets both settable links at once. The firmware refuses the request unless its third
+// divider byte, which it does not use, is in range too.
+const writePollingRate = (cable, dongle) => askKeychron(CMD_KC_MISC, ULTRA_POLLING_SET, cable, dongle, 0);
+
+// Debounce as [type, milliseconds], the sleep times and the polling rate, each null when
+// the build does not report it or will not read it. Keychron's source sets the
+// sleep-times bit under one build option and handles the command under another, so a
+// board can report a setting it then refuses.
 async function readMiscSettingsForPage() {
-  const out = { debounce: null, sleep: null };
+  const out = { debounce: null, sleep: null, pollingRate: null };
   const info = await keychronInfo(CMD_KC_MISC);
   if (!info) return out;
-  const read = async name => {
-    if (!(info[5] & KC_MISC_SETTINGS[name].flag)) return null;
-    try { return await askKeychron(CMD_KC_MISC, KC_MISC_SETTINGS[name].get); } catch { return null; }
+  const ultra = isUltraFirmware();
+  const read = async sub => {
+    try { return await askKeychron(CMD_KC_MISC, sub); } catch { return null; }
   };
-  const debounce = await read('debounce');
-  if (debounce) out.debounce = [debounce[4], debounce[5]];
-  const sleep = await read('wirelessSleep');
-  if (sleep) out.sleep = sleepSecondsFromBytes(sleep.subarray(3, 7));
+  const has = name => (info[5] & KC_MISC_SETTINGS[name].flag) !== 0;
+  if (!ultra && has('debounce')) {
+    const debounce = await read(KC_MISC_SETTINGS.debounce.get);
+    if (debounce) out.debounce = [debounce[4], debounce[5]];
+  }
+  if (ultra || has('wirelessSleep')) {
+    const sleep = await read(KC_MISC_SETTINGS.wirelessSleep.get);
+    if (sleep) out.sleep = sleepSecondsFromBytes(sleep.subarray(3, 7));
+  }
+  if (ultra && info[3] === ULTRA_SETTINGS_VERSION) {
+    const rate = await read(ULTRA_POLLING_GET);
+    if (rate) out.pollingRate = pollingRateFromReply(rate);
+  }
   return out;
 }
 
@@ -30918,7 +31032,7 @@ function showSettingsStatus(text) {
 
 async function loadSettings() {
   const token = ++settingsLoadToken;
-  ['setting-actuation', 'setting-debounce', 'setting-sleep'].forEach(id => { $(id).hidden = true; });
+  ['setting-actuation', 'setting-debounce', 'setting-polling', 'setting-sleep'].forEach(id => { $(id).hidden = true; });
   $('settings-not-connected').hidden = true;
   showSettingsStatus('');
 
@@ -30935,7 +31049,7 @@ async function loadSettings() {
   if (token !== settingsLoadToken) return;
 
   settingsState = { actuation, ...misc };
-  if (!actuation && !misc.debounce && !misc.sleep) {
+  if (!actuation && !misc.debounce && !misc.sleep && !misc.pollingRate) {
     const none = "This keyboard's firmware has no settings KeyAble can change.";
     showSettingsStatus(none);
     announce(none);
@@ -30944,6 +31058,7 @@ async function loadSettings() {
   showSettingsStatus('');
   showActuation();
   showDebounce();
+  showPollingRate();
   showSleep();
 }
 
@@ -30982,6 +31097,32 @@ function showDebounce() {
   $('debounce-now').textContent = `Now ${plural(ms, 'millisecond')}${usualSuffix(ms, DEBOUNCE_USUAL_MS)}.`;
 }
 
+const pollingText = divider =>
+  `${pollingHz(divider)} times a second${usualSuffix(pollingHz(divider), POLLING_USUAL_HZ)}`;
+
+// A link is offered when the board lets it be set; Bluetooth's rate is fixed.
+const pollingSettable = link => !link.readOnly && link.dividers.length > 0;
+
+function showPollingRate() {
+  const p = settingsState.pollingRate;
+  $('setting-polling').hidden = !p;
+  if (!p) return;
+  const now = [];
+  for (const [link, label] of [['cable', 'by cable'], ['dongle', 'on 2.4 GHz']]) {
+    const entry = p[link];
+    const row = $(`polling-${link}-row`);
+    row.hidden = !pollingSettable(entry);
+    if (row.hidden) continue;
+    const dividers = [...new Set([...entry.dividers, entry.divider])].sort((a, b) => b - a);   // slowest first
+    $(`polling-${link}`).replaceChildren(...dividers.map(n => new Option(pollingText(n), String(n))));
+    $(`polling-${link}`).value = String(entry.divider);
+    now.push(`${pollingHz(entry.divider)} times a second ${label}`);
+  }
+  let text = `Now ${listText(now)}.`;
+  if (p.bluetooth.readOnly) text += ` Bluetooth always uses ${p.bluetooth.maxHz}.`;
+  $('polling-now').textContent = text;
+}
+
 // The preset times, plus the board's own time when it is not one of them.
 function fillSleepSelect(id, presets, current, usual) {
   const times = presets.includes(current) ? presets : [...presets, current].sort((a, b) => a - b);
@@ -31006,6 +31147,7 @@ async function rereadMiscSetting(name) {
   if (!settingsState) return;
   settingsState[name] = misc[name];
   if (name === 'debounce') showDebounce();
+  else if (name === 'pollingRate') showPollingRate();
   else showSleep();
 }
 
@@ -31131,14 +31273,39 @@ async function applySleepTimes() {
   });
 }
 
+async function applyPollingRate() {
+  const p = settingsState && settingsState.pollingRate;
+  if (!p) return;
+  // A link that cannot be set is sent back as it is.
+  const chosen = link => (pollingSettable(p[link]) ? Number($(`polling-${link}`).value) : p[link].divider);
+  const want = { cable: chosen('cable'), dongle: chosen('dongle') };
+  if (want.cable === p.cable.divider && want.dongle === p.dongle.divider) {
+    announce('That is already the polling rate.');
+    return;
+  }
+  const said = [];
+  if (pollingSettable(p.cable))  said.push(`${pollingHz(want.cable)} times a second by cable`);
+  if (pollingSettable(p.dongle)) said.push(`${pollingHz(want.dongle)} on 2.4 GHz`);
+  await applySetting('btn-apply-polling', {
+    write:  () => writePollingRate(want.cable, want.dongle),
+    reread: () => rereadMiscSetting('pollingRate'),
+    kept:   () => !!settingsState.pollingRate && settingsState.pollingRate.cable.divider === want.cable &&
+                  settingsState.pollingRate.dongle.divider === want.dongle,
+    done:   `Polling rate set to ${listText(said)}.`,
+    failed: 'Could not set the polling rate. The keyboard did not accept it.',
+  });
+}
+
 // The line in Step 1 that points to Keyboard Settings, naming what the keyboard
 // reports having. loadSettings still reads each one before showing it.
 async function showSettingsHint() {
   const names = [];
   if (await analogMatrixVersion()) names.push('actuation point');
   const info = await keychronInfo(CMD_KC_MISC);
-  if (info && (info[5] & KC_MISC_SETTINGS.debounce.flag)) names.push('debounce');
-  if (info && (info[5] & KC_MISC_SETTINGS.wirelessSleep.flag)) names.push('wireless sleep times');
+  const ultra = isUltraFirmware();
+  if (info && !ultra && (info[5] & KC_MISC_SETTINGS.debounce.flag)) names.push('debounce');
+  if (info && ultra && info[3] === ULTRA_SETTINGS_VERSION) names.push('polling rate');
+  if (info && (ultra || (info[5] & KC_MISC_SETTINGS.wirelessSleep.flag))) names.push('wireless sleep times');
   const hint = $('settings-hint');
   hint.textContent = names.length
     ? `You can change this keyboard's ${listText(names)} in Keyboard Settings ${navKeyHint(5)}.`
@@ -33199,7 +33366,7 @@ const BUTTON_ACTIONS = {
     changeKeyFromConfirm, chooseADifferentKey, closeChangedKeys, confirmKeyWarning,
     confirmMacro, confirmResetAll, confirmShortcut, connectKeyboard,
     disconnectFromUnsupported, disconnectKeyboard, executeResetAll, executeRestore,
-    applyActuation, applyDebounce, applySleepTimes, cancelDebounceConfirm, confirmDebounce,
+    applyActuation, applyDebounce, applyPollingRate, applySleepTimes, cancelDebounceConfirm, confirmDebounce,
     startDepthTest,
     getStartedFromWelcome, goToHelp, openChangedKeys, openWriteTargetDialog,
     reportUnknownKeyboard, reportUntestedKeyboard, resetAllChanged, resetChoiceCancel, resetSelectedKeyToDefault,

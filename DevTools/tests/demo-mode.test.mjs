@@ -626,7 +626,7 @@ async function settingsPage(pid) {
 }
 
 const shownSettings = page => page.evaluate(() =>
-  ['setting-actuation', 'setting-debounce', 'setting-sleep'].filter(id => !document.getElementById(id).hidden));
+  ['setting-actuation', 'setting-debounce', 'setting-polling', 'setting-sleep'].filter(id => !document.getElementById(id).hidden));
 
 test('Keyboard Settings asks for a keyboard when none is connected', async () => {
   const page = await newPage();
@@ -710,6 +710,32 @@ test('sleep times apply, and a refusal says so and keeps the times', async () =>
   await page.locator('#btn-apply-sleep').click();
   await page.locator('#sr-live', { hasText: 'Could not set the sleep times.' }).waitFor();
   assert.equal(await page.locator('#sleep-backlight').inputValue(), '300');
+  await page.close();
+});
+
+test('an Ultra 8K board offers its polling rate and sleep times, and applies the polling rate', async () => {
+  const page = await demoPage(V6_ULTRA_ISO);
+  assert.equal((await page.locator('#settings-hint').textContent()).trim(),
+    "You can change this keyboard's polling rate and wireless sleep times in Keyboard Settings (Alt+5).");
+  await page.keyboard.press('Alt+5');
+  await page.locator('#setting-polling:visible').waitFor();
+  assert.deepEqual(await shownSettings(page), ['setting-polling', 'setting-sleep']);
+  assert.equal(await page.locator('#polling-now').textContent(),
+    'Now 1000 times a second by cable and 1000 times a second on 2.4 GHz. Bluetooth always uses 125.');
+  assert.deepEqual(await page.locator('#polling-cable option').allTextContents(), [
+    '125 times a second', '250 times a second', '500 times a second', "1000 times a second (Keychron's usual)",
+    '2000 times a second', '4000 times a second', '8000 times a second']);
+
+  await page.locator('#polling-cable').selectOption('0');
+  await page.locator('#btn-apply-polling').click();
+  await page.locator('#sr-live', { hasText: 'Polling rate set to 8000 times a second by cable and 1000 on 2.4 GHz.' }).waitFor();
+  assert.deepEqual(await page.evaluate(() => hidDevice.keychronUltra.polling), [0, 3]);
+  assert.equal(await page.locator('#polling-cable').inputValue(), '0');
+
+  await page.locator('#sleep-backlight').selectOption('300');
+  await page.locator('#btn-apply-sleep').click();
+  await page.locator('#sr-live', { hasText: 'Sleep times set.' }).waitFor();
+  assert.deepEqual(await page.evaluate(() => hidDevice.keychronUltra.wirelessSleep), [0x2C, 0x01, 0x20, 0x1C]);
   await page.close();
 });
 
