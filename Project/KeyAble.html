@@ -26775,10 +26775,13 @@ function applyItemPositions(listSelector) {
   });
 }
 
+// A newer message replaces one still waiting, so an older message never lands over it.
+let announceTimer = null;
 function announce(msg, delayMs = 60) {
   const el = $('sr-live');
+  clearTimeout(announceTimer);
   el.textContent = '';
-  setTimeout(() => { el.textContent = msg; }, delayMs);
+  announceTimer = setTimeout(() => { el.textContent = msg; }, delayMs);
 }
 
 // For a message that follows a focus move to a NEW element: the screen reader
@@ -27837,32 +27840,31 @@ async function resetSelectedKeyToDefault() {
   const baseLayers = writeTargetLayers();            // base layer(s) for the current view
   const fnLayers   = baseLayers.map(fnLayerFor);     // paired Fn layer per role map
 
+  // The button stays busy from the check through the write: each change of its state is
+  // spoken, and a flicker between them talks over the result.
   const resetBtn = $('btn-reset-key');
   setButtonBusy(resetBtn, true);
-  announce(`Checking ${keyDesc}. Please wait.`);
-  const baseChanged = await layerActionChanged(baseLayers[0], confirmedKey);
-  const fnChanged   = await layerActionChanged(fnLayers[0],   confirmedKey);
-  setButtonBusy(resetBtn, false);
+  try {
+    announce(`Checking ${keyDesc}. Please wait.`);
+    const baseChanged = await layerActionChanged(baseLayers[0], confirmedKey);
+    const fnChanged   = await layerActionChanged(fnLayers[0],   confirmedKey);
 
-  // A read failed: don't guess, fall back to the plain base reset.
-  if (baseChanged === null || fnChanged === null) {
-    await performKeyReset(baseLayers, { desc: keyDesc, touchesBase: true });
-    return;
+    // A read failed: don't guess, fall back to the plain base reset.
+    if (baseChanged === null || fnChanged === null) {
+      await performKeyReset(baseLayers, { desc: keyDesc, touchesBase: true });
+    } else if (!baseChanged && !fnChanged) {
+      announce(`${keyDesc} is already set to its default action, both on its own and with Fn. There is nothing to reset.`);
+    } else if (baseChanged && !fnChanged) {
+      await performKeyReset(baseLayers, { desc: keyDesc, touchesBase: true });
+    } else if (!baseChanged && fnChanged) {
+      await performKeyReset(fnLayers, { desc: `Fn + ${keyDesc}`, touchesBase: false });
+    } else {
+      // Both changed and independent: ask which one to reset.
+      openResetChoiceDialog(keyDesc, baseLayers, fnLayers);
+    }
+  } finally {
+    setButtonBusy(resetBtn, false);
   }
-  if (!baseChanged && !fnChanged) {
-    announce(`${keyDesc} is already set to its default action, both on its own and with Fn. There is nothing to reset.`);
-    return;
-  }
-  if (baseChanged && !fnChanged) {
-    await performKeyReset(baseLayers, { desc: keyDesc, touchesBase: true });
-    return;
-  }
-  if (!baseChanged && fnChanged) {
-    await performKeyReset(fnLayers, { desc: `Fn + ${keyDesc}`, touchesBase: false });
-    return;
-  }
-  // Both changed and independent: ask which one to reset.
-  openResetChoiceDialog(keyDesc, baseLayers, fnLayers);
 }
 
 // Mark a button busy while a keyboard operation runs. aria-disabled rather than
