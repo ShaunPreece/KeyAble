@@ -35,3 +35,5 @@ ProjectAssets/keychron-firmware-src/
 # Keychron's released firmware binaries, downloaded by DevTools/firmware-binaries.mjs.
 ProjectAssets/keychron-firmware-bin/
 
+
+DevTools/probe-logs/

@@ -1,0 +1,97 @@
+KEYCHRON'S KEYBOARD SETTINGS COMMAND (0xA7)
+============================================
+
+Keychron keyboards take their keyboard-wide settings (debounce, sleep times,
+polling rate and more) through one raw HID command, 0xA7, sent on the same
+channel as VIA. Keychron publishes no description of it; Keychron's Launcher
+is its only official user. This file sets it out from Keychron's firmware
+source, checked against real keyboards where noted.
+
+Every request and reply is a 32-byte report. A request is 0xA7, a
+sub-command, then its arguments from byte 2. The reply is the request with
+the answer written over it: byte 0 stays 0xA7, byte 1 the sub-command, byte 2
+is the result (0 = done, 1 = refused), and any data starts at byte 3.
+Multi-byte numbers are little-endian.
+
+The command comes in two layouts: one on Keychron's QMK firmware (the Max
+boards and later), and one on the Ultra 8K boards' ZMK firmware. The
+sub-command numbers are the same; what some of them carry is not. A program
+has to know which firmware it is talking to, because the Ultra 8K reply to
+sub-command 1 does not say.
+
+
+1. SUB-COMMANDS
+---------------
+  0x01  protocol version, and on QMK which settings the build has
+  0x02  firmware update information
+  0x03  get keyboard language        0x04  set it
+  0x05  get debounce                 0x06  set it
+  0x07  Snap Click: count            0x08  get    0x09  set    0x0A  save
+  0x0B  get sleep times              0x0C  set them
+  0x0D  get polling rate             0x0E  set it
+
+
+2. QMK FIRMWARE (Keychron's QMK fork, keychron_raw_hid.c)
+---------------------------------------------------------
+0x01 replies with the protocol version at bytes 3 and 4 (2 on current
+builds) and, at byte 5, a mask of the settings the build has:
+
+  0x01 firmware update information
+  0x02 keyboard language
+  0x04 debounce
+  0x08 Snap Click
+  0x10 sleep times
+  0x20 polling rate
+
+A setting whose bit is clear is not there. A build can set a bit and still
+refuse the setting, as the sleep-times bit and its handler hang on different
+build options.
+
+0x05 debounce: byte 4 the debounce method, byte 5 the time in milliseconds.
+0x06 sets both: method, then milliseconds.
+
+0x0B and 0x0C sleep times: two 16-bit counts of seconds, backlight off then
+sleep, from byte 3 in the reply and byte 2 in the request. The firmware
+refuses a backlight time under 5 seconds or a sleep time under 60.
+
+The polling-rate handler of the QMK boards is not in the published source,
+so its layout there is unknown.
+
+
+3. ULTRA 8K FIRMWARE (Keychron's ZMK, branch rtl8762g, kc_user_cmd)
+------------------------------------------------------------------
+Checked against a V6 Ultra 8K ISO (firmware v1.0.2-ZK, 27th February 2026):
+every reply below matched the source.
+
+0x01 replies with a version at bytes 3 and 4 and no settings mask. Every
+build has debounce, sleep times and the polling rate. Version 3 means the
+polling rate of the cable and the 2.4 GHz dongle are set apart (every board
+in KeyAble); version 1 means one rate for both, in a different reply layout
+not described here.
+
+0x05 debounce: byte 3 is 1, byte 4 the press time and byte 5 the release
+time, in milliseconds. Press is how long a switch must stay down before the
+press counts, release how long it must stay up before the release counts.
+0x06 sets them: press, then release. The firmware refuses a press time over
+50, or a release time of 0 or over 50.
+
+0x0B and 0x0C sleep times: as on QMK, with the same limits.
+
+0x0D polling rate: three 5-byte entries from byte 3, for the cable, the
+2.4 GHz dongle and Bluetooth, in that order. Each entry is:
+
+  bytes 0-1  the highest rate the link allows, in reports a second
+  byte 2     the rates allowed: bit n allows 8000 / 2^n a second
+  byte 3     the current rate, as n: 0 = 8000, 1 = 4000, 2 = 2000,
+             3 = 1000, 4 = 500, 5 = 250, 6 = 125
+  byte 4     1 when the link's rate cannot be set
+
+The bits count down from 8000 even on a board whose highest rate is lower:
+a 1000 Hz board allows 0x78, which is 1000, 500, 250 and 125. Bluetooth's
+entry is fixed at 125 and marked read-only; its byte 3 is not a rate.
+Both settable links start at n = 3, 1000 a second.
+
+0x0E sets the polling rate: byte 2 the cable's n, byte 3 the dongle's n, and
+byte 4, which the firmware does not use but refuses above 6. Send 0 there.
+The new rate takes effect at once on the link in use and is kept through
+unplugging.

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KeyAble settings probe</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 50rem; margin: 2rem auto; line-height: 1.5; }
+  button { font-size: 1rem; padding: 0.4rem 0.9rem; margin-right: 0.5rem; }
+  textarea { width: 100%; height: 20rem; font-family: Consolas, monospace; }
+</style>
+</head>
+<body>
+<main>
+<h1>Settings probe</h1>
+<p>
+  Read-only diagnostic. Sends the read requests of Keychron's settings command (0xA7) and
+  logs each raw reply, decoded as the Ultra 8K firmware source lays it out. It never sends
+  a request that changes a setting. Disconnect KeyAble first, so only this page talks to
+  the keyboard. Served by probe-server.mjs, the page sends its log there when it finishes.
+</p>
+<p>
+  <button id="connect" type="button">Connect and read settings</button>
+  <button id="save" type="button">Save log</button>
+</p>
+<div id="status" role="status" aria-live="polite"></div>
+<h2>Log</h2>
+<label for="log">Probe log</label>
+<textarea id="log" readonly></textarea>
+</main>
+<script>
+'use strict';
+
+const REPORT_LEN = 32;
+const VIA_UNHANDLED = 0xFF;
+const CMD_KC_FIRMWARE_VERSION = 0xA1;
+const CMD_KC_MISC = 0xA7;
+
+// The read sub-commands of 0xA7 on Keychron's Ultra 8K firmware. Each reply is
+// [0xA7, sub, result, data...], result 0 = done.
+const READS = [
+  { sub: 0x01, name: 'protocol', decode: r => `version ${r[3] | (r[4] << 8)}` },
+  { sub: 0x05, name: 'debounce', decode: r => `type ${r[3]}, press ${r[4]} ms, release ${r[5]} ms` },
+  { sub: 0x0B, name: 'sleep times', decode: r =>
+      `backlight off ${r[3] | (r[4] << 8)} s, sleep ${r[5] | (r[6] << 8)} s` },
+  { sub: 0x0D, name: 'polling rate', decode: decodeRate },
+];
+
+// Three 5-byte entries from byte 3: maximum rate in Hz (little-endian 16-bit), a mask of
+// the dividers allowed (bit n = maximum / 2^n), the current divider, and a read-only flag.
+// The source writes them for cable, then 2.4 GHz, then Bluetooth.
+function decodeRate(r) {
+  return ['cable', '2.4 GHz', 'Bluetooth'].map((link, i) => {
+    const at = 3 + i * 5;
+    const max = r[at] | (r[at + 1] << 8), mask = r[at + 2], div = r[at + 3], readOnly = r[at + 4];
+    const allowed = [];
+    for (let n = 0; n < 8; n++) if (mask & (1 << n)) allowed.push(max >> n);
+    return `${link}: maximum ${max} Hz, divider ${div} (${max >> div} Hz), ` +
+      `allowed ${allowed.join(', ') || 'none'}, ${readOnly ? 'read only' : 'can be set'}`;
+  }).join('; ');
+}
+
+const $ = id => document.getElementById(id);
+let device = null;
+
+function log(line) {
+  $('log').value += line + '\n';
+  $('log').scrollTop = $('log').scrollHeight;
+}
+function say(text) {
+  $('status').textContent = text;
+  log(text);
+}
+const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join(' ');
+
+// Sends one request and resolves with the first reply whose leading bytes match it,
+// VIA's "unhandled" reply, or null after the timeout.
+function request(bytes, echo, timeoutMs = 500) {
+  return new Promise((resolve, reject) => {
+    const buf = new Uint8Array(REPORT_LEN);
+    bytes.forEach((b, i) => { buf[i] = b; });
+    const settle = () => {
+      clearTimeout(timer);
+      device.removeEventListener('inputreport', onReport);
+    };
+    const timer = setTimeout(() => { settle(); resolve(null); }, timeoutMs);
+    function onReport(ev) {
+      const reply = new Uint8Array(ev.data.buffer);
+      if (reply[0] === VIA_UNHANDLED || buf.subarray(0, echo).every((b, i) => reply[i] === b)) {
+        settle();
+        resolve(reply);
+      }
+    }
+    device.addEventListener('inputreport', onReport);
+    device.sendReport(0x00, buf).catch(err => { settle(); reject(err); });
+  });
+}
+
+async function connect() {
+  const found = await navigator.hid.requestDevice({ filters: [{ usagePage: 0xff60, usage: 0x61 }] });
+  if (!found.length) { say('No keyboard chosen.'); return; }
+  device = found[0];
+  if (!device.opened) await device.open();
+  log(`Device: ${device.productName}, product 0x${device.productId.toString(16).padStart(4, '0')}`);
+
+  const version = await request([CMD_KC_FIRMWARE_VERSION], 1);
+  if (version) {
+    const end = version.indexOf(0, 1);
+    log(`Firmware version: ${String.fromCharCode(...version.subarray(1, end < 0 ? REPORT_LEN : end))}`);
+  } else log('Firmware version: no reply');
+
+  for (const { sub, name, decode } of READS) {
+    const reply = await request([CMD_KC_MISC, sub], 2);
+    if (!reply) { log(`${name}: no reply`); continue; }
+    log(`${name} raw: ${hex(reply)}`);
+    if (reply[0] === VIA_UNHANDLED) log(`${name}: unhandled`);
+    else log(`${name}: result ${reply[2]}, ${decode(reply)}`);
+  }
+  await sendLog();
+}
+
+// Hands the log to probe-server.mjs, when the page is served by it.
+async function sendLog() {
+  const pid = device.productId.toString(16).padStart(4, '0');
+  try {
+    const res = await fetch(`/log?name=settings-probe-${pid}`, { method: 'POST', body: $('log').value });
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    say('Done. The log has been sent.');
+  } catch {
+    say('Done, but the log could not be sent. Choose Save log.');
+  }
+}
+
+$('connect').addEventListener('click', () => connect().catch(err => say('Error: ' + err.message)));
+$('save').addEventListener('click', () => {
+  const pid = device ? device.productId.toString(16).padStart(4, '0') : 'none';
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([$('log').value], { type: 'text/plain' }));
+  link.download = `settings-probe-${pid}.txt`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  say(`Saved as settings-probe-${pid}.txt in your Downloads folder.`);
+});
+window.addEventListener('pagehide', () => { if (device && device.opened) device.close(); });
+</script>
+</body>
+</html>

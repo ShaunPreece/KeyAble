@@ -109,8 +109,8 @@ The app is organised as a short sequence:
   Choose action  - choose what the key should do; a Ready to Apply dialog
                    reads the change back, and nothing is written to the
                    keyboard until it is confirmed.
-  Extras         - macros, RGB lighting, "review changes on this keyboard",
-                   save and restore, resets.
+  Extras         - macros, RGB lighting, keyboard settings, "review changes
+                   on this keyboard", save and restore, resets.
 
 Each step is a normal section of the page. Moving between them shows and hides
 sections and moves the screen-reader focus to the new section heading, rather

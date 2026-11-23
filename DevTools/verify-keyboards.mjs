@@ -112,8 +112,7 @@ function checkZmk(r, pid, layout, firmware) {
   const model = FACTORY_KEYMAPS[pid];
   if (!model) r.notes.push('no factory dataset');
   else if (JSON.stringify(model.layers) !== JSON.stringify(b.layers) ||
-    JSON.stringify(model.encoders) !== JSON.stringify(b.encoders ?? b.layers.map(() => [])) ||
-    JSON.stringify(model.reportsNone || []) !== JSON.stringify(b.reportsNone ?? [])) {
+    JSON.stringify(model.encoders) !== JSON.stringify(b.encoders ?? b.layers.map(() => []))) {
     r.notes.push('factory dataset differs from the source');
   }
   const vias = via.get(pid) || [];

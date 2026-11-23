@@ -30,9 +30,10 @@ in a browser.
   KeyAble's RGB Lighting section.
 - Keychron's wireless and battery keys (section 8).
 - Japanese and Korean input keys, and Japanese (JIS) keyboard layouts.
-- Keyboard-wide settings such as debounce and polling rate.
-- Settings of HE (Hall Effect) keyboards, such as the actuation point and
-  rapid trigger.
+- Keyboard-wide settings other than debounce, the wireless sleep times and the
+  Ultra 8K keyboards' polling rate, such as the polling rate of other keyboards.
+- Settings of HE (Hall Effect) keyboards other than one actuation point for
+  every key, such as rapid trigger and an actuation point for each key.
 - The HE and Ultra 8K keyboards not in Supported Keyboards, such as the Q0 HE,
   the HE 8K models and the V2 Ultra 8K.
 

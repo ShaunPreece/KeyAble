@@ -361,6 +361,23 @@
   }
   .lighting-row .hint { margin-top: .35rem; margin-bottom: 0; }
 
+  /* - Keyboard Settings - */
+  .setting-uses { margin: .5rem 0 .85rem 1.25rem; padding: 0; line-height: 1.55; }
+  .setting-now { font-weight: 700; margin: .85rem 0; }
+  .lighting-row select,
+  .lighting-row input[type="number"],
+  .lighting-row input[type="text"] {
+    font: inherit;
+    padding: .45rem .6rem;
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+  }
+  .lighting-row input[type="number"] { width: 8rem; }
+  .lighting-row input[aria-invalid="true"] { border: 2px solid var(--err-border); }
+  .field-error { color: var(--err-text); font-weight: 700; margin: .4rem 0 0; }
+
 
   /* - Key names in text - */
   kbd {
@@ -829,6 +846,36 @@
   </div>
 </dialog>
 
+<!-- Shown by applyDebounce for a time that turns debounce off or is long enough to
+     drop fast presses. Cancel has autofocus so the safe choice is the default. -->
+<dialog id="debounce-confirm"
+        class="danger-card"
+        role="alertdialog"
+        aria-labelledby="h-debounce-confirm"
+        aria-describedby="debounce-confirm-desc">
+  <h3 id="h-debounce-confirm" tabindex="-1">Check This Debounce Time.</h3>
+  <p id="debounce-confirm-desc" style="margin-bottom:.85rem"></p>
+  <div class="btn-row" style="margin-top:0">
+    <button id="btn-debounce-cancel" autofocus data-action="cancelDebounceConfirm">Cancel</button>
+    <button id="btn-debounce-confirm" class="danger" data-action="confirmDebounce">Apply Anyway</button>
+  </div>
+</dialog>
+
+<!-- Shown by resetSettingsToUsual, listing only the settings that would change. Cancel
+     has autofocus so the safe choice is the default. -->
+<dialog id="settings-reset-confirm"
+        class="danger-card"
+        role="alertdialog"
+        aria-labelledby="h-settings-reset-confirm"
+        aria-describedby="settings-reset-confirm-desc">
+  <h3 id="h-settings-reset-confirm" tabindex="-1">Reset Keyboard Settings.</h3>
+  <p id="settings-reset-confirm-desc" style="margin-bottom:.85rem"></p>
+  <div class="btn-row" style="margin-top:0">
+    <button id="btn-settings-reset-cancel" autofocus data-action="cancelSettingsReset">Cancel</button>
+    <button id="btn-settings-reset-confirm" class="danger" data-action="confirmSettingsReset">Reset Settings</button>
+  </div>
+</dialog>
+
 <!-- Write-target dialog, opened from the Step 3 summary line. Native radios are
      safe here: arrowing changes the selection, but nothing is applied until Save. -->
 <dialog id="wt-dialog"
@@ -893,7 +940,8 @@
       <li><a    class="navlink" href="#/step2"    data-route="step2"    aria-keyshortcuts="Alt+2">Step 2. Choose a Key to Customize.</a></li>
       <li><a    class="navlink" href="#/step3"    data-route="step3"    aria-keyshortcuts="Alt+3">Step 3. Choose an Action for Selected Key.</a></li>
       <li><a    class="navlink" href="#/lighting" data-route="lighting" aria-keyshortcuts="Alt+4">RGB Lighting.</a></li>
-      <li><a    class="navlink" href="#/help"     data-route="help"     aria-keyshortcuts="Alt+5">Help.</a></li>
+      <li><a    class="navlink" href="#/settings" data-route="settings" aria-keyshortcuts="Alt+5">Keyboard Settings.</a></li>
+      <li><a    class="navlink" href="#/help"     data-route="help"     aria-keyshortcuts="Alt+6">Help.</a></li>
     </ul>
   </div>
 </nav>
@@ -1033,6 +1081,7 @@
             <button data-action="reportUntestedKeyboard">Tell Us How It Went</button>
           </div>
         </div>
+        <p id="settings-hint" hidden></p>
         <p>Your keyboard is ready. What would you like to do?</p>
 
         <div class="action-menu">
@@ -1670,7 +1719,7 @@
         your keyboard and screen reader alone. This guide covers how to get started, what is
         new in this version, which keyboards are supported, what KeyAble cannot do yet, the emergency reset shortcut if
         anything ever goes wrong, and answers to the questions we are asked most often. In
-        KeyAble, Alt plus a number, 1 through 5, returns you to any step at any time.
+        KeyAble, Alt plus a number, 1 through 6, returns you to any step at any time.
       </p>
 
       <div class="card">
@@ -1703,7 +1752,20 @@
       <!-- Each release adds its version above the previous one. -->
       <div class="card">
         <h3 style="border-left:none;padding-left:0;margin-bottom:.6rem">What's New.</h3>
-        <h4 style="margin-top:.5rem">Version 1.5, 19th November 2026</h4>
+        <h4 style="margin-top:.5rem">Version 1.6, 23rd November 2026</h4>
+        <ul style="margin:.3rem 0 0 1.25rem;padding:0;line-height:1.55">
+          <li>A new Keyboard Settings page, Alt plus 5, for the settings your keyboard's firmware
+            has: debounce and the wireless sleep times on Max keyboards, and the actuation point
+            on HE keyboards, with Test Key Depth to help choose it. Help moves to Alt plus 6.</li>
+          <li>On Ultra 8K keyboards, Keyboard Settings sets the polling rate, up to 8000 times a
+            second, separate press and release debounce times, and the sleep times.</li>
+          <li>Reset All Settings to Keychron's Usual puts every setting back, after listing what
+            it would change.</li>
+          <li>The voice key on Ultra 8K keyboards is now known to be Cortana (Win+C), so it no
+            longer shows as changed on a new keyboard.</li>
+          <li>The V6 Ultra 8K ISO has been tested on a real keyboard.</li>
+        </ul>
+        <h4 style="margin-top:1rem">Version 1.5, 19th November 2026</h4>
         <ul style="margin:.3rem 0 0 1.25rem;padding:0;line-height:1.55">
           <li>60 more models, including the wired Q and V series, the K Pro and Q Pro ranges, the
             K17 Max and more Max models, and the C1, C2 and C3 Pro.</li>
@@ -1817,17 +1879,17 @@
           <li>B1 Pro</li><li>B6 Pro</li>
         </ul>
         <p style="margin-top:.85rem">
-          We have tested the B6 Pro ISO, Q6 Max ISO, V5 Max ISO and V6 Max ISO on real
-          hardware. The rest are built from Keychron's own firmware data and should work.
-          When one connects, Step 1 shows a Tell Us How It Went button: please use it,
-          whether it works or not. If your keyboard connects but is not recognised, Step 1
-          shows a keyboard ID and a Report This Keyboard ID button so we can add it.
+          We have tested the B6 Pro ISO, Q6 Max ISO, V5 Max ISO, V6 Max ISO and V6 Ultra 8K
+          ISO on real hardware. The rest are built from Keychron's own firmware data and
+          should work. When one connects, Step 1 shows a Tell Us How It Went button: please
+          use it, whether it works or not. If your keyboard connects but is not recognised,
+          Step 1 shows a keyboard ID and a Report This Keyboard ID button so we can add it.
         </p>
         <!-- END GENERATED SUPPORTED KEYBOARDS -->
         <p>
-          On the HE (Hall Effect) models, KeyAble does everything it does on other keyboards.
-          Their own settings, such as the actuation point and rapid trigger, still need
-          Keychron's Launcher.
+          On the HE (Hall Effect) models, KeyAble does everything it does on other keyboards,
+          and sets their actuation point in Keyboard Settings. Rapid trigger and their other
+          settings still need Keychron's Launcher.
         </p>
         <p>
           Not supported: the HE and Ultra 8K models not listed here, such as the Q0 HE, the HE
@@ -1854,9 +1916,10 @@
             controllable from the RGB Lighting section.</li>
           <li>Keychron's Bluetooth, 2.4 GHz and battery check keys.</li>
           <li>Japanese and Korean input keys, and Japanese (JIS) keyboard layouts.</li>
-          <li>Keyboard-wide settings such as debounce and polling rate.</li>
-          <li>Settings of HE (Hall Effect) keyboards, such as the actuation point and rapid
-            trigger.</li>
+          <li>Keyboard-wide settings other than debounce, the wireless sleep times and the Ultra
+            8K keyboards' polling rate, such as the polling rate of other keyboards.</li>
+          <li>Settings of HE (Hall Effect) keyboards other than one actuation point for every
+            key, such as rapid trigger and an actuation point for each key.</li>
           <li>The HE and Ultra 8K keyboards not in Supported Keyboards, such as the Q0 HE, the HE
             8K models and the V2 Ultra 8K.</li>
         </ul>
@@ -1900,16 +1963,18 @@
         <p>
           Most of them, yes. The Ultra 8K models run ZMK
           firmware rather than QMK, but Keychron's ZMK includes the same VIA connection KeyAble
-          uses, so they connect like any other model. Supported Keyboards lists them. None has
-          been tested on a real keyboard yet, so please tell us how yours goes. A few are not
+          uses, so they connect like any other model. Supported Keyboards lists them. The V6
+          Ultra 8K ISO has been tested on a real keyboard; for any other, please tell us how
+          yours goes. A few are not
           supported yet, such as the V2 Ultra 8K, which has two Fn layers for each system.
         </p>
         <p>
           The HE (Hall Effect) models in Supported Keyboards work like any other: remapping,
           macros, lighting and backups. They are built from Keychron's released firmware, like
-          most models. Their magnetic switches also have settings of their own, such as the
-          actuation point and rapid trigger, which use Keychron commands KeyAble does not
-          support yet, so set those with Keychron's Launcher. Some HE models are not supported
+          most models. Their magnetic switches also have settings of their own. KeyAble sets
+          one actuation point for every key, in Keyboard Settings; rapid trigger, an actuation
+          point for each key and the other HE settings still need Keychron's Launcher. Some HE
+          models are not supported
           yet, such as the Q0 HE and the HE 8K models. Keyboards KeyAble does not support can be
           set up with Keychron's own Launcher.
         </p>
@@ -2083,6 +2148,29 @@
           Go to the RGB Lighting section, Alt plus 4, and use the Turn Backlighting Off button.
           On wireless keyboards this noticeably extends battery life. The same section also has
           brightness, colour, and effect controls if you want them.
+        </p>
+
+        <h4 style="margin-top:1.25rem">What can I change in Keyboard Settings?</h4>
+        <p data-nav-keys>
+          Keyboard Settings, Alt plus 5, shows the settings your keyboard's firmware has: the
+          actuation point on HE keyboards, debounce and the wireless sleep times on keyboards
+          with recent Keychron firmware, and the polling rate on Ultra 8K keyboards. Each
+          setting says what it does and when it helps, and changes only when you press its
+          Apply button. If your keyboard has none of them, the page says so. Reset All
+          Settings to Keychron's Usual, at the end of the page, lists what it would change
+          and asks before changing anything.
+        </p>
+        <p>
+          On Ultra 8K keyboards, debounce has two times: one for a key going down and one for
+          it coming up. The polling rate is set separately for the cable and for 2.4 GHz
+          wireless, from 125 to 8000 times a second; Bluetooth's is fixed. The Ultra 8K
+          keyboards' settings are not saved in a setup file yet.
+        </p>
+        <p>
+          The actuation point is set for every key at once, in the profile the keyboard is
+          using. It is not saved in a setup file yet. To help choose it, Test Key Depth plays
+          a tone that rises as you press F, clicks where the chosen point would make it type,
+          and says how deep each press went.
         </p>
 
         <h4 style="margin-top:1.25rem">Is there a light theme?</h4>
@@ -2265,6 +2353,190 @@
                    aria-valuetext="100 percent">
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- ========================================================
+         SECTION: Keyboard Settings
+         Each setting shows only when the keyboard answers for it (loadSettings),
+         and each applies with its own button, never as a control changes.
+    ======================================================== -->
+    <section id="sec-settings" hidden>
+      <h2 id="h-settings" tabindex="-1">Keyboard Settings.</h2>
+
+      <div id="settings-not-connected" hidden>
+        <div class="status-box" role="status" aria-live="polite" aria-atomic="true">
+          <span class="status-icon" aria-hidden="true">○</span>
+          <span>Connect a keyboard from Step 1 to change its settings.</span>
+        </div>
+        <div class="section-footer">
+          <button data-action="goToSection" data-section="connect">Return to Step 1. Connect Keyboard. (Alt+1)</button>
+        </div>
+      </div>
+
+      <!-- Not a live region: loadSettings announces the one result that needs it. -->
+      <div id="settings-status" class="status-box" hidden>
+        <span class="status-icon" aria-hidden="true">○</span>
+        <span id="settings-status-text"></span>
+      </div>
+
+      <div id="setting-actuation" class="card" hidden>
+        <h3>Actuation Point.</h3>
+        <p>
+          How far down you press a key before it types. It can be set from 0.1 to 3.9
+          millimetres; Keychron's usual is 2.0 millimetres.
+        </p>
+        <ul class="setting-uses">
+          <li>Deeper, such as 3.0 millimetres: a key you brush or rest a finger on does not
+            type. This helps with a tremor, or if you rest your hands on the keys.</li>
+          <li>Shallower, such as 1.0 millimetre: a light touch types. This helps if pressing
+            keys down is tiring or painful.</li>
+        </ul>
+        <p id="actuation-now" class="setting-now"></p>
+        <div class="lighting-row">
+          <label for="actuation-point">Actuation point:</label>
+          <input type="range" id="actuation-point" min="1" max="39" step="1" value="20"
+                 aria-valuetext="2.0 millimetres">
+        </div>
+        <div class="btn-row">
+          <button id="btn-apply-actuation" class="primary" data-action="applyActuation">Apply Actuation Point</button>
+        </div>
+
+        <div id="depth-test">
+          <h4 style="margin-top:1.25rem">Test Key Depth.</h4>
+          <p>
+            Hear how far down you press, to choose a point that suits you. After Start, press
+            and hold F, the key with the raised bump. A tone rises as the key goes down, and a
+            click sounds where the actuation point chosen above would make it type. When you
+            let go, KeyAble says how deep the press went. Try resting a finger on F, or
+            brushing it, to find a point that ignores that.
+          </p>
+          <div class="btn-row">
+            <button id="btn-depth-test" data-action="startDepthTest">Start Depth Test</button>
+          </div>
+          <div id="depth-area" class="lighting-row" hidden>
+            <label for="depth-scratch">Depth test. F types here:</label>
+            <input type="text" id="depth-scratch" autocomplete="off" spellcheck="false"
+                   aria-describedby="depth-hint">
+            <p id="depth-hint" class="hint">Press and hold F, then let go. Escape ends the test.</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="setting-debounce" class="card" hidden>
+        <h3>Debounce.</h3>
+        <p>
+          How long the keyboard waits for a key's switch to settle before it counts the
+          press. Keychron's usual is 5 milliseconds.
+        </p>
+        <ul class="setting-uses">
+          <li>Longer, such as 15 milliseconds: stops a worn or bouncy key typing its letter
+            twice.</li>
+          <li>Shorter: fast presses of the same key are never missed.</li>
+        </ul>
+        <p>
+          Debounce does not stop keys pressed by accident or held too long, as with a tremor.
+          Filter Keys in Windows and Slow Keys on a Mac are made for that.
+        </p>
+        <p id="debounce-now" class="setting-now"></p>
+        <div class="lighting-row">
+          <label for="debounce-ms">Debounce, in milliseconds from 0 to 255:</label>
+          <input type="number" id="debounce-ms" min="0" max="255" step="1" inputmode="numeric"
+                 aria-describedby="debounce-error">
+          <p id="debounce-error" class="field-error" hidden></p>
+        </div>
+        <div class="btn-row">
+          <button id="btn-apply-debounce" class="primary" data-action="applyDebounce">Apply Debounce</button>
+        </div>
+      </div>
+
+      <div id="setting-split-debounce" class="card" hidden>
+        <h3>Debounce.</h3>
+        <p>
+          How long a key's switch must stay still before the keyboard counts it: held down
+          for the press, and let up for the release. This keyboard sets the two separately.
+        </p>
+        <ul class="setting-uses">
+          <li>A longer release time, such as 15 milliseconds or more: stops a worn or bouncy
+            key typing its letter twice. A quick second press of the same key within that
+            time is missed.</li>
+          <li>A press time of 0: each press counts the moment the switch closes.</li>
+        </ul>
+        <p>
+          Debounce does not stop keys pressed by accident or held too long, as with a tremor.
+          Filter Keys in Windows and Slow Keys on a Mac are made for that.
+        </p>
+        <p id="split-debounce-now" class="setting-now"></p>
+        <div class="lighting-row">
+          <label for="debounce-press">Press time, in milliseconds from 0 to 50:</label>
+          <input type="number" id="debounce-press" min="0" max="50" step="1" inputmode="numeric"
+                 aria-describedby="debounce-press-error">
+          <p id="debounce-press-error" class="field-error" hidden></p>
+        </div>
+        <div class="lighting-row">
+          <label for="debounce-release">Release time, in milliseconds from 1 to 50:</label>
+          <input type="number" id="debounce-release" min="1" max="50" step="1" inputmode="numeric"
+                 aria-describedby="debounce-release-error">
+          <p id="debounce-release-error" class="field-error" hidden></p>
+        </div>
+        <div class="btn-row">
+          <button id="btn-apply-split-debounce" class="primary" data-action="applySplitDebounce">Apply Debounce</button>
+        </div>
+      </div>
+
+      <div id="setting-polling" class="card" hidden>
+        <h3>Polling Rate.</h3>
+        <p>
+          How many times a second the keyboard tells the computer which keys are down.
+          Keychron's usual is 1000.
+        </p>
+        <ul class="setting-uses">
+          <li>Higher, up to 8000: a key press reaches the computer up to a millisecond
+            sooner. This matters mostly in fast games.</li>
+          <li>Lower: on 2.4 GHz the battery lasts longer, and the computer has less to do.</li>
+        </ul>
+        <p id="polling-now" class="setting-now"></p>
+        <div id="polling-cable-row" class="lighting-row">
+          <label for="polling-cable">By cable:</label>
+          <select id="polling-cable"></select>
+        </div>
+        <div id="polling-dongle-row" class="lighting-row">
+          <label for="polling-dongle">On 2.4 GHz wireless:</label>
+          <select id="polling-dongle"></select>
+        </div>
+        <div class="btn-row">
+          <button id="btn-apply-polling" class="primary" data-action="applyPollingRate">Apply Polling Rate</button>
+        </div>
+      </div>
+
+      <div id="setting-sleep" class="card" hidden>
+        <h3>Wireless Sleep Times.</h3>
+        <p>
+          Used only on Bluetooth or 2.4 GHz, to save battery. When you stop typing, the
+          backlight turns off after the first time and the keyboard sleeps after the second.
+          Pressing a key wakes it.
+        </p>
+        <ul class="setting-uses">
+          <li>Longer: the keyboard stays awake through long pauses, such as while you listen
+            to a long document read aloud.</li>
+          <li>Shorter: the battery lasts longer between charges.</li>
+        </ul>
+        <p id="sleep-now" class="setting-now"></p>
+        <div class="lighting-row">
+          <label for="sleep-backlight">Backlight off after:</label>
+          <select id="sleep-backlight"></select>
+        </div>
+        <div class="lighting-row">
+          <label for="sleep-keyboard">Keyboard sleeps after:</label>
+          <select id="sleep-keyboard"></select>
+        </div>
+        <div class="btn-row">
+          <button id="btn-apply-sleep" class="primary" data-action="applySleepTimes">Apply Sleep Times</button>
+        </div>
+      </div>
+
+      <div id="settings-reset-row" class="btn-row" hidden>
+        <button id="btn-reset-settings" data-action="resetSettingsToUsual">Reset All Settings to Keychron's Usual</button>
       </div>
     </section>
 
@@ -21206,6 +21478,41 @@ function playChirp(success) {
   ]);
 }
 
+// A held tone whose pitch follows a key's depth, from 220 Hz at rest to 880 Hz at
+// 4.0 millimetres, silent while the key is up.
+class DepthTone {
+  constructor() {
+    try {
+      this.ctx  = new (window.AudioContext || window.webkitAudioContext)();
+      this.osc  = this.ctx.createOscillator();
+      this.gain = this.ctx.createGain();
+      this.gain.gain.value = 0;
+      this.osc.connect(this.gain);
+      this.gain.connect(this.ctx.destination);
+      this.osc.start();
+    } catch {
+      this.ctx = null;   // no Web Audio: the spoken result still comes on release
+    }
+  }
+
+  set(tenths) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.osc.frequency.setTargetAtTime(220 * 2 ** (tenths / 20), t, 0.01);
+    this.gain.gain.setTargetAtTime(tenths > 0 ? 0.08 : 0, t, 0.01);
+  }
+
+  stop() {
+    if (this.ctx) this.ctx.close().catch(() => {});
+    this.ctx = null;
+  }
+}
+
+// The depth test's mark where the chosen actuation point is passed.
+function playDepthClick() {
+  playTones([{ freq: 1600, gain: 0.2, decay: 0.03, dur: 0.04, type: 'square' }]);
+}
+
 function playBeep() {
   playTones([{ freq: 660, gain: 0.22, decay: 0.15, dur: 0.18 }]);
 }
@@ -21275,6 +21582,7 @@ const CMD_MACRO_SET_BUFFER      = 0x0F;   // args: [offset_hi, offset_lo, size, 
 const CMD_KC_FIRMWARE_VERSION = 0xA1;   // reply: the build's text from byte 1, e.g. "v1.1.1 2026-01-15-09:56:47"
 const CMD_KC_MISC = 0xA7;               // language, debounce, Snap Click, wireless sleep
 const CMD_KC_RGB  = 0xA8;               // indicators, per-key colours, effect regions and lists
+const CMD_KC_ANALOG = 0xA9;             // HE boards' analog matrix: actuation, rapid trigger, profiles
 
 // - Keycode numbering -
 // Keychron firmware comes in three keycode numberings, told apart by the VIA protocol
@@ -21971,6 +22279,7 @@ const HARDWARE_TESTED_BOARDS = {
   0x0951: true,   // V5 Max ISO Knob
   0x0961: true,   // V6 Max ISO Knob
   0x0762: true,   // B6 Pro ISO
+  0x0C61: true,   // V6 Ultra 8K ISO Knob
 };
 
 // - Factory keymaps (per-model reset dataset) -
@@ -21981,8 +22290,7 @@ const HARDWARE_TESTED_BOARDS = {
 // layers[layer]["row,col"] = 16-bit factory code, by DEVICE layer number. Canonical
 // 4-layer boards: Mac=0, MacFn=1, Win=2, WinFn=3. Others (5-layer V2 Max, K6 Pro and
 // wired V2) carry `roles` {mac,win,macFn,winFn,fn2} giving each layer's index; the app
-// uses the canonical map when `roles` is absent. `reportsNone` lists, as "layer:row,col",
-// keys the keyboard reads back as 0 until written, though they type their code here.
+// uses the canonical map when `roles` is absent.
 const FACTORY_KEYMAPS = {
   // Shipped firmware: q1_us_v1.10.hex
   0x0100: {
@@ -25857,7 +26165,7 @@ const FACTORY_KEYMAPS = {
     layers: [
       {"0,0":41,"0,1":190,"0,2":189,"0,3":193,"0,4":194,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,13":168,"0,14":32278,"0,15":32280,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,12":50,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,12":229,"4,15":82,"5,0":224,"5,1":32263,"5,2":32265,"5,6":44,"5,10":32266,"5,11":32264,"5,12":21025,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
       {"0,0":1,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":30752,"0,14":1,"0,15":1,"0,16":30752,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,12":1,"4,0":1,"4,1":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,12":1,"4,15":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1},
-      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":168,"0,14":70,"0,15":2059,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,12":50,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,12":229,"4,15":82,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
+      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":168,"0,14":70,"0,15":32281,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,12":50,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,12":229,"4,15":82,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
       {"0,0":1,"0,1":190,"0,2":189,"0,3":32270,"0,4":32273,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,13":30752,"0,14":1,"0,15":1,"0,16":30752,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,12":1,"4,0":1,"4,1":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,12":1,"4,15":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1},
     ],
     encoders: [
@@ -25866,7 +26174,6 @@ const FACTORY_KEYMAPS = {
       [{"ccw":170,"cw":169}],
       [{"ccw":30760,"cw":30759}],
     ],
-    reportsNone: ["2:0,15"],
   },
   0x0C50: {
     layers: [
@@ -25914,7 +26221,7 @@ const FACTORY_KEYMAPS = {
     layers: [
       {"0,0":41,"0,1":190,"0,2":189,"0,3":193,"0,4":194,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,13":168,"0,14":32278,"0,15":32280,"0,16":30753,"0,17":104,"0,18":105,"0,19":106,"3,16":107,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"1,17":83,"1,18":84,"1,19":85,"3,15":86,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"2,17":95,"2,18":96,"2,19":97,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,12":50,"3,17":92,"3,18":93,"3,19":94,"3,14":87,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,12":229,"4,15":82,"4,17":89,"4,18":90,"4,19":91,"5,0":224,"5,1":32263,"5,2":32265,"5,6":44,"5,10":32266,"5,11":32264,"5,12":21025,"5,13":228,"5,14":80,"5,15":81,"5,16":79,"5,17":98,"5,19":99,"5,18":88},
       {"0,0":1,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":30752,"0,14":1,"0,15":1,"0,16":30752,"0,17":1,"0,18":1,"0,19":1,"3,16":1,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"1,17":1,"1,18":1,"1,19":1,"3,15":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"2,17":1,"2,18":1,"2,19":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,12":1,"3,17":1,"3,18":1,"3,19":1,"3,14":1,"4,0":1,"4,1":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,12":1,"4,15":1,"4,17":1,"4,18":1,"4,19":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1,"5,17":1,"5,19":1,"5,18":1},
-      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":168,"0,14":70,"0,15":2059,"0,16":30753,"0,17":104,"0,18":105,"0,19":106,"3,16":107,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"1,17":83,"1,18":84,"1,19":85,"3,15":86,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"2,17":95,"2,18":96,"2,19":97,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,12":50,"3,17":92,"3,18":93,"3,19":94,"3,14":87,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,12":229,"4,15":82,"4,17":89,"4,18":90,"4,19":91,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79,"5,17":98,"5,19":99,"5,18":88},
+      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":168,"0,14":70,"0,15":32281,"0,16":30753,"0,17":104,"0,18":105,"0,19":106,"3,16":107,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"1,17":83,"1,18":84,"1,19":85,"3,15":86,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"2,17":95,"2,18":96,"2,19":97,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,12":50,"3,17":92,"3,18":93,"3,19":94,"3,14":87,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,12":229,"4,15":82,"4,17":89,"4,18":90,"4,19":91,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79,"5,17":98,"5,19":99,"5,18":88},
       {"0,0":1,"0,1":190,"0,2":189,"0,3":32270,"0,4":32273,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,13":30752,"0,14":1,"0,15":1,"0,16":30752,"0,17":1,"0,18":1,"0,19":1,"3,16":1,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"1,17":1,"1,18":1,"1,19":1,"3,15":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"2,17":1,"2,18":1,"2,19":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,12":1,"3,17":1,"3,18":1,"3,19":1,"3,14":1,"4,0":1,"4,1":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,12":1,"4,15":1,"4,17":1,"4,18":1,"4,19":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1,"5,17":1,"5,19":1,"5,18":1},
     ],
     encoders: [
@@ -25923,7 +26230,6 @@ const FACTORY_KEYMAPS = {
       [{"ccw":170,"cw":169}],
       [{"ccw":30760,"cw":30759}],
     ],
-    reportsNone: ["2:0,15"],
   },
   0x0CA0: {
     layers: [
@@ -26123,7 +26429,7 @@ const FACTORY_KEYMAPS = {
     layers: [
       {"0,0":41,"0,1":190,"0,2":189,"0,3":193,"0,4":194,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,13":168,"0,14":32278,"0,15":32280,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":50,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"5,0":224,"5,1":32263,"5,2":32265,"5,6":44,"5,10":32266,"5,11":32264,"5,12":21025,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
       {"0,0":1,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":30752,"0,14":1,"0,15":1,"0,16":30752,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,13":1,"4,0":1,"4,1":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,13":1,"4,15":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1},
-      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":168,"0,14":70,"0,15":2059,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":50,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
+      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":168,"0,14":70,"0,15":32281,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":50,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
       {"0,0":1,"0,1":190,"0,2":189,"0,3":32270,"0,4":32273,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,13":30752,"0,14":1,"0,15":1,"0,16":30752,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,13":1,"4,0":1,"4,1":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,13":1,"4,15":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1},
     ],
     encoders: [
@@ -26132,7 +26438,6 @@ const FACTORY_KEYMAPS = {
       [{"ccw":170,"cw":169}],
       [{"ccw":30760,"cw":30759}],
     ],
-    reportsNone: ["2:0,15"],
   },
   0x1251: {
     layers: [
@@ -26166,7 +26471,7 @@ const FACTORY_KEYMAPS = {
     layers: [
       {"0,0":41,"0,1":190,"0,2":189,"0,3":32284,"0,4":32285,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,13":168,"0,14":32278,"0,15":32280,"0,16":30753,"0,17":104,"0,18":105,"0,19":106,"3,16":107,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"1,17":83,"1,18":84,"1,19":85,"3,15":86,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"2,17":95,"2,18":96,"2,19":97,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,12":50,"3,17":92,"3,18":93,"3,19":94,"3,14":87,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,12":229,"4,15":82,"4,17":89,"4,18":90,"4,19":91,"5,0":224,"5,1":32263,"5,2":32265,"5,6":44,"5,10":32266,"5,11":32264,"5,12":21025,"5,13":228,"5,14":80,"5,15":81,"5,16":79,"5,17":98,"5,18":99,"5,19":88},
       {"0,0":1,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":30752,"0,14":1,"0,15":1,"0,16":30752,"0,17":1,"0,18":1,"0,19":1,"3,16":1,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"1,17":1,"1,18":1,"1,19":1,"3,15":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"2,17":1,"2,18":1,"2,19":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,12":1,"3,17":1,"3,18":1,"3,19":1,"3,14":1,"4,0":1,"4,1":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,12":1,"4,15":1,"4,17":1,"4,18":1,"4,19":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1,"5,17":1,"5,18":1,"5,19":1},
-      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":168,"0,14":70,"0,15":2059,"0,16":30753,"0,17":104,"0,18":105,"0,19":106,"3,16":107,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"1,17":83,"1,18":84,"1,19":85,"3,15":86,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"2,17":95,"2,18":96,"2,19":97,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,12":50,"3,17":92,"3,18":93,"3,19":94,"3,14":87,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,12":229,"4,15":82,"4,17":89,"4,18":90,"4,19":91,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79,"5,17":98,"5,18":99,"5,19":88},
+      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":168,"0,14":70,"0,15":32281,"0,16":30753,"0,17":104,"0,18":105,"0,19":106,"3,16":107,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"1,17":83,"1,18":84,"1,19":85,"3,15":86,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"2,17":95,"2,18":96,"2,19":97,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,12":50,"3,17":92,"3,18":93,"3,19":94,"3,14":87,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,12":229,"4,15":82,"4,17":89,"4,18":90,"4,19":91,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79,"5,17":98,"5,18":99,"5,19":88},
       {"0,0":1,"0,1":190,"0,2":189,"0,3":32270,"0,4":32273,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,13":30752,"0,14":1,"0,15":1,"0,16":30752,"0,17":1,"0,18":1,"0,19":1,"3,16":1,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"1,17":1,"1,18":1,"1,19":1,"3,15":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"2,17":1,"2,18":1,"2,19":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,12":1,"3,17":1,"3,18":1,"3,19":1,"3,14":1,"4,0":1,"4,1":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,12":1,"4,15":1,"4,17":1,"4,18":1,"4,19":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1,"5,17":1,"5,18":1,"5,19":1},
     ],
     encoders: [
@@ -26175,7 +26480,6 @@ const FACTORY_KEYMAPS = {
       [{"ccw":170,"cw":169}],
       [{"ccw":30760,"cw":30759}],
     ],
-    reportsNone: ["2:0,15"],
   },
   0x12D0: {
     layers: [
@@ -26195,7 +26499,7 @@ const FACTORY_KEYMAPS = {
     layers: [
       {"0,0":41,"0,1":190,"0,2":189,"0,3":193,"0,4":194,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,13":168,"0,14":32278,"0,15":32280,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":49,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":40,"4,0":225,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"5,0":224,"5,1":32263,"5,2":32265,"5,6":44,"5,10":32266,"5,11":32264,"5,12":21025,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
       {"0,0":1,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":30752,"0,14":1,"0,15":1,"0,16":30752,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,13":1,"4,0":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,13":1,"4,15":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1},
-      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":168,"0,14":70,"0,15":2059,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":49,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":40,"4,0":225,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
+      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":168,"0,14":70,"0,15":32281,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":49,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":40,"4,0":225,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
       {"0,0":1,"0,1":190,"0,2":189,"0,3":32270,"0,4":32273,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,13":30752,"0,14":1,"0,15":1,"0,16":30752,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,13":1,"4,0":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,13":1,"4,15":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1},
     ],
     encoders: [
@@ -26204,13 +26508,12 @@ const FACTORY_KEYMAPS = {
       [{"ccw":170,"cw":169}],
       [{"ccw":30760,"cw":30759}],
     ],
-    reportsNone: ["2:0,15"],
   },
   0x1611: {
     layers: [
       {"0,0":41,"0,1":190,"0,2":189,"0,3":193,"0,4":194,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,13":168,"0,14":32278,"0,15":32280,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":50,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"5,0":224,"5,1":32263,"5,2":32265,"5,6":44,"5,10":32266,"5,11":32264,"5,12":21025,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
       {"0,0":1,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":30752,"0,14":1,"0,15":1,"0,16":30752,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,13":1,"4,0":1,"4,1":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,13":1,"4,15":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1},
-      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":168,"0,14":70,"0,15":2059,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":50,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
+      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":168,"0,14":70,"0,15":32281,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":50,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
       {"0,0":1,"0,1":190,"0,2":189,"0,3":32270,"0,4":32273,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,13":30752,"0,14":1,"0,15":1,"0,16":30752,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,13":1,"4,0":1,"4,1":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,13":1,"4,15":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1},
     ],
     encoders: [
@@ -26219,7 +26522,6 @@ const FACTORY_KEYMAPS = {
       [{"ccw":170,"cw":169}],
       [{"ccw":30760,"cw":30759}],
     ],
-    reportsNone: ["2:0,15"],
   },
   0x1620: {
     layers: [
@@ -26295,7 +26597,7 @@ const FACTORY_KEYMAPS = {
     layers: [
       {"0,0":41,"0,1":190,"0,2":189,"0,3":32284,"0,4":32285,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,13":168,"0,14":32278,"0,15":32280,"0,16":30753,"0,17":104,"0,18":105,"0,19":106,"3,14":107,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"1,17":83,"1,18":84,"1,19":85,"3,15":86,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":49,"2,14":76,"2,15":77,"2,16":78,"2,17":95,"2,18":96,"2,19":97,"3,16":87,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":40,"3,17":92,"3,18":93,"3,19":94,"4,0":225,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"4,17":89,"4,18":90,"4,19":91,"5,18":88,"5,0":224,"5,1":32263,"5,2":32265,"5,6":44,"5,10":32266,"5,11":32264,"5,12":21025,"5,13":228,"5,14":80,"5,15":81,"5,16":79,"5,17":98,"5,19":99},
       {"0,0":1,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":30752,"0,14":1,"0,15":1,"0,16":30752,"0,17":1,"0,18":1,"0,19":1,"3,14":1,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"1,17":1,"1,18":1,"1,19":1,"3,15":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"2,17":1,"2,18":1,"2,19":1,"3,16":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,13":1,"3,17":1,"3,18":1,"3,19":1,"4,0":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,13":1,"4,15":1,"4,17":1,"4,18":1,"4,19":1,"5,18":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1,"5,17":1,"5,19":1},
-      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":168,"0,14":70,"0,15":2059,"0,16":30753,"0,17":104,"0,18":105,"0,19":106,"3,14":107,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"1,17":83,"1,18":84,"1,19":85,"3,15":86,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":49,"2,14":76,"2,15":77,"2,16":78,"2,17":95,"2,18":96,"2,19":97,"3,16":87,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":40,"3,17":92,"3,18":93,"3,19":94,"4,0":225,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"4,17":89,"4,18":90,"4,19":91,"5,18":88,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79,"5,17":98,"5,19":99},
+      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":168,"0,14":70,"0,15":32281,"0,16":30753,"0,17":104,"0,18":105,"0,19":106,"3,14":107,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"1,17":83,"1,18":84,"1,19":85,"3,15":86,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":49,"2,14":76,"2,15":77,"2,16":78,"2,17":95,"2,18":96,"2,19":97,"3,16":87,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":40,"3,17":92,"3,18":93,"3,19":94,"4,0":225,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"4,17":89,"4,18":90,"4,19":91,"5,18":88,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79,"5,17":98,"5,19":99},
       {"0,0":1,"0,1":190,"0,2":189,"0,3":32270,"0,4":32273,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,13":30752,"0,14":1,"0,15":1,"0,16":30752,"0,17":1,"0,18":1,"0,19":1,"3,14":1,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"1,17":1,"1,18":1,"1,19":1,"3,15":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"2,17":1,"2,18":1,"2,19":1,"3,16":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,13":1,"3,17":1,"3,18":1,"3,19":1,"4,0":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,13":1,"4,15":1,"4,17":1,"4,18":1,"4,19":1,"5,18":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1,"5,17":1,"5,19":1},
     ],
     encoders: [
@@ -26304,13 +26606,12 @@ const FACTORY_KEYMAPS = {
       [{"ccw":170,"cw":169}],
       [{"ccw":30760,"cw":30759}],
     ],
-    reportsNone: ["2:0,15"],
   },
   0x1651: {
     layers: [
       {"0,0":41,"0,1":190,"0,2":189,"0,3":32284,"0,4":32285,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,13":168,"0,14":32278,"0,15":32280,"0,16":30753,"0,17":104,"0,18":105,"0,19":106,"3,14":107,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"1,17":83,"1,18":84,"1,19":85,"3,15":86,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"2,17":95,"2,18":96,"2,19":97,"3,16":87,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":50,"3,17":92,"3,18":93,"3,19":94,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"4,17":89,"4,18":90,"4,19":91,"5,18":88,"5,0":224,"5,1":32263,"5,2":32265,"5,6":44,"5,10":32266,"5,11":32264,"5,12":21025,"5,13":228,"5,14":80,"5,15":81,"5,16":79,"5,17":98,"5,19":99},
       {"0,0":1,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":30752,"0,14":1,"0,15":1,"0,16":30752,"0,17":1,"0,18":1,"0,19":1,"3,14":1,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"1,17":1,"1,18":1,"1,19":1,"3,15":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"2,17":1,"2,18":1,"2,19":1,"3,16":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,13":1,"3,17":1,"3,18":1,"3,19":1,"4,0":1,"4,1":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,13":1,"4,15":1,"4,17":1,"4,18":1,"4,19":1,"5,18":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1,"5,17":1,"5,19":1},
-      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":168,"0,14":70,"0,15":2059,"0,16":30753,"0,17":104,"0,18":105,"0,19":106,"3,14":107,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"1,17":83,"1,18":84,"1,19":85,"3,15":86,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"2,17":95,"2,18":96,"2,19":97,"3,16":87,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":50,"3,17":92,"3,18":93,"3,19":94,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"4,17":89,"4,18":90,"4,19":91,"5,18":88,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79,"5,17":98,"5,19":99},
+      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,13":168,"0,14":70,"0,15":32281,"0,16":30753,"0,17":104,"0,18":105,"0,19":106,"3,14":107,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"1,17":83,"1,18":84,"1,19":85,"3,15":86,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"2,17":95,"2,18":96,"2,19":97,"3,16":87,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":50,"3,17":92,"3,18":93,"3,19":94,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"4,17":89,"4,18":90,"4,19":91,"5,18":88,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79,"5,17":98,"5,19":99},
       {"0,0":1,"0,1":190,"0,2":189,"0,3":32270,"0,4":32273,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,13":30752,"0,14":1,"0,15":1,"0,16":30752,"0,17":1,"0,18":1,"0,19":1,"3,14":1,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"1,17":1,"1,18":1,"1,19":1,"3,15":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"2,17":1,"2,18":1,"2,19":1,"3,16":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,13":1,"3,17":1,"3,18":1,"3,19":1,"4,0":1,"4,1":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,13":1,"4,15":1,"4,17":1,"4,18":1,"4,19":1,"5,18":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1,"5,17":1,"5,19":1},
     ],
     encoders: [
@@ -26319,13 +26620,12 @@ const FACTORY_KEYMAPS = {
       [{"ccw":170,"cw":169}],
       [{"ccw":30760,"cw":30759}],
     ],
-    reportsNone: ["2:0,15"],
   },
   0x1680: {
     layers: [
       {"0,0":41,"0,1":190,"0,2":189,"0,3":32284,"0,4":32285,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,14":32278,"0,15":32280,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":49,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":40,"4,0":225,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"5,0":224,"5,1":32263,"5,2":32265,"5,6":44,"5,10":32266,"5,11":32264,"5,12":21025,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
       {"0,0":1,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,14":1,"0,15":1,"0,16":30752,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,13":1,"4,0":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,13":1,"4,15":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1},
-      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,14":70,"0,15":2059,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":49,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":40,"4,0":225,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
+      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,14":70,"0,15":32281,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":49,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,13":40,"4,0":225,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
       {"0,0":1,"0,1":190,"0,2":189,"0,3":32270,"0,4":32273,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,14":1,"0,15":1,"0,16":30752,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,13":1,"4,0":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,13":1,"4,15":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1},
     ],
     encoders: [
@@ -26334,13 +26634,12 @@ const FACTORY_KEYMAPS = {
       [],
       [],
     ],
-    reportsNone: ["2:0,15"],
   },
   0x1681: {
     layers: [
       {"0,0":41,"0,1":190,"0,2":189,"0,3":32284,"0,4":32285,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,14":32278,"0,15":32280,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,12":50,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"5,0":224,"5,1":32263,"5,2":32265,"5,6":44,"5,10":32266,"5,11":32264,"5,12":21025,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
       {"0,0":1,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,14":1,"0,15":1,"0,16":30752,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,12":1,"4,0":1,"4,1":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,13":1,"4,15":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1},
-      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,14":70,"0,15":2059,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,12":50,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
+      {"0,0":41,"0,1":58,"0,2":59,"0,3":60,"0,4":61,"0,5":62,"0,6":63,"0,7":64,"0,8":65,"0,9":66,"0,10":67,"0,11":68,"0,12":69,"0,14":70,"0,15":32281,"0,16":30753,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":40,"2,14":76,"2,15":77,"2,16":78,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,12":50,"4,0":225,"4,1":100,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79},
       {"0,0":1,"0,1":190,"0,2":189,"0,3":32270,"0,4":32273,"0,5":30760,"0,6":30759,"0,7":172,"0,8":174,"0,9":171,"0,10":168,"0,11":170,"0,12":169,"0,14":1,"0,15":1,"0,16":30752,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,12":1,"4,0":1,"4,1":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,13":1,"4,15":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1},
     ],
     encoders: [
@@ -26349,13 +26648,12 @@ const FACTORY_KEYMAPS = {
       [],
       [],
     ],
-    reportsNone: ["2:0,15"],
   },
   0x16A0: {
     layers: [
       {"0,0":41,"0,2":190,"0,3":189,"0,4":32284,"0,5":32285,"0,6":30760,"0,7":30759,"0,8":172,"0,9":174,"0,10":171,"0,11":168,"0,12":170,"0,13":169,"0,14":32278,"0,15":32280,"0,16":30753,"0,17":104,"0,18":105,"0,19":106,"3,13":107,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"1,17":83,"1,18":84,"1,19":85,"3,14":86,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":49,"2,14":76,"2,15":77,"2,16":78,"2,17":95,"2,18":96,"2,19":97,"3,15":87,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,12":40,"3,17":92,"3,18":93,"3,19":94,"4,0":225,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"4,17":89,"4,18":90,"4,19":91,"3,16":88,"5,0":224,"5,1":32263,"5,2":32265,"5,6":44,"5,10":32266,"5,11":32264,"5,12":21025,"5,13":228,"5,14":80,"5,15":81,"5,16":79,"5,18":98,"5,19":99},
       {"0,0":1,"0,2":58,"0,3":59,"0,4":60,"0,5":61,"0,6":62,"0,7":63,"0,8":64,"0,9":65,"0,10":66,"0,11":67,"0,12":68,"0,13":69,"0,14":1,"0,15":1,"0,16":30752,"0,17":1,"0,18":1,"0,19":1,"3,13":1,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"1,17":1,"1,18":1,"1,19":1,"3,14":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"2,17":1,"2,18":1,"2,19":1,"3,15":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,12":1,"3,17":1,"3,18":1,"3,19":1,"4,0":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,13":1,"4,15":1,"4,17":1,"4,18":1,"4,19":1,"3,16":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1,"5,18":1,"5,19":1},
-      {"0,0":41,"0,2":58,"0,3":59,"0,4":60,"0,5":61,"0,6":62,"0,7":63,"0,8":64,"0,9":65,"0,10":66,"0,11":67,"0,12":68,"0,13":69,"0,14":70,"0,15":2059,"0,16":30753,"0,17":104,"0,18":105,"0,19":106,"3,13":107,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"1,17":83,"1,18":84,"1,19":85,"3,14":86,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":49,"2,14":76,"2,15":77,"2,16":78,"2,17":95,"2,18":96,"2,19":97,"3,15":87,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,12":40,"3,17":92,"3,18":93,"3,19":94,"4,0":225,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"4,17":89,"4,18":90,"4,19":91,"3,16":88,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79,"5,18":98,"5,19":99},
+      {"0,0":41,"0,2":58,"0,3":59,"0,4":60,"0,5":61,"0,6":62,"0,7":63,"0,8":64,"0,9":65,"0,10":66,"0,11":67,"0,12":68,"0,13":69,"0,14":70,"0,15":32281,"0,16":30753,"0,17":104,"0,18":105,"0,19":106,"3,13":107,"1,0":53,"1,1":30,"1,2":31,"1,3":32,"1,4":33,"1,5":34,"1,6":35,"1,7":36,"1,8":37,"1,9":38,"1,10":39,"1,11":45,"1,12":46,"1,13":42,"1,14":73,"1,15":74,"1,16":75,"1,17":83,"1,18":84,"1,19":85,"3,14":86,"2,0":43,"2,1":20,"2,2":26,"2,3":8,"2,4":21,"2,5":23,"2,6":28,"2,7":24,"2,8":12,"2,9":18,"2,10":19,"2,11":47,"2,12":48,"2,13":49,"2,14":76,"2,15":77,"2,16":78,"2,17":95,"2,18":96,"2,19":97,"3,15":87,"3,0":57,"3,1":4,"3,2":22,"3,3":7,"3,4":9,"3,5":10,"3,6":11,"3,7":13,"3,8":14,"3,9":15,"3,10":51,"3,11":52,"3,12":40,"3,17":92,"3,18":93,"3,19":94,"4,0":225,"4,2":29,"4,3":27,"4,4":6,"4,5":25,"4,6":5,"4,7":17,"4,8":16,"4,9":54,"4,10":55,"4,11":56,"4,13":229,"4,15":82,"4,17":89,"4,18":90,"4,19":91,"3,16":88,"5,0":224,"5,1":227,"5,2":226,"5,6":44,"5,10":230,"5,11":231,"5,12":21027,"5,13":228,"5,14":80,"5,15":81,"5,16":79,"5,18":98,"5,19":99},
       {"0,0":1,"0,2":190,"0,3":189,"0,4":32270,"0,5":32273,"0,6":30760,"0,7":30759,"0,8":172,"0,9":174,"0,10":171,"0,11":168,"0,12":170,"0,13":169,"0,14":1,"0,15":1,"0,16":30752,"0,17":1,"0,18":1,"0,19":1,"3,13":1,"1,0":1,"1,1":32256,"1,2":32257,"1,3":32258,"1,4":32260,"1,5":1,"1,6":1,"1,7":1,"1,8":1,"1,9":1,"1,10":1,"1,11":1,"1,12":1,"1,13":1,"1,14":1,"1,15":1,"1,16":1,"1,17":1,"1,18":1,"1,19":1,"3,14":1,"2,0":30752,"2,1":30753,"2,2":30759,"2,3":30755,"2,4":30757,"2,5":30761,"2,6":1,"2,7":1,"2,8":1,"2,9":1,"2,10":1,"2,11":1,"2,12":1,"2,13":1,"2,14":1,"2,15":1,"2,16":1,"2,17":1,"2,18":1,"2,19":1,"3,15":1,"3,0":1,"3,1":30754,"3,2":30760,"3,3":30756,"3,4":30758,"3,5":30762,"3,6":1,"3,7":1,"3,8":1,"3,9":1,"3,10":1,"3,11":1,"3,12":1,"3,17":1,"3,18":1,"3,19":1,"4,0":1,"4,2":1,"4,3":1,"4,4":1,"4,5":1,"4,6":32279,"4,7":1,"4,8":1,"4,9":1,"4,10":1,"4,11":1,"4,13":1,"4,15":1,"4,17":1,"4,18":1,"4,19":1,"3,16":1,"5,0":1,"5,1":1,"5,2":1,"5,6":1,"5,10":1,"5,11":1,"5,12":1,"5,13":1,"5,14":1,"5,15":1,"5,16":1,"5,18":1,"5,19":1},
     ],
     encoders: [
@@ -26364,7 +26662,6 @@ const FACTORY_KEYMAPS = {
       [],
       [],
     ],
-    reportsNone: ["2:0,15"],
   },
 };
 // END GENERATED FACTORY_KEYMAPS
@@ -26406,9 +26703,10 @@ const SECTION_TITLES = {
   step3:    'Step 3. Choose an Action for Selected Key - KeyAble',
   help:     'Help - KeyAble',
   lighting: 'RGB Lighting - KeyAble',
+  settings: 'Keyboard Settings - KeyAble',
 };
 
-const SECTIONS = ['connect', 'step2', 'step3', 'help', 'lighting'];
+const SECTIONS = ['connect', 'step2', 'step3', 'help', 'lighting', 'settings'];
 
 // - Saved settings -
 // Every name KeyAble saves in the browser's site storage. The head script reads the
@@ -26482,7 +26780,7 @@ function navKeyHint(n) {
 function applyPlatformShortcutLabels() {
   if (!isMacPlatform()) return;
 
-  // Spoken-form wording ("Alt plus 1 to 5") in any element marked
+  // Spoken-form wording ("Alt plus 4") in any element marked
   // data-nav-keys (Help text).
   document.querySelectorAll('[data-nav-keys]').forEach(el => {
     el.textContent = el.textContent.replace(/Alt plus/g, 'Option plus');
@@ -26510,7 +26808,8 @@ const NAV_SHORTCUT_MAP = {
   Digit2: 'step2',
   Digit3: 'step3',
   Digit4: 'lighting',
-  Digit5: 'help',
+  Digit5: 'settings',
+  Digit6: 'help',
 };
 
 function bindNavShortcuts() {
@@ -26529,7 +26828,7 @@ function bindNavShortcuts() {
   });
 }
 
-// Fold each nav item's position ("Help, 5 of 5") into a visually-hidden
+// Fold each nav item's position ("Help, 6 of 6") into a visually-hidden
 // span. Screen readers expose list position in browse mode but not on Tab in
 // focus mode; the span makes it announce in every mode. The count is read
 // from the list, so it cannot go stale.
@@ -26548,10 +26847,13 @@ function applyItemPositions(listSelector) {
   });
 }
 
+// A newer message replaces one still waiting, so an older message never lands over it.
+let announceTimer = null;
 function announce(msg, delayMs = 60) {
   const el = $('sr-live');
+  clearTimeout(announceTimer);
   el.textContent = '';
-  setTimeout(() => { el.textContent = msg; }, delayMs);
+  announceTimer = setTimeout(() => { el.textContent = msg; }, delayMs);
 }
 
 // For a message that follows a focus move to a NEW element: the screen reader
@@ -26626,6 +26928,8 @@ function goToSection(id, focusHeading = true) {
   if (id === 'step2')    loadStep2();
   if (id === 'step3')    loadStep3();
   if (id === 'lighting') loadLighting();
+  if (id === 'settings') loadSettings();
+  else stopDepthTest();
   if (!focusHeading) return;
   const heading = document.querySelector(`#sec-${id} > h2[tabindex="-1"]`);
   if (heading) moveFocus(heading);
@@ -26989,15 +27293,6 @@ function factoryCode(layer, key) {
   return lm[`${key.row},${key.col}`];   // undefined if this position is absent
 }
 
-// True when the connected model reads `key` back as 0 on `layer` until it is written,
-// though the key types its factory code (the dataset's reportsNone). On those keys both
-// 0 and the factory code are the factory state.
-function readsAsNone(layer, key) {
-  const model = modelFactory();
-  return !key.isRotation && !!(model && model.reportsNone) &&
-    model.reportsNone.includes(`${layer}:${key.row},${key.col}`);
-}
-
 // Name a curated System Key or a generic modifier-wrapped keycode for display,
 // so a remapped key reads back by name instead of the generic "Custom".
 // Returns null when the code is not something we can describe. OS-aware: picks
@@ -27037,7 +27332,7 @@ function systemOrComboName(code, os) {
 function decodeAction(code, key, layer, isFnLayer = false) {
   const fc = factoryCode(layer, key);
   if (fc !== undefined) {
-    if (code === fc || (code === 0 && readsAsNone(layer, key))) return 'Default';
+    if (code === fc) return 'Default';
   } else if (!isFnLayer) {
     // No dataset for this model: guess the base-layer default from the label.
     const expectedCode = expectedDefaultCode(key);
@@ -27605,7 +27900,6 @@ async function layerActionChanged(layer, key) {
   if (current === 0x0001) return false;
   const factory = resetValueForLayer(layer, key);
   if (factory === undefined) return false;   // can't know the default -> don't claim a change
-  if (current === 0 && readsAsNone(layer, key)) return false;
   return current !== factory;
 }
 
@@ -27618,32 +27912,31 @@ async function resetSelectedKeyToDefault() {
   const baseLayers = writeTargetLayers();            // base layer(s) for the current view
   const fnLayers   = baseLayers.map(fnLayerFor);     // paired Fn layer per role map
 
+  // The button stays busy from the check through the write: each change of its state is
+  // spoken, and a flicker between them talks over the result.
   const resetBtn = $('btn-reset-key');
   setButtonBusy(resetBtn, true);
-  announce(`Checking ${keyDesc}. Please wait.`);
-  const baseChanged = await layerActionChanged(baseLayers[0], confirmedKey);
-  const fnChanged   = await layerActionChanged(fnLayers[0],   confirmedKey);
-  setButtonBusy(resetBtn, false);
+  try {
+    announce(`Checking ${keyDesc}. Please wait.`);
+    const baseChanged = await layerActionChanged(baseLayers[0], confirmedKey);
+    const fnChanged   = await layerActionChanged(fnLayers[0],   confirmedKey);
 
-  // A read failed: don't guess, fall back to the plain base reset.
-  if (baseChanged === null || fnChanged === null) {
-    await performKeyReset(baseLayers, { desc: keyDesc, touchesBase: true });
-    return;
+    // A read failed: don't guess, fall back to the plain base reset.
+    if (baseChanged === null || fnChanged === null) {
+      await performKeyReset(baseLayers, { desc: keyDesc, touchesBase: true });
+    } else if (!baseChanged && !fnChanged) {
+      announce(`${keyDesc} is already set to its default action, both on its own and with Fn. There is nothing to reset.`);
+    } else if (baseChanged && !fnChanged) {
+      await performKeyReset(baseLayers, { desc: keyDesc, touchesBase: true });
+    } else if (!baseChanged && fnChanged) {
+      await performKeyReset(fnLayers, { desc: `Fn + ${keyDesc}`, touchesBase: false });
+    } else {
+      // Both changed and independent: ask which one to reset.
+      openResetChoiceDialog(keyDesc, baseLayers, fnLayers);
+    }
+  } finally {
+    setButtonBusy(resetBtn, false);
   }
-  if (!baseChanged && !fnChanged) {
-    announce(`${keyDesc} is already set to its default action, both on its own and with Fn. There is nothing to reset.`);
-    return;
-  }
-  if (baseChanged && !fnChanged) {
-    await performKeyReset(baseLayers, { desc: keyDesc, touchesBase: true });
-    return;
-  }
-  if (!baseChanged && fnChanged) {
-    await performKeyReset(fnLayers, { desc: `Fn + ${keyDesc}`, touchesBase: false });
-    return;
-  }
-  // Both changed and independent: ask which one to reset.
-  openResetChoiceDialog(keyDesc, baseLayers, fnLayers);
 }
 
 // Mark a button busy while a keyboard operation runs. aria-disabled rather than
@@ -28311,6 +28604,7 @@ const VIA_ECHO_LENGTH = {
   [CMD_KEYMAP_GET_BUFFER]: 4,                         // offset, size
   [CMD_GET_ENCODER]: 4, [CMD_SET_ENCODER]: 6,         // layer, encoder, direction (+ value)
   [CMD_KC_MISC]: 2, [CMD_KC_RGB]: 2,                  // sub-command; byte 2 is the status
+  [CMD_KC_ANALOG]: 2,                                 // sub-command
 };
 const VIA_UNHANDLED = 0xFF;   // VIA's reply byte 0 for a command the firmware does not handle
 
@@ -28437,11 +28731,20 @@ class DemoKeyboard extends EventTarget {
     this.macros   = new Uint8Array(DEMO_MACRO_BYTES);
     // The Max boards' QMK firmware reports its build and has Keychron's own settings
     // (debounce and wireless sleep times here) and, on RGB models, Keychron's lighting.
-    // Older and ZMK firmware answers none of these.
+    // Older and ZMK firmware answers none of these. Keychron's HE source reports its
+    // build and has the analog matrix instead of the settings and lighting.
+    // The Ultra 8K firmware answers 0xA7 in its own layout, with the values a V6 Ultra
+    // ISO gave: debounce press 0 and release 50 ms, and 1000 Hz on cable and 2.4 GHz.
     const isMax = keycodesForBoard(entry, this.protocolVersion) === KEYCODES_PROTOCOL_12;
-    this.keychron = isMax ? { debounce: [0, 5], wirelessSleep: [0x58, 0x02, 0x20, 0x1C] } : null;
+    const isHE  = /\bHE\b/.test(entry.name);
+    this.reportsBuild = isMax;
+    const sleepTimes = [0x58, 0x02, 0x20, 0x1C];   // 600 and 7200 seconds
+    this.keychron = isMax && !isHE ? { debounce: [0, 5], wirelessSleep: sleepTimes } : null;
+    this.keychronUltra = entry.firmware === 'zmk-ultra'
+      ? { debounce: [0, 50], wirelessSleep: sleepTimes, polling: [3, 3] } : null;
+    this.analog = isHE ? new DemoAnalogMatrix(this.layout, () => this.heldSwitches) : null;
     const leds = this.layout.keys.length;
-    this.keychronRgb = isMax && this.lightingChannel === LIGHTING_CH_RGB_MATRIX ? {
+    this.keychronRgb = isMax && !isHE && this.lightingChannel === LIGHTING_CH_RGB_MATRIX ? {
       leds, indicators: new Uint8Array(4), perKeyType: 0,
       colours: new Uint8Array(3 * leds), regions: new Uint8Array(leds),
       effects: new Uint8Array(DEMO_RGB_REGIONS * DEMO_RGB_EFFECTS_PER_REGION * KC_RGB_EFFECT_BYTES),
@@ -28534,10 +28837,8 @@ class DemoKeyboard extends EventTarget {
     for (let l = 0; l < this.layerCount; l++) {
       const isBase = [this.roles.mac, this.roles.win].includes(l);
       const factoryLayer = this.factory && this.factory.layers[l];
-      const readsNone = (this.factory && this.factory.reportsNone) || [];   // read as 0, as a new board does
       for (const key of this.layout.keys) {
-        const pos  = `${key.row},${key.col}`;
-        const code = readsNone.includes(`${l}:${pos}`) ? 0 : factoryLayer && factoryLayer[pos];
+        const code = factoryLayer && factoryLayer[`${key.row},${key.col}`];
         this.keymap[this.cell(l, key.row, key.col)] = code ?? (isBase ? (LABEL_TO_KEYCODE[key.label] ?? 0) : 0x0001);
       }
       const knobs = (this.factory && this.factory.encoders && this.factory.encoders[l]) || [];
@@ -28601,7 +28902,7 @@ class DemoKeyboard extends EventTarget {
   }
 
   answerFirmwareVersion(d) {
-    if (!this.keychron) { d[0] = VIA_UNHANDLED; return; }
+    if (!this.reportsBuild) { d[0] = VIA_UNHANDLED; return; }
     d.fill(0, 1);
     for (let i = 0; i < DEMO_FIRMWARE_VERSION.length; i++) d[1 + i] = DEMO_FIRMWARE_VERSION.charCodeAt(i);
   }
@@ -28609,6 +28910,7 @@ class DemoKeyboard extends EventTarget {
   // Keychron 0xA7 and 0xA8: arguments from byte 2, then the status over byte 2 and any
   // data from byte 3, as keychron_raw_hid.c and keychron_rgb.c answer them.
   answerKeychronMisc(d) {
+    if (this.keychronUltra) { this.answerUltraMisc(d); return; }
     const k = this.keychron;
     if (!k) { d[0] = VIA_UNHANDLED; return; }
     switch (d[1]) {
@@ -28620,6 +28922,39 @@ class DemoKeyboard extends EventTarget {
       default: d[2] = 1; return;   // a setting this build does not have
     }
     d[2] = 0;
+  }
+
+  // 0xA7 as the Ultra 8K firmware answers it: no feature flags, and a sub-command it
+  // lacks leaves the request as it is.
+  answerUltraMisc(d) {
+    const k = this.keychronUltra;
+    switch (d[1]) {
+      case 0x01: d[2] = 0; d[3] = ULTRA_SETTINGS_VERSION; d[4] = 0; break;
+      case 0x05: d.set([0, 1, ...k.debounce], 2); break;
+      case 0x06:
+        if (d[2] > 50 || d[3] > 50 || d[3] === 0) { d[2] = 1; break; }
+        k.debounce = [d[2], d[3]];
+        d[2] = 0;
+        break;
+      case 0x0B: d[2] = 0; d.set(k.wirelessSleep, 3); break;
+      case 0x0C: {
+        const [backlight, sleep] = sleepSecondsFromBytes(d.subarray(2, 6));
+        if (backlight < 5 || sleep < 60) { d[2] = 1; break; }
+        k.wirelessSleep = Array.from(d.subarray(2, 6));
+        d[2] = 0;
+        break;
+      }
+      case ULTRA_POLLING_GET: {
+        const [cable, dongle] = k.polling;
+        d.set([0, 0x40, 0x1F, 0x7F, cable, 0, 0x40, 0x1F, 0x7F, dongle, 0, 0x7D, 0, 0x40, 0x40, 1], 2);
+        break;
+      }
+      case ULTRA_POLLING_SET:
+        if (d[2] > POLLING_MAX_DIVIDER || d[3] > POLLING_MAX_DIVIDER || d[4] > POLLING_MAX_DIVIDER) { d[2] = 1; break; }
+        k.polling = [d[2], d[3]];
+        d[2] = 0;
+        break;
+    }
   }
 
   answerKeychronRgb(d) {
@@ -28645,6 +28980,80 @@ class DemoKeyboard extends EventTarget {
       default: d[2] = 1; return;
     }
     d[2] = 0;
+  }
+}
+
+// The analog matrix of an HE board, answering 0xA9 as Keychron's HE firmware does:
+// three profiles at Keychron's factory travel settings, the first in use. Each profile
+// is laid out as readActuation reads it.
+const DEMO_ANALOG_VERSION = 4;
+
+class DemoAnalogMatrix {
+  // `heldSwitches` gives the demo keyboard's held switches, which read as fully
+  // pressed; tests set a depth of their own in `travel` ("row,col" -> tenths).
+  constructor(layout, heldSwitches) {
+    this.layout  = layout;
+    this.heldSwitches = heldSwitches;
+    this.travel  = new Map();
+    this.current = 0;
+    // AMC_MODE is defined later in the script, so it is read here, not at load.
+    this.profiles = [AMC_MODE.REGULAR, AMC_MODE.RAPID, AMC_MODE.RAPID].map(mode => {
+      const p = new Uint8Array(AMC_CONFIG_BYTES * (1 + layout.rows * layout.cols));
+      DemoAnalogMatrix.setTravel(p, 0, { mode, point: ACTUATION_USUAL,
+        sens: RAPID_TRIGGER_USUAL_SENSITIVITY, releaseSens: RAPID_TRIGGER_USUAL_SENSITIVITY });
+      return p;
+    });
+  }
+
+  // Writes the travel fields of one analog_key_config_t, keeping its advanced mode.
+  static setTravel(bytes, at, { mode, point, sens, releaseSens }) {
+    const advanced = bytes[at + 2] & 0xF0;
+    const v = mode | (point << 2) | (sens << 8) | (releaseSens << 14);
+    bytes[at]     = v & 0xFF;
+    bytes[at + 1] = (v >> 8) & 0xFF;
+    bytes[at + 2] = advanced | ((v >> 16) & 0x0F);
+  }
+
+  // Tests use this to play a key given its own point in Keychron's Launcher.
+  keyAt(row, col) { return AMC_CONFIG_BYTES * (1 + row * this.layout.cols + col); }
+
+  answer(d) {
+    const p = this.profiles[d[2]];
+    switch (d[1]) {
+      case AMC.GET_VERSION:       d[2] = DEMO_ANALOG_VERSION; break;
+      case AMC.GET_PROFILES_INFO: d[2] = this.current; d[3] = this.profiles.length; break;
+      case AMC.GET_PROFILE_RAW: {
+        const at = d[3] | (d[4] << 8);
+        for (let i = 0; i < d[5]; i++) d[AMC_RAW_DATA_AT + i] = (p && p[at + i]) || 0;
+        break;
+      }
+      case AMC.SET_TRAVEL: {
+        const [mode, point, sens, releaseSens, whole] = [d[3], d[4], d[5], d[6], d[7]];
+        const valid = p && mode <= AMC_MODE.RAPID && point <= ACTUATION_MAX && !(whole && mode === AMC_MODE.GLOBAL);
+        if (valid && whole) DemoAnalogMatrix.setTravel(p, 0, { mode, point, sens, releaseSens });
+        if (valid && !whole) {
+          for (let r = 0; r < this.layout.rows; r++) {
+            const mask = d[AMC_ROW_MASKS_AT + 3 * r] | (d[AMC_ROW_MASKS_AT + 3 * r + 1] << 8) | (d[AMC_ROW_MASKS_AT + 3 * r + 2] << 16);
+            for (let c = 0; c < this.layout.cols; c++) {
+              if (mask & (1 << c)) DemoAnalogMatrix.setTravel(p, this.keyAt(r, c), { mode, point, sens, releaseSens });
+            }
+          }
+        }
+        d[2] = valid ? 0 : 1;
+        break;
+      }
+      case AMC.SAVE_PROFILE: d[2] = p ? 0 : 1; break;
+      case AMC.GET_REALTIME_TRAVEL: {
+        const [row, col] = [d[2], d[3]];
+        const at = `${row},${col}`;
+        d[3] = row;
+        d[4] = col;
+        d[5] = this.travel.get(at) ?? (this.heldSwitches().has(at) ? ACTUATION_MAX + 1 : 0);
+        d[2] = 0;
+        break;
+      }
+      default: break;   // the firmware returns any other request unchanged
+    }
   }
 }
 
@@ -28686,6 +29095,7 @@ const DEMO_COMMANDS = {
   [CMD_KC_FIRMWARE_VERSION]: (kb, d) => kb.answerFirmwareVersion(d),
   [CMD_KC_MISC]: (kb, d) => kb.answerKeychronMisc(d),
   [CMD_KC_RGB]:  (kb, d) => kb.answerKeychronRgb(d),
+  [CMD_KC_ANALOG]: (kb, d) => (kb.analog ? kb.analog.answer(d) : (d[0] = VIA_UNHANDLED)),
 };
 
 const inDemoMode = () => hidDevice instanceof DemoKeyboard;
@@ -28997,6 +29407,7 @@ async function identifyKeyboard(vid, pid, protocolVersion) {
     deviceLayerCount = await detectLayerCount();
     currentOSMode = await detectOSMode();
     followSwitchForWriteTarget();
+    await showSettingsHint();
     const modeLabel = osModeLabel(currentOSMode);
     // setStatus + the kbd-os-mode live region already announce the success
     // and slide-switch state; focus moves into the identified section
@@ -29118,6 +29529,10 @@ async function disconnectKeyboard(
   lightingState       = null;
   lightingLastOnLevel = LIGHTING_DEFAULT_ON_LEVEL;
   lightingLastEffect  = LIGHTING_DEFAULT_ON_EFFECT;
+  settingsState     = null;
+  pendingDebounceMs = null;
+  settingsLoadToken++;   // drop any settings read still running for the old keyboard
+  stopDepthTest();
   deviceLayerCount = null;
   viaProtocolVersion = null;
   deviceKeycodes = KEYCODES_PROTOCOL_12;
@@ -29248,7 +29663,7 @@ async function executeResetAll() {
 // Bump KEYABLE_VERSION by hand at a real release (MAJOR.MINOR.PATCH: a small
 // fix is a PATCH, a new feature a MINOR); update KEYABLE_RELEASE_DATE (ISO)
 // to that day. showAppVersion writes it under the page title and the Help page.
-const KEYABLE_VERSION       = '1.5';
+const KEYABLE_VERSION       = '1.6';
 const KEYABLE_RELEASE_DATE  = '2026-11-19';   // ISO yyyy-mm-dd
 
 // The human-friendly version string, e.g. "Version 1.3, released
@@ -29370,9 +29785,9 @@ async function askKeychron(command, sub, ...args) {
 }
 
 // A Keychron command family's sub-command 1 reply, which starts with the family's
-// protocol version; null when the board does not have the family. Keychron's ZMK
-// firmware has neither family and returns the request unchanged, which reads as
-// version 0.
+// protocol version; null when the board does not have the family. The B Pro boards'
+// ZMK firmware has neither family and returns the request unchanged, which reads as
+// version 0. The Ultra 8K boards' ZMK firmware has both.
 async function keychronInfo(command) {
   const reply = await sendVIA([command, 0x01]);
   if (!reply || reply[0] !== command || reply[2] !== 0) return null;
@@ -29434,6 +29849,181 @@ async function writeKeychronSetting(name, value) {
     }
     await askKeychron(CMD_KC_MISC, KC_SNAP_CLICK_SAVE);
   }
+}
+
+// Wireless sleep times as [backlight off, sleep] in seconds, from and to the two
+// little-endian 16-bit counts the firmware sends.
+const sleepSecondsFromBytes = b => [b[0] | (b[1] << 8), b[2] | (b[3] << 8)];
+const sleepBytesFromSeconds = ([backlight, sleep]) =>
+  [backlight & 0xFF, backlight >> 8, sleep & 0xFF, sleep >> 8];
+
+// - Keychron settings on the Ultra 8K firmware (0xA7) -
+// The Ultra 8K boards answer 0xA7 in a layout of their own, set out in
+// docs/KEYCHRON-SETTINGS.txt. Sub-command 1 carries no feature flags; its version is 3
+// on builds that set the polling rate of cable and 2.4 GHz apart, the only layout read
+// here. The sleep times are as on QMK.
+const ULTRA_SETTINGS_VERSION = 3;
+// Debounce is a press time and a release time; the firmware refuses a press time over
+// 50 or a release time outside 1 to 50.
+const SPLIT_DEBOUNCE_LIMITS = { press: [0, 50], release: [1, 50] };
+const SPLIT_DEBOUNCE_USUAL = [0, 50];   // every Ultra board's matrix in Keychron's source
+const ULTRA_POLLING_GET = 0x0D;
+const ULTRA_POLLING_SET = 0x0E;
+const POLLING_BASE_HZ   = 8000;   // a rate is POLLING_BASE_HZ >> n for its divider n
+const POLLING_MAX_DIVIDER = 6;
+const POLLING_USUAL_DIVIDER = 3;
+const POLLING_USUAL_HZ  = POLLING_BASE_HZ >> POLLING_USUAL_DIVIDER;
+const POLLING_LINKS     = ['cable', 'dongle', 'bluetooth'];   // the reply's entry order
+const POLLING_ENTRY_BYTES = 5;
+
+const isUltraFirmware = () => !!activeKbd && activeKbd.firmware === 'zmk-ultra';
+const pollingHz = divider => POLLING_BASE_HZ >> divider;
+
+// The 0x0D reply as { cable, dongle, bluetooth }, each { maxHz, divider, dividers,
+// readOnly }: the current divider and the ones the board allows (bit n of the mask
+// allows n). A read-only link's divider is not a divider (Bluetooth sends 0x40), so only
+// its maxHz is its rate.
+function pollingRateFromReply(reply) {
+  const out = {};
+  POLLING_LINKS.forEach((link, i) => {
+    const at = 3 + i * POLLING_ENTRY_BYTES;
+    const mask = reply[at + 2];
+    const dividers = [];
+    for (let n = 0; n <= POLLING_MAX_DIVIDER; n++) if (mask & (1 << n)) dividers.push(n);
+    out[link] = { maxHz: reply[at] | (reply[at + 1] << 8), divider: reply[at + 3], dividers, readOnly: reply[at + 4] !== 0 };
+  });
+  return out;
+}
+
+// Sets both settable links at once. The firmware refuses the request unless its third
+// divider byte, which it does not use, is in range too.
+const writePollingRate = (cable, dongle) => askKeychron(CMD_KC_MISC, ULTRA_POLLING_SET, cable, dongle, 0);
+const writeSplitDebounce = ([press, release]) =>
+  askKeychron(CMD_KC_MISC, KC_MISC_SETTINGS.debounce.set, press, release);
+
+// Debounce as [type, milliseconds] (QMK) or splitDebounce as [press, release] (Ultra),
+// the sleep times and the polling rate, each null when the build does not report it or
+// will not read it. Keychron's source sets the sleep-times bit under one build option
+// and handles the command under another, so a board can report a setting it then
+// refuses.
+async function readMiscSettingsForPage() {
+  const out = { debounce: null, splitDebounce: null, sleep: null, pollingRate: null };
+  const info = await keychronInfo(CMD_KC_MISC);
+  if (!info) return out;
+  const ultra = isUltraFirmware();
+  const read = async sub => {
+    try { return await askKeychron(CMD_KC_MISC, sub); } catch { return null; }
+  };
+  const has = name => (info[5] & KC_MISC_SETTINGS[name].flag) !== 0;
+  if (ultra || has('debounce')) {
+    const debounce = await read(KC_MISC_SETTINGS.debounce.get);
+    if (debounce && ultra) out.splitDebounce = [debounce[4], debounce[5]];
+    else if (debounce) out.debounce = [debounce[4], debounce[5]];
+  }
+  if (ultra || has('wirelessSleep')) {
+    const sleep = await read(KC_MISC_SETTINGS.wirelessSleep.get);
+    if (sleep) out.sleep = sleepSecondsFromBytes(sleep.subarray(3, 7));
+  }
+  if (ultra && info[3] === ULTRA_SETTINGS_VERSION) {
+    const rate = await read(ULTRA_POLLING_GET);
+    if (rate) out.pollingRate = pollingRateFromReply(rate);
+  }
+  return out;
+}
+
+// - HE analog matrix (0xA9, Keychron's HE firmware) -
+// A board holds several profiles and uses one. A profile is a whole-keyboard travel
+// setting followed by one per matrix key, row by row, 4 bytes each; a key whose travel
+// fields are all 0 follows the whole-keyboard setting. The getters' replies carry no
+// status byte. A board without the analog matrix answers unhandled (QMK) or returns
+// the request unchanged (ZMK), so version 0 means none.
+const AMC = { GET_VERSION: 0x01, GET_PROFILES_INFO: 0x10, GET_PROFILE_RAW: 0x12, SET_TRAVEL: 0x14,
+              SAVE_PROFILE: 0x1F, GET_REALTIME_TRAVEL: 0x30 };
+const AMC_MODE = { GLOBAL: 0, REGULAR: 1, RAPID: 2 };
+const AMC_CONFIG_BYTES = 4;
+const AMC_RAW_DATA_AT = 6;                      // after GET_PROFILE_RAW's request bytes
+const AMC_RAW_PER_REQUEST = REPORT_LEN - AMC_RAW_DATA_AT;
+const AMC_ROW_MASKS_AT = 8;                     // SET_TRAVEL's per-row key masks, 3 bytes each
+// Actuation in tenths of a millimetre. SET_TRAVEL refuses above 39, and 0 would count
+// every key as pressed at rest.
+const ACTUATION_MIN = 1;
+const ACTUATION_MAX = 39;
+const ACTUATION_USUAL = 20;
+const RAPID_TRIGGER_USUAL_SENSITIVITY = 4;
+
+async function analogMatrixVersion() {
+  const reply = await sendVIA([CMD_KC_ANALOG, AMC.GET_VERSION]);
+  return reply && reply[0] === CMD_KC_ANALOG ? reply[2] : 0;
+}
+
+// `size` bytes of one profile from `offset`, or null when the board does not answer.
+async function readAnalogProfile(profile, offset, size) {
+  const out = new Uint8Array(size);
+  for (let done = 0; done < size; done += AMC_RAW_PER_REQUEST) {
+    const n = Math.min(AMC_RAW_PER_REQUEST, size - done);
+    const at = offset + done;
+    const request = [CMD_KC_ANALOG, AMC.GET_PROFILE_RAW, profile, at & 0xFF, at >> 8, n];
+    const reply = await sendVIA(request, undefined, request.length);
+    if (!reply || reply[0] !== CMD_KC_ANALOG) return null;
+    out.set(reply.subarray(AMC_RAW_DATA_AT, AMC_RAW_DATA_AT + n), done);
+  }
+  return out;
+}
+
+// One analog_key_config_t. GCC packs its bitfields upward from bit 0 of a little-endian
+// 24-bit value: mode 2 bits, actuation 6, rapid trigger press and release sensitivity
+// 6 each, advanced mode 4. A fourth byte holds advanced-mode data.
+function analogTravelAt(bytes, at) {
+  const v = bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16);
+  return { mode: v & 0x3, point: (v >> 2) & 0x3F, sens: (v >> 8) & 0x3F, releaseSens: (v >> 14) & 0x3F };
+}
+
+// The profile in use, its whole-keyboard travel setting, and how many of the layout's
+// keys have travel settings of their own (set in Keychron's Launcher); null when the
+// board has no analog matrix.
+async function readActuation(layout) {
+  if (!await analogMatrixVersion()) return null;
+  const info = await sendVIA([CMD_KC_ANALOG, AMC.GET_PROFILES_INFO]);
+  if (!info || info[0] !== CMD_KC_ANALOG) return null;
+  const [profile, profiles] = [info[2], info[3]];
+  if (profile >= profiles) return null;
+  const bytes = await readAnalogProfile(profile, 0, AMC_CONFIG_BYTES * (1 + layout.rows * layout.cols));
+  if (!bytes) return null;
+  const ownKeys = layout.keys.filter(k => {
+    const t = analogTravelAt(bytes, AMC_CONFIG_BYTES * (1 + k.row * layout.cols + k.col));
+    return t.mode || t.point || t.sens || t.releaseSens;
+  }).length;
+  return { profile, profiles, ...analogTravelAt(bytes, 0), ownKeys };
+}
+
+// Gives every key one actuation point in the profile in use, keeping the profile's
+// mode and rapid trigger sensitivities, and saves the profile. SET_TRAVEL for the whole
+// keyboard stores the setting without applying it: keys take it up only when the
+// firmware rebuilds them, at power-on. So a second SET_TRAVEL, with every key in its
+// mask, sets each key back to following the whole-keyboard setting, which rebuilds it.
+async function writeActuation(current, point) {
+  const sens = current.sens || RAPID_TRIGGER_USUAL_SENSITIVITY;
+  const requests = [
+    [CMD_KC_ANALOG, AMC.SET_TRAVEL, current.profile, current.mode || AMC_MODE.REGULAR, point,
+      sens, current.releaseSens || sens, 1],
+    [CMD_KC_ANALOG, AMC.SET_TRAVEL, current.profile, AMC_MODE.GLOBAL, 0, 0, 0, 0,
+      ...new Array(REPORT_LEN - AMC_ROW_MASKS_AT).fill(0xFF)],
+    [CMD_KC_ANALOG, AMC.SAVE_PROFILE, current.profile],
+  ];
+  for (const request of requests) {
+    const reply = await sendVIA(request);
+    if (!reply || reply[0] !== CMD_KC_ANALOG || reply[2] !== 0) {
+      throw new Error('The keyboard did not accept the actuation point.');
+    }
+  }
+}
+
+// How far one key is pressed now, in tenths of a millimetre, or null when the board
+// does not say. The reply holds the row and column again from byte 3, then the depth.
+async function readKeyTravel(row, col) {
+  const reply = await sendVIA([CMD_KC_ANALOG, AMC.GET_REALTIME_TRAVEL, row, col], 500);
+  if (!reply || reply[0] !== CMD_KC_ANALOG || reply[2] !== 0) return null;
+  return reply[5];
 }
 
 // - Keychron lighting (0xA8, keychron_rgb.c) -
@@ -30488,6 +31078,552 @@ async function onLightingEffectChange(value) {
   updateLightingStatusText();
   updateLightingToggleButton();
   announce(`Effect changed to ${lightingEffectName(idx)}.`);
+}
+
+// - Keyboard Settings -
+// Read on every visit, and each setting shown only if the keyboard answers for it:
+// what a board has depends on its firmware build, not its model.
+
+// Presets in seconds, within the firmware's limits: it refuses a backlight time under
+// 5 seconds or a sleep time under 60, and 16 bits of seconds cap both near 18 hours.
+const SLEEP_BACKLIGHT_CHOICES = [5, 10, 30, 60, 120, 300, 600, 900, 1800, 3600];
+const SLEEP_KEYBOARD_CHOICES  = [60, 300, 600, 900, 1800, 3600, 7200, 14400, 28800, 43200, 64800];
+const SLEEP_USUAL = [600, 7200];
+const DEBOUNCE_USUAL_MS = 5;
+const DEBOUNCE_MAX_MS = 255;
+const DEBOUNCE_WARN_ABOVE_MS = 50;
+const KEYCHRON_USUAL = "Keychron's usual";
+
+let settingsState     = null;   // { actuation, debounce, sleep }, each null when the board lacks it
+let settingsLoadToken = 0;      // increments per load and on disconnect; a stale load drops its result
+let pendingDebounceMs = null;   // the time waiting on the debounce warning dialog
+
+const millimetresText = tenths => `${(tenths / 10).toFixed(1)} millimetres`;
+const usualSuffix = (value, usual) => (value === usual ? ` (${KEYCHRON_USUAL})` : '');
+
+function durationText(seconds) {
+  if (seconds % 3600 === 0) return plural(seconds / 3600, 'hour');
+  if (seconds % 60 === 0)   return plural(seconds / 60, 'minute');
+  if (seconds > 60)         return `${plural(Math.floor(seconds / 60), 'minute')} ${plural(seconds % 60, 'second')}`;
+  return plural(seconds, 'second');
+}
+
+function showSettingsStatus(text) {
+  $('settings-status-text').textContent = text;
+  $('settings-status').hidden = !text;
+}
+
+async function loadSettings() {
+  const token = ++settingsLoadToken;
+  ['setting-actuation', 'setting-debounce', 'setting-split-debounce', 'setting-polling', 'setting-sleep',
+    'settings-reset-row'].forEach(id => { $(id).hidden = true; });
+  $('settings-not-connected').hidden = true;
+  showSettingsStatus('');
+
+  if (!hidDevice || !activeKbd) {
+    settingsState = null;
+    $('settings-not-connected').hidden = false;
+    return;
+  }
+
+  showSettingsStatus("Reading this keyboard's settings...");
+  const layout    = activeLayout();
+  const actuation = layout ? await readActuation(layout) : null;
+  const misc      = await readMiscSettingsForPage();
+  if (token !== settingsLoadToken) return;
+
+  settingsState = { actuation, ...misc };
+  if (!actuation && !misc.debounce && !misc.splitDebounce && !misc.sleep && !misc.pollingRate) {
+    const none = "This keyboard's firmware has no settings KeyAble can change.";
+    showSettingsStatus(none);
+    announce(none);
+    return;
+  }
+  showSettingsStatus('');
+  showAllSettings();
+  $('settings-reset-row').hidden = false;
+}
+
+function showAllSettings() {
+  showActuation();
+  showDebounce();
+  showSplitDebounce();
+  showPollingRate();
+  showSleep();
+}
+
+function setActuationSliderText(tenths) {
+  $('actuation-point').setAttribute('aria-valuetext',
+    millimetresText(tenths) + (tenths === ACTUATION_USUAL ? `, ${KEYCHRON_USUAL}` : ''));
+}
+
+function showActuation() {
+  const a = settingsState.actuation;
+  $('setting-actuation').hidden = !a;
+  if (!a) return;
+  const slider = $('actuation-point');
+  slider.min = String(ACTUATION_MIN);
+  slider.max = String(ACTUATION_MAX);
+  slider.value = String(a.point);
+  setActuationSliderText(a.point);
+
+  let now = `Now ${millimetresText(a.point)}${usualSuffix(a.point, ACTUATION_USUAL)}. ` +
+    `This changes profile ${a.profile + 1} of ${a.profiles}, the one the keyboard is using.`;
+  if (a.mode === AMC_MODE.RAPID) now += ' Rapid Trigger is on in this profile, and KeyAble leaves it as it is.';
+  if (a.ownKeys) {
+    now += ` ${plural(a.ownKeys, 'key')} ${a.ownKeys === 1 ? 'has its' : 'have their'} own settings ` +
+      "from Keychron's Launcher. Applying replaces them, so every key uses the new point.";
+  }
+  $('actuation-now').textContent = now;
+}
+
+function showDebounce() {
+  const d = settingsState.debounce;
+  $('setting-debounce').hidden = !d;
+  if (!d) return;
+  const ms = d[1];
+  $('debounce-ms').value = String(ms);
+  setDebounceError('');
+  $('debounce-now').textContent = `Now ${plural(ms, 'millisecond')}${usualSuffix(ms, DEBOUNCE_USUAL_MS)}.`;
+}
+
+const splitDebounceText = ([press, release]) =>
+  `press ${plural(press, 'millisecond')} and release ${plural(release, 'millisecond')}`;
+
+function showSplitDebounce() {
+  const d = settingsState.splitDebounce;
+  $('setting-split-debounce').hidden = !d;
+  if (!d) return;
+  $('debounce-press').value = String(d[0]);
+  $('debounce-release').value = String(d[1]);
+  setFieldError('debounce-press', '');
+  setFieldError('debounce-release', '');
+  $('split-debounce-now').textContent = `Now ${splitDebounceText(d)}.`;
+}
+
+const pollingText = divider =>
+  `${pollingHz(divider)} times a second${usualSuffix(pollingHz(divider), POLLING_USUAL_HZ)}`;
+
+// A link is offered when the board lets it be set; Bluetooth's rate is fixed.
+const pollingSettable = link => !link.readOnly && link.dividers.length > 0;
+
+function showPollingRate() {
+  const p = settingsState.pollingRate;
+  $('setting-polling').hidden = !p;
+  if (!p) return;
+  const now = [];
+  for (const [link, label] of [['cable', 'by cable'], ['dongle', 'on 2.4 GHz']]) {
+    const entry = p[link];
+    const row = $(`polling-${link}-row`);
+    row.hidden = !pollingSettable(entry);
+    if (row.hidden) continue;
+    const dividers = [...new Set([...entry.dividers, entry.divider])].sort((a, b) => b - a);   // slowest first
+    $(`polling-${link}`).replaceChildren(...dividers.map(n => new Option(pollingText(n), String(n))));
+    $(`polling-${link}`).value = String(entry.divider);
+    now.push(`${pollingHz(entry.divider)} times a second ${label}`);
+  }
+  let text = `Now ${listText(now)}.`;
+  if (p.bluetooth.readOnly) text += ` Bluetooth always uses ${p.bluetooth.maxHz}.`;
+  $('polling-now').textContent = text;
+}
+
+// The preset times, plus the board's own time when it is not one of them.
+function fillSleepSelect(id, presets, current, usual) {
+  const times = presets.includes(current) ? presets : [...presets, current].sort((a, b) => a - b);
+  $(id).replaceChildren(...times.map(t => new Option(durationText(t) + usualSuffix(t, usual), String(t))));
+  $(id).value = String(current);
+}
+
+function showSleep() {
+  const s = settingsState.sleep;
+  $('setting-sleep').hidden = !s;
+  if (!s) return;
+  fillSleepSelect('sleep-backlight', SLEEP_BACKLIGHT_CHOICES, s[0], SLEEP_USUAL[0]);
+  fillSleepSelect('sleep-keyboard',  SLEEP_KEYBOARD_CHOICES,  s[1], SLEEP_USUAL[1]);
+  $('sleep-now').textContent = `Now the backlight turns off after ${durationText(s[0])}, ` +
+    `and the keyboard sleeps after ${durationText(s[1])}.`;
+}
+
+// Re-reads one of the Keychron settings after a write and shows it, leaving the other
+// card as the user has it.
+async function rereadMiscSetting(name) {
+  const misc = await readMiscSettingsForPage();
+  if (!settingsState) return;
+  settingsState[name] = misc[name];
+  if (name === 'debounce') showDebounce();
+  else if (name === 'splitDebounce') showSplitDebounce();
+  else if (name === 'pollingRate') showPollingRate();
+  else showSleep();
+}
+
+// Writes one setting with its Apply button busy, reads it back, and says whether the
+// keyboard kept it. The button keeps the focus, so the result is spoken there.
+async function applySetting(buttonId, { write, reread, kept, done, failed }, announceDelay) {
+  const btn    = $(buttonId);
+  const device = hidDevice;
+  setButtonBusy(btn, true);
+  let wrote = true;
+  try { await write(); } catch { wrote = false; }
+  if (hidDevice === device) await reread();
+  setButtonBusy(btn, false);
+  if (hidDevice !== device) return;   // unplugged meanwhile, and disconnect has said so
+  const ok = wrote && kept();
+  playChirp(ok);
+  announce(ok ? done : failed, announceDelay);
+}
+
+async function applyActuation() {
+  const a = settingsState && settingsState.actuation;
+  if (!a) return;
+  const point = Number($('actuation-point').value);
+  if (point === a.point && !a.ownKeys) {
+    announce(`The actuation point is already ${millimetresText(point)}.`);
+    return;
+  }
+  await applySetting('btn-apply-actuation', {
+    write:  () => writeActuation(a, point),
+    reread: async () => {
+      const now = await readActuation(activeLayout());
+      if (!settingsState) return;
+      settingsState.actuation = now;
+      showActuation();
+    },
+    kept:   () => !!settingsState.actuation && settingsState.actuation.point === point &&
+                  !settingsState.actuation.ownKeys,
+    done:   `Actuation point set to ${millimetresText(point)} on every key.`,
+    failed: 'Could not set the actuation point. The keyboard did not accept it.',
+  });
+}
+
+// Shows or clears a field's error, which the field names as its description.
+function setFieldError(inputId, message, errorId = `${inputId}-error`) {
+  const input = $(inputId);
+  $(errorId).textContent = message;
+  $(errorId).hidden = !message;
+  if (message) input.setAttribute('aria-invalid', 'true');
+  else         input.removeAttribute('aria-invalid');
+}
+
+const setDebounceError = message => setFieldError('debounce-ms', message, 'debounce-error');
+
+// Reports a refused value: moving to the field reads the error as its description; from
+// Enter in the field there is no focus move to read it.
+function reportFieldError(inputId, message) {
+  playErrorBuzz();
+  if (document.activeElement === $(inputId)) announce(message);
+  else moveFocus(inputId);
+}
+
+function applyDebounce() {
+  const d = settingsState && settingsState.debounce;
+  if (!d) return;
+  const text = $('debounce-ms').value.trim();
+  const ms = /^\d+$/.test(text) ? Number(text) : NaN;
+  if (!(ms <= DEBOUNCE_MAX_MS)) {
+    const error = `Enter a whole number of milliseconds from 0 to ${DEBOUNCE_MAX_MS}.`;
+    setDebounceError(error);
+    reportFieldError('debounce-ms', error);
+    return;
+  }
+  setDebounceError('');
+  if (ms === d[1]) {
+    announce(`Debounce is already ${plural(ms, 'millisecond')}.`);
+    return;
+  }
+  if (ms === 0 || ms > DEBOUNCE_WARN_ABOVE_MS) {
+    pendingDebounceMs = ms;
+    $('debounce-confirm-desc').textContent = ms === 0
+      ? 'A debounce of 0 milliseconds turns debounce off, so a worn or bouncy key may type its letter twice.'
+      : `A debounce of ${ms} milliseconds is long: a quick second press of the same key, ` +
+        'such as the double t in "letter", may be missed.';
+    openDialog('debounce-confirm');   // autofocus is Cancel
+    return;
+  }
+  writeDebounce(ms);
+}
+
+function writeDebounce(ms, announceDelay) {
+  const [type] = settingsState.debounce;   // the board's own debounce method is kept
+  return applySetting('btn-apply-debounce', {
+    write:  () => writeKeychronSetting('debounce', [type, ms]),
+    reread: () => rereadMiscSetting('debounce'),
+    kept:   () => !!settingsState.debounce && settingsState.debounce[1] === ms,
+    done:   `Debounce set to ${plural(ms, 'millisecond')}.`,
+    failed: 'Could not set debounce. The keyboard did not accept it.',
+  }, announceDelay);
+}
+
+// Closing the dialog returns focus to where it was, which reads before the result.
+function confirmDebounce() {
+  const ms = pendingDebounceMs;
+  pendingDebounceMs = null;
+  closeDialog('debounce-confirm');
+  if (ms !== null && settingsState && settingsState.debounce) writeDebounce(ms, ANNOUNCE_AFTER_FOCUS_MS);
+}
+
+function cancelDebounceConfirm() {
+  pendingDebounceMs = null;
+  closeDialog('debounce-confirm');
+  announce('Debounce not changed.', ANNOUNCE_AFTER_FOCUS_MS);
+}
+
+async function applySplitDebounce() {
+  const d = settingsState && settingsState.splitDebounce;
+  if (!d) return;
+  const want = [];
+  let firstBad = null;
+  for (const [field, name] of [['press', 'Press'], ['release', 'Release']]) {
+    const id = `debounce-${field}`;
+    const [min, max] = SPLIT_DEBOUNCE_LIMITS[field];
+    const text = $(id).value.trim();
+    const ms = /^\d+$/.test(text) ? Number(text) : NaN;
+    const ok = ms >= min && ms <= max;
+    const error = ok ? '' : `${name} time: enter a whole number of milliseconds from ${min} to ${max}.`;
+    setFieldError(id, error);
+    if (!ok && !firstBad) firstBad = [id, error];
+    want.push(ms);
+  }
+  if (firstBad) {
+    reportFieldError(...firstBad);
+    return;
+  }
+  if (sameValue(want, d)) {
+    announce(`Debounce is already ${splitDebounceText(want)}.`);
+    return;
+  }
+  await applySetting('btn-apply-split-debounce', {
+    write:  () => writeSplitDebounce(want),
+    reread: () => rereadMiscSetting('splitDebounce'),
+    kept:   () => sameValue(settingsState.splitDebounce, want),
+    done:   `Debounce set to ${splitDebounceText(want)}.`,
+    failed: 'Could not set debounce. The keyboard did not accept it.',
+  });
+}
+
+async function applySleepTimes() {
+  const s = settingsState && settingsState.sleep;
+  if (!s) return;
+  const want = [Number($('sleep-backlight').value), Number($('sleep-keyboard').value)];
+  if (sameValue(want, s)) {
+    announce('Those are already the sleep times.');
+    return;
+  }
+  await applySetting('btn-apply-sleep', {
+    write:  () => writeKeychronSetting('wirelessSleep', toHex(sleepBytesFromSeconds(want))),
+    reread: () => rereadMiscSetting('sleep'),
+    kept:   () => sameValue(settingsState.sleep, want),
+    done:   `Sleep times set. The backlight turns off after ${durationText(want[0])}, ` +
+            `and the keyboard sleeps after ${durationText(want[1])}.`,
+    failed: 'Could not set the sleep times. The keyboard did not accept them.',
+  });
+}
+
+async function applyPollingRate() {
+  const p = settingsState && settingsState.pollingRate;
+  if (!p) return;
+  // A link that cannot be set is sent back as it is.
+  const chosen = link => (pollingSettable(p[link]) ? Number($(`polling-${link}`).value) : p[link].divider);
+  const want = { cable: chosen('cable'), dongle: chosen('dongle') };
+  if (want.cable === p.cable.divider && want.dongle === p.dongle.divider) {
+    announce('That is already the polling rate.');
+    return;
+  }
+  const said = [];
+  if (pollingSettable(p.cable))  said.push(`${pollingHz(want.cable)} times a second by cable`);
+  if (pollingSettable(p.dongle)) said.push(`${pollingHz(want.dongle)} on 2.4 GHz`);
+  await applySetting('btn-apply-polling', {
+    write:  () => writePollingRate(want.cable, want.dongle),
+    reread: () => rereadMiscSetting('pollingRate'),
+    kept:   () => !!settingsState.pollingRate && settingsState.pollingRate.cable.divider === want.cable &&
+                  settingsState.pollingRate.dongle.divider === want.dongle,
+    done:   `Polling rate set to ${listText(said)}.`,
+    failed: 'Could not set the polling rate. The keyboard did not accept it.',
+  });
+}
+
+// - Reset to Keychron's usual -
+// Each shown setting that differs from Keychron's usual, as { label, value, write, kept },
+// where value is the usual value in words and kept(state) says whether a re-read state holds the usual value. The actuation
+// point also counts as changed while keys have their own, which the reset replaces.
+function settingsResetPlan() {
+  const s = settingsState;
+  const plan = [];
+  const a = s.actuation;
+  if (a && (a.point !== ACTUATION_USUAL || a.ownKeys)) plan.push({
+    label: 'Actuation point', value: `${millimetresText(ACTUATION_USUAL)} on every key`,
+    write:    () => writeActuation(a, ACTUATION_USUAL),
+    kept:     now => !!now.actuation && now.actuation.point === ACTUATION_USUAL && !now.actuation.ownKeys,
+  });
+  if (s.debounce && s.debounce[1] !== DEBOUNCE_USUAL_MS) {
+    const [type] = s.debounce;
+    plan.push({
+      label: 'Debounce', value: plural(DEBOUNCE_USUAL_MS, 'millisecond'),
+      write:    () => writeKeychronSetting('debounce', [type, DEBOUNCE_USUAL_MS]),
+      kept:     now => !!now.debounce && now.debounce[1] === DEBOUNCE_USUAL_MS,
+    });
+  }
+  if (s.splitDebounce && !sameValue(s.splitDebounce, SPLIT_DEBOUNCE_USUAL)) plan.push({
+    label: 'Debounce', value: splitDebounceText(SPLIT_DEBOUNCE_USUAL),
+    write:    () => writeSplitDebounce(SPLIT_DEBOUNCE_USUAL),
+    kept:     now => sameValue(now.splitDebounce, SPLIT_DEBOUNCE_USUAL),
+  });
+  const p = s.pollingRate;
+  if (p) {
+    const usual = link => (pollingSettable(p[link]) ? POLLING_USUAL_DIVIDER : p[link].divider);
+    const want = { cable: usual('cable'), dongle: usual('dongle') };
+    if (want.cable !== p.cable.divider || want.dongle !== p.dongle.divider) plan.push({
+      label: 'Polling rate', value: `${POLLING_USUAL_HZ} times a second`,
+      write:    () => writePollingRate(want.cable, want.dongle),
+      kept:     now => !!now.pollingRate && now.pollingRate.cable.divider === want.cable &&
+                       now.pollingRate.dongle.divider === want.dongle,
+    });
+  }
+  if (s.sleep && !sameValue(s.sleep, SLEEP_USUAL)) plan.push({
+    label: 'Wireless sleep times', value: `backlight off after ${durationText(SLEEP_USUAL[0])}, sleep after ${durationText(SLEEP_USUAL[1])}`,
+    write:    () => writeKeychronSetting('wirelessSleep', toHex(sleepBytesFromSeconds(SLEEP_USUAL))),
+    kept:     now => sameValue(now.sleep, SLEEP_USUAL),
+  });
+  return plan;
+}
+
+let pendingSettingsReset = null;   // the plan waiting on the confirm dialog
+
+function resetSettingsToUsual() {
+  if (!settingsState) return;
+  const plan = settingsResetPlan();
+  if (!plan.length) {
+    announce(`Every setting is already at ${KEYCHRON_USUAL}.`);
+    return;
+  }
+  pendingSettingsReset = plan;
+  $('settings-reset-confirm-desc').textContent = `This sets each of these to ${KEYCHRON_USUAL}. ` +
+    plan.map(step => `${step.label}: ${step.value}.`).join(' ');
+  openDialog('settings-reset-confirm');   // autofocus is Cancel
+}
+
+function cancelSettingsReset() {
+  pendingSettingsReset = null;
+  closeDialog('settings-reset-confirm');
+  announce('Settings not changed.', ANNOUNCE_AFTER_FOCUS_MS);
+}
+
+// Writes each step, re-reads every setting, and names any the keyboard did not keep.
+// Closing the dialog returns focus to the reset button, which reads before the result.
+async function confirmSettingsReset() {
+  const plan = pendingSettingsReset;
+  pendingSettingsReset = null;
+  closeDialog('settings-reset-confirm');
+  if (!plan || !settingsState) return;
+  const btn = $('btn-reset-settings');
+  const device = hidDevice;
+  setButtonBusy(btn, true);
+  const wrote = [];
+  for (const step of plan) {
+    try { await step.write(); wrote.push(true); } catch { wrote.push(false); }
+  }
+  if (hidDevice === device) await rereadAllSettings();
+  setButtonBusy(btn, false);
+  if (hidDevice !== device || !settingsState) return;
+  const failed = plan.filter((step, i) => !wrote[i] || !step.kept(settingsState));
+  playChirp(!failed.length);
+  announce(failed.length
+    ? `Could not reset ${listText(failed.map(step => step.label.toLowerCase()))}. The keyboard did not accept ${failed.length === 1 ? 'it' : 'them'}.`
+    : `Keyboard settings reset to ${KEYCHRON_USUAL}.`, ANNOUNCE_AFTER_FOCUS_MS);
+}
+
+async function rereadAllSettings() {
+  const layout = activeLayout();
+  const actuation = settingsState.actuation && layout ? await readActuation(layout) : null;
+  const misc = await readMiscSettingsForPage();
+  if (!settingsState) return;
+  Object.assign(settingsState, { actuation, ...misc });
+  showAllSettings();
+}
+
+// The line in Step 1 that points to Keyboard Settings, naming what the keyboard
+// reports having. loadSettings still reads each one before showing it.
+async function showSettingsHint() {
+  const names = [];
+  if (await analogMatrixVersion()) names.push('actuation point');
+  const info = await keychronInfo(CMD_KC_MISC);
+  const ultra = isUltraFirmware();
+  if (info && (ultra || (info[5] & KC_MISC_SETTINGS.debounce.flag))) names.push('debounce');
+  if (info && ultra && info[3] === ULTRA_SETTINGS_VERSION) names.push('polling rate');
+  if (info && (ultra || (info[5] & KC_MISC_SETTINGS.wirelessSleep.flag))) names.push('wireless sleep times');
+  const hint = $('settings-hint');
+  hint.textContent = names.length
+    ? `You can change this keyboard's ${listText(names)} in Keyboard Settings ${navKeyHint(5)}.`
+    : '';
+  hint.hidden = !names.length;
+}
+
+// - Key depth test -
+// Polls F's depth while the test runs. A held tone follows the depth, a click marks the
+// chosen point being passed, and the deepest point is spoken when the key comes back up.
+// F types into the test's own box meanwhile.
+const DEPTH_POLL_MS = 20;
+const DEPTH_RELEASE_POLLS = 2;   // polls at rest before a press counts as over
+
+let depthTestToken = 0;
+let depthTestRunning = false;
+
+const depthTestKey = () => {
+  const layout = activeLayout();
+  return layout ? layout.keys.find(k => k.label === 'F') : null;
+};
+
+function startDepthTest() {
+  if (depthTestRunning || !settingsState || !settingsState.actuation || !depthTestKey()) return;
+  depthTestRunning = true;
+  $('depth-scratch').value = '';
+  $('depth-area').hidden = false;
+  $('depth-scratch').focus();   // its label and hint say what to do
+  runDepthTest(++depthTestToken);
+}
+
+// Stops polling and hides the box. Safe to call when no test is running.
+function stopDepthTest() {
+  if (!depthTestRunning) return;
+  depthTestRunning = false;
+  depthTestToken++;
+  $('depth-area').hidden = true;
+}
+
+// Escape in the test box: back to the Start button, which reads before the message.
+function endDepthTest() {
+  $('btn-depth-test').focus();   // the blur stops the test
+  stopDepthTest();
+  announce('Depth test ended.', ANNOUNCE_AFTER_FOCUS_MS);
+}
+
+async function runDepthTest(token) {
+  const key  = depthTestKey();
+  const tone = new DepthTone();
+  let deepest = 0, atRest = 0, past = false;
+  while (token === depthTestToken) {
+    const depth = await readKeyTravel(key.row, key.col);
+    if (token !== depthTestToken) break;
+    if (depth === null) {
+      $('btn-depth-test').focus();
+      stopDepthTest();
+      announce('The keyboard did not say how far F is pressed, so the depth test has stopped.', ANNOUNCE_AFTER_FOCUS_MS);
+      break;
+    }
+    const point = Number($('actuation-point').value);
+    tone.set(depth);
+    if (depth >= point && !past) playDepthClick();
+    past = depth >= point;
+    if (depth > 0) {
+      deepest = Math.max(deepest, depth);
+      atRest = 0;
+    } else if (deepest > 0 && ++atRest >= DEPTH_RELEASE_POLLS) {
+      announce(`Deepest ${millimetresText(deepest)}. At ${millimetresText(point)}, ` +
+        `this press ${deepest >= point ? 'types' : 'does not type'}.`);
+      deepest = 0;
+    }
+    await new Promise(resolve => setTimeout(resolve, DEPTH_POLL_MS));
+  }
+  tone.stop();
 }
 
 // - Macros -
@@ -32474,6 +33610,9 @@ const BUTTON_ACTIONS = {
     changeKeyFromConfirm, chooseADifferentKey, closeChangedKeys, confirmKeyWarning,
     confirmMacro, confirmResetAll, confirmShortcut, connectKeyboard,
     disconnectFromUnsupported, disconnectKeyboard, executeResetAll, executeRestore,
+    applyActuation, applyDebounce, applyPollingRate, applySleepTimes, applySplitDebounce,
+    resetSettingsToUsual, cancelSettingsReset, confirmSettingsReset, cancelDebounceConfirm, confirmDebounce,
+    startDepthTest,
     getStartedFromWelcome, goToHelp, openChangedKeys, openWriteTargetDialog,
     reportUnknownKeyboard, reportUntestedKeyboard, resetAllChanged, resetChoiceCancel, resetSelectedKeyToDefault,
     restoreSettingsPrompt, saveStepEditor, saveWriteTargetDialog, selectDisableAction,
@@ -32508,6 +33647,16 @@ function bindFormControls() {
   for (const [id, control] of Object.entries(sliders)) {
     $(id).addEventListener('input', ev => onLightingSliderInput(ev, control));
   }
+  $('actuation-point').addEventListener('input', ev => setActuationSliderText(Number(ev.target.value)));
+  $('debounce-ms').addEventListener('keydown', ev => { if (ev.key === 'Enter') applyDebounce(); });
+  ['debounce-press', 'debounce-release'].forEach(id =>
+    $(id).addEventListener('keydown', ev => { if (ev.key === 'Enter') applySplitDebounce(); }));
+  $('depth-scratch').addEventListener('keydown', ev => {
+    if (ev.key !== 'Escape') return;
+    ev.preventDefault();
+    endDepthTest();
+  });
+  $('depth-scratch').addEventListener('blur', () => stopDepthTest());
 }
 
 // - Initialise -
@@ -32592,6 +33741,8 @@ function bindFormControls() {
   bindDialogCancel('reset-confirm',      cancelResetAll);
   bindDialogCancel('restore-confirm',    cancelRestore);
   bindDialogCancel('wt-dialog',          cancelWriteTargetDialog);
+  bindDialogCancel('debounce-confirm',   cancelDebounceConfirm);
+  bindDialogCancel('settings-reset-confirm', cancelSettingsReset);
 
   document.addEventListener('click', busyButtonClickGuard, true);
   document.addEventListener('click', onButtonAction);
