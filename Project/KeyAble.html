@@ -2130,8 +2130,10 @@
           Apply button. If your keyboard has none of them, the page says so.
         </p>
         <p>
-          The polling rate is set separately for the cable and for 2.4 GHz wireless, from 125
-          to 8000 times a second; Bluetooth's is fixed. It is not saved in a setup file yet.
+          On Ultra 8K keyboards, debounce has two times: one for a key going down and one for
+          it coming up. The polling rate is set separately for the cable and for 2.4 GHz
+          wireless, from 125 to 8000 times a second; Bluetooth's is fixed. The Ultra 8K
+          keyboards' settings are not saved in a setup file yet.
         </p>
         <p>
           The actuation point is set for every key at once, in the profile the keyboard is
@@ -2414,6 +2416,40 @@
         </div>
         <div class="btn-row">
           <button id="btn-apply-debounce" class="primary" data-action="applyDebounce">Apply Debounce</button>
+        </div>
+      </div>
+
+      <div id="setting-split-debounce" class="card" hidden>
+        <h3>Debounce.</h3>
+        <p>
+          How long a key's switch must stay still before the keyboard counts it: held down
+          for the press, and let up for the release. This keyboard sets the two separately.
+        </p>
+        <ul class="setting-uses">
+          <li>A longer release time, such as 15 milliseconds or more: stops a worn or bouncy
+            key typing its letter twice. A quick second press of the same key within that
+            time is missed.</li>
+          <li>A press time of 0: each press counts the moment the switch closes.</li>
+        </ul>
+        <p>
+          Debounce does not stop keys pressed by accident or held too long, as with a tremor.
+          Filter Keys in Windows and Slow Keys on a Mac are made for that.
+        </p>
+        <p id="split-debounce-now" class="setting-now"></p>
+        <div class="lighting-row">
+          <label for="debounce-press">Press time, in milliseconds from 0 to 50:</label>
+          <input type="number" id="debounce-press" min="0" max="50" step="1" inputmode="numeric"
+                 aria-describedby="debounce-press-error">
+          <p id="debounce-press-error" class="field-error" hidden></p>
+        </div>
+        <div class="lighting-row">
+          <label for="debounce-release">Release time, in milliseconds from 1 to 50:</label>
+          <input type="number" id="debounce-release" min="1" max="50" step="1" inputmode="numeric"
+                 aria-describedby="debounce-release-error">
+          <p id="debounce-release-error" class="field-error" hidden></p>
+        </div>
+        <div class="btn-row">
+          <button id="btn-apply-split-debounce" class="primary" data-action="applySplitDebounce">Apply Debounce</button>
         </div>
       </div>
 
@@ -29791,6 +29827,9 @@ const sleepBytesFromSeconds = ([backlight, sleep]) =>
 // on builds that set the polling rate of cable and 2.4 GHz apart, the only layout read
 // here. The sleep times are as on QMK.
 const ULTRA_SETTINGS_VERSION = 3;
+// Debounce is a press time and a release time; the firmware refuses a press time over
+// 50 or a release time outside 1 to 50.
+const SPLIT_DEBOUNCE_LIMITS = { press: [0, 50], release: [1, 50] };
 const ULTRA_POLLING_GET = 0x0D;
 const ULTRA_POLLING_SET = 0x0E;
 const POLLING_BASE_HZ   = 8000;   // a rate is POLLING_BASE_HZ >> n for its divider n
@@ -29822,12 +29861,13 @@ function pollingRateFromReply(reply) {
 // divider byte, which it does not use, is in range too.
 const writePollingRate = (cable, dongle) => askKeychron(CMD_KC_MISC, ULTRA_POLLING_SET, cable, dongle, 0);
 
-// Debounce as [type, milliseconds], the sleep times and the polling rate, each null when
-// the build does not report it or will not read it. Keychron's source sets the
-// sleep-times bit under one build option and handles the command under another, so a
-// board can report a setting it then refuses.
+// Debounce as [type, milliseconds] (QMK) or splitDebounce as [press, release] (Ultra),
+// the sleep times and the polling rate, each null when the build does not report it or
+// will not read it. Keychron's source sets the sleep-times bit under one build option
+// and handles the command under another, so a board can report a setting it then
+// refuses.
 async function readMiscSettingsForPage() {
-  const out = { debounce: null, sleep: null, pollingRate: null };
+  const out = { debounce: null, splitDebounce: null, sleep: null, pollingRate: null };
   const info = await keychronInfo(CMD_KC_MISC);
   if (!info) return out;
   const ultra = isUltraFirmware();
@@ -29835,9 +29875,10 @@ async function readMiscSettingsForPage() {
     try { return await askKeychron(CMD_KC_MISC, sub); } catch { return null; }
   };
   const has = name => (info[5] & KC_MISC_SETTINGS[name].flag) !== 0;
-  if (!ultra && has('debounce')) {
+  if (ultra || has('debounce')) {
     const debounce = await read(KC_MISC_SETTINGS.debounce.get);
-    if (debounce) out.debounce = [debounce[4], debounce[5]];
+    if (debounce && ultra) out.splitDebounce = [debounce[4], debounce[5]];
+    else if (debounce) out.debounce = [debounce[4], debounce[5]];
   }
   if (ultra || has('wirelessSleep')) {
     const sleep = await read(KC_MISC_SETTINGS.wirelessSleep.get);
@@ -31034,7 +31075,8 @@ function showSettingsStatus(text) {
 
 async function loadSettings() {
   const token = ++settingsLoadToken;
-  ['setting-actuation', 'setting-debounce', 'setting-polling', 'setting-sleep'].forEach(id => { $(id).hidden = true; });
+  ['setting-actuation', 'setting-debounce', 'setting-split-debounce', 'setting-polling', 'setting-sleep']
+    .forEach(id => { $(id).hidden = true; });
   $('settings-not-connected').hidden = true;
   showSettingsStatus('');
 
@@ -31051,7 +31093,7 @@ async function loadSettings() {
   if (token !== settingsLoadToken) return;
 
   settingsState = { actuation, ...misc };
-  if (!actuation && !misc.debounce && !misc.sleep && !misc.pollingRate) {
+  if (!actuation && !misc.debounce && !misc.splitDebounce && !misc.sleep && !misc.pollingRate) {
     const none = "This keyboard's firmware has no settings KeyAble can change.";
     showSettingsStatus(none);
     announce(none);
@@ -31060,6 +31102,7 @@ async function loadSettings() {
   showSettingsStatus('');
   showActuation();
   showDebounce();
+  showSplitDebounce();
   showPollingRate();
   showSleep();
 }
@@ -31097,6 +31140,20 @@ function showDebounce() {
   $('debounce-ms').value = String(ms);
   setDebounceError('');
   $('debounce-now').textContent = `Now ${plural(ms, 'millisecond')}${usualSuffix(ms, DEBOUNCE_USUAL_MS)}.`;
+}
+
+const splitDebounceText = ([press, release]) =>
+  `press ${plural(press, 'millisecond')} and release ${plural(release, 'millisecond')}`;
+
+function showSplitDebounce() {
+  const d = settingsState.splitDebounce;
+  $('setting-split-debounce').hidden = !d;
+  if (!d) return;
+  $('debounce-press').value = String(d[0]);
+  $('debounce-release').value = String(d[1]);
+  setFieldError('debounce-press', '');
+  setFieldError('debounce-release', '');
+  $('split-debounce-now').textContent = `Now ${splitDebounceText(d)}.`;
 }
 
 const pollingText = divider =>
@@ -31149,6 +31206,7 @@ async function rereadMiscSetting(name) {
   if (!settingsState) return;
   settingsState[name] = misc[name];
   if (name === 'debounce') showDebounce();
+  else if (name === 'splitDebounce') showSplitDebounce();
   else if (name === 'pollingRate') showPollingRate();
   else showSleep();
 }
@@ -31192,12 +31250,23 @@ async function applyActuation() {
   });
 }
 
-function setDebounceError(message) {
-  const input = $('debounce-ms');
-  $('debounce-error').textContent = message;
-  $('debounce-error').hidden = !message;
+// Shows or clears a field's error, which the field names as its description.
+function setFieldError(inputId, message, errorId = `${inputId}-error`) {
+  const input = $(inputId);
+  $(errorId).textContent = message;
+  $(errorId).hidden = !message;
   if (message) input.setAttribute('aria-invalid', 'true');
   else         input.removeAttribute('aria-invalid');
+}
+
+const setDebounceError = message => setFieldError('debounce-ms', message, 'debounce-error');
+
+// Reports a refused value: moving to the field reads the error as its description; from
+// Enter in the field there is no focus move to read it.
+function reportFieldError(inputId, message) {
+  playErrorBuzz();
+  if (document.activeElement === $(inputId)) announce(message);
+  else moveFocus(inputId);
 }
 
 function applyDebounce() {
@@ -31208,11 +31277,7 @@ function applyDebounce() {
   if (!(ms <= DEBOUNCE_MAX_MS)) {
     const error = `Enter a whole number of milliseconds from 0 to ${DEBOUNCE_MAX_MS}.`;
     setDebounceError(error);
-    playErrorBuzz();
-    // Moving to the field reads the error as its description; from Enter in the field
-    // there is no focus move to read it.
-    if (document.activeElement === $('debounce-ms')) announce(error);
-    else moveFocus('debounce-ms');
+    reportFieldError('debounce-ms', error);
     return;
   }
   setDebounceError('');
@@ -31255,6 +31320,39 @@ function cancelDebounceConfirm() {
   pendingDebounceMs = null;
   closeDialog('debounce-confirm');
   announce('Debounce not changed.', ANNOUNCE_AFTER_FOCUS_MS);
+}
+
+async function applySplitDebounce() {
+  const d = settingsState && settingsState.splitDebounce;
+  if (!d) return;
+  const want = [];
+  let firstBad = null;
+  for (const [field, name] of [['press', 'Press'], ['release', 'Release']]) {
+    const id = `debounce-${field}`;
+    const [min, max] = SPLIT_DEBOUNCE_LIMITS[field];
+    const text = $(id).value.trim();
+    const ms = /^\d+$/.test(text) ? Number(text) : NaN;
+    const ok = ms >= min && ms <= max;
+    const error = ok ? '' : `${name} time: enter a whole number of milliseconds from ${min} to ${max}.`;
+    setFieldError(id, error);
+    if (!ok && !firstBad) firstBad = [id, error];
+    want.push(ms);
+  }
+  if (firstBad) {
+    reportFieldError(...firstBad);
+    return;
+  }
+  if (sameValue(want, d)) {
+    announce(`Debounce is already ${splitDebounceText(want)}.`);
+    return;
+  }
+  await applySetting('btn-apply-split-debounce', {
+    write:  () => askKeychron(CMD_KC_MISC, KC_MISC_SETTINGS.debounce.set, ...want),
+    reread: () => rereadMiscSetting('splitDebounce'),
+    kept:   () => sameValue(settingsState.splitDebounce, want),
+    done:   `Debounce set to ${splitDebounceText(want)}.`,
+    failed: 'Could not set debounce. The keyboard did not accept it.',
+  });
 }
 
 async function applySleepTimes() {
@@ -31305,7 +31403,7 @@ async function showSettingsHint() {
   if (await analogMatrixVersion()) names.push('actuation point');
   const info = await keychronInfo(CMD_KC_MISC);
   const ultra = isUltraFirmware();
-  if (info && !ultra && (info[5] & KC_MISC_SETTINGS.debounce.flag)) names.push('debounce');
+  if (info && (ultra || (info[5] & KC_MISC_SETTINGS.debounce.flag))) names.push('debounce');
   if (info && ultra && info[3] === ULTRA_SETTINGS_VERSION) names.push('polling rate');
   if (info && (ultra || (info[5] & KC_MISC_SETTINGS.wirelessSleep.flag))) names.push('wireless sleep times');
   const hint = $('settings-hint');
@@ -33368,7 +33466,7 @@ const BUTTON_ACTIONS = {
     changeKeyFromConfirm, chooseADifferentKey, closeChangedKeys, confirmKeyWarning,
     confirmMacro, confirmResetAll, confirmShortcut, connectKeyboard,
     disconnectFromUnsupported, disconnectKeyboard, executeResetAll, executeRestore,
-    applyActuation, applyDebounce, applyPollingRate, applySleepTimes, cancelDebounceConfirm, confirmDebounce,
+    applyActuation, applyDebounce, applyPollingRate, applySleepTimes, applySplitDebounce, cancelDebounceConfirm, confirmDebounce,
     startDepthTest,
     getStartedFromWelcome, goToHelp, openChangedKeys, openWriteTargetDialog,
     reportUnknownKeyboard, reportUntestedKeyboard, resetAllChanged, resetChoiceCancel, resetSelectedKeyToDefault,
@@ -33406,6 +33504,8 @@ function bindFormControls() {
   }
   $('actuation-point').addEventListener('input', ev => setActuationSliderText(Number(ev.target.value)));
   $('debounce-ms').addEventListener('keydown', ev => { if (ev.key === 'Enter') applyDebounce(); });
+  ['debounce-press', 'debounce-release'].forEach(id =>
+    $(id).addEventListener('keydown', ev => { if (ev.key === 'Enter') applySplitDebounce(); }));
   $('depth-scratch').addEventListener('keydown', ev => {
     if (ev.key !== 'Escape') return;
     ev.preventDefault();

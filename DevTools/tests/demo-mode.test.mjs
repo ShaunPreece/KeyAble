@@ -626,7 +626,8 @@ async function settingsPage(pid) {
 }
 
 const shownSettings = page => page.evaluate(() =>
-  ['setting-actuation', 'setting-debounce', 'setting-polling', 'setting-sleep'].filter(id => !document.getElementById(id).hidden));
+  ['setting-actuation', 'setting-debounce', 'setting-split-debounce', 'setting-polling', 'setting-sleep']
+    .filter(id => !document.getElementById(id).hidden));
 
 test('Keyboard Settings asks for a keyboard when none is connected', async () => {
   const page = await newPage();
@@ -713,13 +714,13 @@ test('sleep times apply, and a refusal says so and keeps the times', async () =>
   await page.close();
 });
 
-test('an Ultra 8K board offers its polling rate and sleep times, and applies the polling rate', async () => {
+test('an Ultra 8K board offers its debounce, polling rate and sleep times, and applies the polling rate', async () => {
   const page = await demoPage(V6_ULTRA_ISO);
   assert.equal((await page.locator('#settings-hint').textContent()).trim(),
-    "You can change this keyboard's polling rate and wireless sleep times in Keyboard Settings (Alt+5).");
+    "You can change this keyboard's debounce, polling rate and wireless sleep times in Keyboard Settings (Alt+5).");
   await page.keyboard.press('Alt+5');
   await page.locator('#setting-polling:visible').waitFor();
-  assert.deepEqual(await shownSettings(page), ['setting-polling', 'setting-sleep']);
+  assert.deepEqual(await shownSettings(page), ['setting-split-debounce', 'setting-polling', 'setting-sleep']);
   assert.equal(await page.locator('#polling-now').textContent(),
     'Now 1000 times a second by cable and 1000 times a second on 2.4 GHz. Bluetooth always uses 125.');
   assert.deepEqual(await page.locator('#polling-cable option').allTextContents(), [
@@ -736,6 +737,27 @@ test('an Ultra 8K board offers its polling rate and sleep times, and applies the
   await page.locator('#btn-apply-sleep').click();
   await page.locator('#sr-live', { hasText: 'Sleep times set.' }).waitFor();
   assert.deepEqual(await page.evaluate(() => hidDevice.keychronUltra.wirelessSleep), [0x2C, 0x01, 0x20, 0x1C]);
+  await page.close();
+});
+
+test('an Ultra 8K board sets press and release debounce, and refuses a release time of 0 at the field', async () => {
+  const page = await demoPage(V6_ULTRA_ISO);
+  await page.keyboard.press('Alt+5');
+  await page.locator('#setting-split-debounce:visible').waitFor();
+  assert.equal(await page.locator('#split-debounce-now').textContent(), 'Now press 0 milliseconds and release 50 milliseconds.');
+
+  await page.locator('#debounce-release').fill('0');
+  await page.locator('#btn-apply-split-debounce').click();
+  await page.locator('#debounce-release-error:visible', { hasText: 'from 1 to 50' }).waitFor();
+  assert.equal(await page.locator('#debounce-release').getAttribute('aria-invalid'), 'true');
+  assert.deepEqual(await page.evaluate(() => hidDevice.keychronUltra.debounce), [0, 50]);
+
+  await page.locator('#debounce-press').fill('5');
+  await page.locator('#debounce-release').fill('15');
+  await page.locator('#btn-apply-split-debounce').click();
+  await page.locator('#sr-live', { hasText: 'Debounce set to press 5 milliseconds and release 15 milliseconds.' }).waitFor();
+  assert.deepEqual(await page.evaluate(() => hidDevice.keychronUltra.debounce), [5, 15]);
+  assert.equal(await page.locator('#debounce-release').getAttribute('aria-invalid'), null);
   await page.close();
 });
 
