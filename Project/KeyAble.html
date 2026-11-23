@@ -861,6 +861,21 @@
   </div>
 </dialog>
 
+<!-- Shown by resetSettingsToUsual, listing only the settings that would change. Cancel
+     has autofocus so the safe choice is the default. -->
+<dialog id="settings-reset-confirm"
+        class="danger-card"
+        role="alertdialog"
+        aria-labelledby="h-settings-reset-confirm"
+        aria-describedby="settings-reset-confirm-desc">
+  <h3 id="h-settings-reset-confirm" tabindex="-1">Reset Keyboard Settings.</h3>
+  <p id="settings-reset-confirm-desc" style="margin-bottom:.85rem"></p>
+  <div class="btn-row" style="margin-top:0">
+    <button id="btn-settings-reset-cancel" autofocus data-action="cancelSettingsReset">Cancel</button>
+    <button id="btn-settings-reset-confirm" class="danger" data-action="confirmSettingsReset">Reset Settings</button>
+  </div>
+</dialog>
+
 <!-- Write-target dialog, opened from the Step 3 summary line. Native radios are
      safe here: arrowing changes the selection, but nothing is applied until Save. -->
 <dialog id="wt-dialog"
@@ -2127,7 +2142,9 @@
           actuation point on HE keyboards, debounce and the wireless sleep times on keyboards
           with recent Keychron firmware, and the polling rate on Ultra 8K keyboards. Each
           setting says what it does and when it helps, and changes only when you press its
-          Apply button. If your keyboard has none of them, the page says so.
+          Apply button. If your keyboard has none of them, the page says so. Reset All
+          Settings to Keychron's Usual, at the end of the page, lists what it would change
+          and asks before changing anything.
         </p>
         <p>
           On Ultra 8K keyboards, debounce has two times: one for a key going down and one for
@@ -2502,6 +2519,10 @@
         <div class="btn-row">
           <button id="btn-apply-sleep" class="primary" data-action="applySleepTimes">Apply Sleep Times</button>
         </div>
+      </div>
+
+      <div id="settings-reset-row" class="btn-row" hidden>
+        <button id="btn-reset-settings" data-action="resetSettingsToUsual">Reset All Settings to Keychron's Usual</button>
       </div>
     </section>
 
@@ -29830,11 +29851,13 @@ const ULTRA_SETTINGS_VERSION = 3;
 // Debounce is a press time and a release time; the firmware refuses a press time over
 // 50 or a release time outside 1 to 50.
 const SPLIT_DEBOUNCE_LIMITS = { press: [0, 50], release: [1, 50] };
+const SPLIT_DEBOUNCE_USUAL = [0, 50];   // every Ultra board's matrix in Keychron's source
 const ULTRA_POLLING_GET = 0x0D;
 const ULTRA_POLLING_SET = 0x0E;
 const POLLING_BASE_HZ   = 8000;   // a rate is POLLING_BASE_HZ >> n for its divider n
 const POLLING_MAX_DIVIDER = 6;
-const POLLING_USUAL_HZ  = 1000;
+const POLLING_USUAL_DIVIDER = 3;
+const POLLING_USUAL_HZ  = POLLING_BASE_HZ >> POLLING_USUAL_DIVIDER;
 const POLLING_LINKS     = ['cable', 'dongle', 'bluetooth'];   // the reply's entry order
 const POLLING_ENTRY_BYTES = 5;
 
@@ -29860,6 +29883,8 @@ function pollingRateFromReply(reply) {
 // Sets both settable links at once. The firmware refuses the request unless its third
 // divider byte, which it does not use, is in range too.
 const writePollingRate = (cable, dongle) => askKeychron(CMD_KC_MISC, ULTRA_POLLING_SET, cable, dongle, 0);
+const writeSplitDebounce = ([press, release]) =>
+  askKeychron(CMD_KC_MISC, KC_MISC_SETTINGS.debounce.set, press, release);
 
 // Debounce as [type, milliseconds] (QMK) or splitDebounce as [press, release] (Ultra),
 // the sleep times and the polling rate, each null when the build does not report it or
@@ -31075,8 +31100,8 @@ function showSettingsStatus(text) {
 
 async function loadSettings() {
   const token = ++settingsLoadToken;
-  ['setting-actuation', 'setting-debounce', 'setting-split-debounce', 'setting-polling', 'setting-sleep']
-    .forEach(id => { $(id).hidden = true; });
+  ['setting-actuation', 'setting-debounce', 'setting-split-debounce', 'setting-polling', 'setting-sleep',
+    'settings-reset-row'].forEach(id => { $(id).hidden = true; });
   $('settings-not-connected').hidden = true;
   showSettingsStatus('');
 
@@ -31100,6 +31125,11 @@ async function loadSettings() {
     return;
   }
   showSettingsStatus('');
+  showAllSettings();
+  $('settings-reset-row').hidden = false;
+}
+
+function showAllSettings() {
   showActuation();
   showDebounce();
   showSplitDebounce();
@@ -31347,7 +31377,7 @@ async function applySplitDebounce() {
     return;
   }
   await applySetting('btn-apply-split-debounce', {
-    write:  () => askKeychron(CMD_KC_MISC, KC_MISC_SETTINGS.debounce.set, ...want),
+    write:  () => writeSplitDebounce(want),
     reread: () => rereadMiscSetting('splitDebounce'),
     kept:   () => sameValue(settingsState.splitDebounce, want),
     done:   `Debounce set to ${splitDebounceText(want)}.`,
@@ -31394,6 +31424,105 @@ async function applyPollingRate() {
     done:   `Polling rate set to ${listText(said)}.`,
     failed: 'Could not set the polling rate. The keyboard did not accept it.',
   });
+}
+
+// - Reset to Keychron's usual -
+// Each shown setting that differs from Keychron's usual, as { label, value, write, kept },
+// where value is the usual value in words and kept(state) says whether a re-read state holds the usual value. The actuation
+// point also counts as changed while keys have their own, which the reset replaces.
+function settingsResetPlan() {
+  const s = settingsState;
+  const plan = [];
+  const a = s.actuation;
+  if (a && (a.point !== ACTUATION_USUAL || a.ownKeys)) plan.push({
+    label: 'Actuation point', value: `${millimetresText(ACTUATION_USUAL)} on every key`,
+    write:    () => writeActuation(a, ACTUATION_USUAL),
+    kept:     now => !!now.actuation && now.actuation.point === ACTUATION_USUAL && !now.actuation.ownKeys,
+  });
+  if (s.debounce && s.debounce[1] !== DEBOUNCE_USUAL_MS) {
+    const [type] = s.debounce;
+    plan.push({
+      label: 'Debounce', value: plural(DEBOUNCE_USUAL_MS, 'millisecond'),
+      write:    () => writeKeychronSetting('debounce', [type, DEBOUNCE_USUAL_MS]),
+      kept:     now => !!now.debounce && now.debounce[1] === DEBOUNCE_USUAL_MS,
+    });
+  }
+  if (s.splitDebounce && !sameValue(s.splitDebounce, SPLIT_DEBOUNCE_USUAL)) plan.push({
+    label: 'Debounce', value: splitDebounceText(SPLIT_DEBOUNCE_USUAL),
+    write:    () => writeSplitDebounce(SPLIT_DEBOUNCE_USUAL),
+    kept:     now => sameValue(now.splitDebounce, SPLIT_DEBOUNCE_USUAL),
+  });
+  const p = s.pollingRate;
+  if (p) {
+    const usual = link => (pollingSettable(p[link]) ? POLLING_USUAL_DIVIDER : p[link].divider);
+    const want = { cable: usual('cable'), dongle: usual('dongle') };
+    if (want.cable !== p.cable.divider || want.dongle !== p.dongle.divider) plan.push({
+      label: 'Polling rate', value: `${POLLING_USUAL_HZ} times a second`,
+      write:    () => writePollingRate(want.cable, want.dongle),
+      kept:     now => !!now.pollingRate && now.pollingRate.cable.divider === want.cable &&
+                       now.pollingRate.dongle.divider === want.dongle,
+    });
+  }
+  if (s.sleep && !sameValue(s.sleep, SLEEP_USUAL)) plan.push({
+    label: 'Wireless sleep times', value: `backlight off after ${durationText(SLEEP_USUAL[0])}, sleep after ${durationText(SLEEP_USUAL[1])}`,
+    write:    () => writeKeychronSetting('wirelessSleep', toHex(sleepBytesFromSeconds(SLEEP_USUAL))),
+    kept:     now => sameValue(now.sleep, SLEEP_USUAL),
+  });
+  return plan;
+}
+
+let pendingSettingsReset = null;   // the plan waiting on the confirm dialog
+
+function resetSettingsToUsual() {
+  if (!settingsState) return;
+  const plan = settingsResetPlan();
+  if (!plan.length) {
+    announce(`Every setting is already at ${KEYCHRON_USUAL}.`);
+    return;
+  }
+  pendingSettingsReset = plan;
+  $('settings-reset-confirm-desc').textContent = `This sets each of these to ${KEYCHRON_USUAL}. ` +
+    plan.map(step => `${step.label}: ${step.value}.`).join(' ');
+  openDialog('settings-reset-confirm');   // autofocus is Cancel
+}
+
+function cancelSettingsReset() {
+  pendingSettingsReset = null;
+  closeDialog('settings-reset-confirm');
+  announce('Settings not changed.', ANNOUNCE_AFTER_FOCUS_MS);
+}
+
+// Writes each step, re-reads every setting, and names any the keyboard did not keep.
+// Closing the dialog returns focus to the reset button, which reads before the result.
+async function confirmSettingsReset() {
+  const plan = pendingSettingsReset;
+  pendingSettingsReset = null;
+  closeDialog('settings-reset-confirm');
+  if (!plan || !settingsState) return;
+  const btn = $('btn-reset-settings');
+  const device = hidDevice;
+  setButtonBusy(btn, true);
+  const wrote = [];
+  for (const step of plan) {
+    try { await step.write(); wrote.push(true); } catch { wrote.push(false); }
+  }
+  if (hidDevice === device) await rereadAllSettings();
+  setButtonBusy(btn, false);
+  if (hidDevice !== device || !settingsState) return;
+  const failed = plan.filter((step, i) => !wrote[i] || !step.kept(settingsState));
+  playChirp(!failed.length);
+  announce(failed.length
+    ? `Could not reset ${listText(failed.map(step => step.label.toLowerCase()))}. The keyboard did not accept ${failed.length === 1 ? 'it' : 'them'}.`
+    : `Keyboard settings reset to ${KEYCHRON_USUAL}.`, ANNOUNCE_AFTER_FOCUS_MS);
+}
+
+async function rereadAllSettings() {
+  const layout = activeLayout();
+  const actuation = settingsState.actuation && layout ? await readActuation(layout) : null;
+  const misc = await readMiscSettingsForPage();
+  if (!settingsState) return;
+  Object.assign(settingsState, { actuation, ...misc });
+  showAllSettings();
 }
 
 // The line in Step 1 that points to Keyboard Settings, naming what the keyboard
@@ -33466,7 +33595,8 @@ const BUTTON_ACTIONS = {
     changeKeyFromConfirm, chooseADifferentKey, closeChangedKeys, confirmKeyWarning,
     confirmMacro, confirmResetAll, confirmShortcut, connectKeyboard,
     disconnectFromUnsupported, disconnectKeyboard, executeResetAll, executeRestore,
-    applyActuation, applyDebounce, applyPollingRate, applySleepTimes, applySplitDebounce, cancelDebounceConfirm, confirmDebounce,
+    applyActuation, applyDebounce, applyPollingRate, applySleepTimes, applySplitDebounce,
+    resetSettingsToUsual, cancelSettingsReset, confirmSettingsReset, cancelDebounceConfirm, confirmDebounce,
     startDepthTest,
     getStartedFromWelcome, goToHelp, openChangedKeys, openWriteTargetDialog,
     reportUnknownKeyboard, reportUntestedKeyboard, resetAllChanged, resetChoiceCancel, resetSelectedKeyToDefault,
@@ -33597,6 +33727,7 @@ function bindFormControls() {
   bindDialogCancel('restore-confirm',    cancelRestore);
   bindDialogCancel('wt-dialog',          cancelWriteTargetDialog);
   bindDialogCancel('debounce-confirm',   cancelDebounceConfirm);
+  bindDialogCancel('settings-reset-confirm', cancelSettingsReset);
 
   document.addEventListener('click', busyButtonClickGuard, true);
   document.addEventListener('click', onButtonAction);

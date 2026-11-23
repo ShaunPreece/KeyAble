@@ -761,6 +761,38 @@ test('an Ultra 8K board sets press and release debounce, and refuses a release t
   await page.close();
 });
 
+test("Reset All Settings asks first, lists only what changes, and returns each to Keychron's usual", async () => {
+  const page = await demoPage(V6_ULTRA_ISO);
+  await page.keyboard.press('Alt+5');
+  await page.locator('#setting-polling:visible').waitFor();
+  await page.locator('#btn-reset-settings').click();
+  await page.locator('#sr-live', { hasText: "Every setting is already at Keychron's usual." }).waitFor();
+
+  await page.evaluate(() => {
+    hidDevice.keychronUltra.polling = [0, 1];
+    hidDevice.keychronUltra.debounce = [5, 15];
+  });
+  await page.keyboard.press('Alt+1');
+  await page.keyboard.press('Alt+5');   // a visit re-reads the settings
+  await page.locator('#split-debounce-now', { hasText: 'press 5 milliseconds' }).waitFor();
+  await page.locator('#btn-reset-settings').click();
+  await page.locator('#settings-reset-confirm[open]').waitFor();
+  assert.equal(await page.locator('#settings-reset-confirm-desc').textContent(),
+    "This sets each of these to Keychron's usual. Debounce: press 0 milliseconds and release 50 milliseconds. " +
+    'Polling rate: 1000 times a second.');
+  await page.locator('#btn-settings-reset-cancel').click();
+  await page.locator('#sr-live', { hasText: 'Settings not changed.' }).waitFor();
+  assert.deepEqual(await page.evaluate(() => hidDevice.keychronUltra.polling), [0, 1]);
+
+  await page.locator('#btn-reset-settings').click();
+  await page.locator('#btn-settings-reset-confirm').click();
+  await page.locator('#sr-live', { hasText: "Keyboard settings reset to Keychron's usual." }).waitFor();
+  assert.deepEqual(await page.evaluate(() => ({ polling: hidDevice.keychronUltra.polling, debounce: hidDevice.keychronUltra.debounce })),
+    { polling: [3, 3], debounce: [0, 50] });
+  assert.equal(await page.locator('#split-debounce-now').textContent(), 'Now press 0 milliseconds and release 50 milliseconds.');
+  await page.close();
+});
+
 test('an HE board sets one actuation point for every key, replacing keys with their own', async () => {
   const page = await demoPage(K2_HE_ANSI);
   assert.equal((await page.locator('#settings-hint').textContent()).trim(),
