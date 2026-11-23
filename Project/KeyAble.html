@@ -29711,9 +29711,9 @@ async function askKeychron(command, sub, ...args) {
 }
 
 // A Keychron command family's sub-command 1 reply, which starts with the family's
-// protocol version; null when the board does not have the family. Keychron's ZMK
-// firmware has neither family and returns the request unchanged, which reads as
-// version 0.
+// protocol version; null when the board does not have the family. The B Pro boards'
+// ZMK firmware has neither family and returns the request unchanged, which reads as
+// version 0. The Ultra 8K boards' ZMK firmware has both.
 async function keychronInfo(command) {
   const reply = await sendVIA([command, 0x01]);
   if (!reply || reply[0] !== command || reply[2] !== 0) return null;
