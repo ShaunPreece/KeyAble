@@ -1752,7 +1752,20 @@
       <!-- Each release adds its version above the previous one. -->
       <div class="card">
         <h3 style="border-left:none;padding-left:0;margin-bottom:.6rem">What's New.</h3>
-        <h4 style="margin-top:.5rem">Version 1.5, 19th November 2026</h4>
+        <h4 style="margin-top:.5rem">Version 1.6, 23rd November 2026</h4>
+        <ul style="margin:.3rem 0 0 1.25rem;padding:0;line-height:1.55">
+          <li>A new Keyboard Settings page, Alt plus 5, for the settings your keyboard's firmware
+            has: debounce and the wireless sleep times on Max keyboards, and the actuation point
+            on HE keyboards, with Test Key Depth to help choose it. Help moves to Alt plus 6.</li>
+          <li>On Ultra 8K keyboards, Keyboard Settings sets the polling rate, up to 8000 times a
+            second, separate press and release debounce times, and the sleep times.</li>
+          <li>Reset All Settings to Keychron's Usual puts every setting back, after listing what
+            it would change.</li>
+          <li>The voice key on Ultra 8K keyboards is now known to be Cortana (Win+C), so it no
+            longer shows as changed on a new keyboard.</li>
+          <li>The V6 Ultra 8K ISO has been tested on a real keyboard.</li>
+        </ul>
+        <h4 style="margin-top:1rem">Version 1.5, 19th November 2026</h4>
         <ul style="margin:.3rem 0 0 1.25rem;padding:0;line-height:1.55">
           <li>60 more models, including the wired Q and V series, the K Pro and Q Pro ranges, the
             K17 Max and more Max models, and the C1, C2 and C3 Pro.</li>
@@ -29650,7 +29663,7 @@ async function executeResetAll() {
 // Bump KEYABLE_VERSION by hand at a real release (MAJOR.MINOR.PATCH: a small
 // fix is a PATCH, a new feature a MINOR); update KEYABLE_RELEASE_DATE (ISO)
 // to that day. showAppVersion writes it under the page title and the Help page.
-const KEYABLE_VERSION       = '1.5';
+const KEYABLE_VERSION       = '1.6';
 const KEYABLE_RELEASE_DATE  = '2026-11-19';   // ISO yyyy-mm-dd
 
 // The human-friendly version string, e.g. "Version 1.3, released
