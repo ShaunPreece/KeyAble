@@ -8,7 +8,7 @@
    inDemoMode, scanChangedKeys, captureSession, writeKeyCodeOnLayer, restoreFileChosen,
    macroKeycode, offeredSystemKeys, codeName, LIST_STEP_TYPES, writeTarget:writable,
    readKeyCodeOnLayer, decodeAction, layerActionChanged, resetValueForLayer,
-   CMD_DYNAMIC_KEYMAP_RESET, DemoAnalogMatrix, analogTravelAt */
+   CMD_DYNAMIC_KEYMAP_RESET, DemoAnalogMatrix, analogTravelAt, fnLayerFor */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -18,6 +18,7 @@ const V2_MAX_ANSI = 0x0920;   // a five-layer model, so its own role map matters
 const V6_MAX_ANSI = 0x0960;   // protocol 12 RGB: Keychron settings and Keychron lighting
 const K2_PRO_ANSI = 0x0220;   // protocol 9 firmware: the oldest keycode numbering and lighting commands
 const K2_PRO_ANSI_WHITE = 0x0223;
+const K6_PRO_ANSI = 0x0260;   // 65%: no top row of F keys
 const V1_ANSI = 0x0310;       // protocol 11 firmware: Keychron keys from 0x7F00
 const Q1_V1_ANSI = 0x0100;    // AVR firmware, read from its .hex file: protocol 11 numbering
 // ZMK firmware: protocol 12, but its own list of Keychron keys. Original and 2025 boards.
@@ -626,7 +627,7 @@ async function settingsPage(pid) {
 }
 
 const shownSettings = page => page.evaluate(() =>
-  ['setting-actuation', 'setting-debounce', 'setting-split-debounce', 'setting-polling', 'setting-sleep']
+  ['setting-fn-lock', 'setting-actuation', 'setting-debounce', 'setting-split-debounce', 'setting-polling', 'setting-sleep']
     .filter(id => !document.getElementById(id).hidden));
 
 test('Keyboard Settings asks for a keyboard when none is connected', async () => {
@@ -638,8 +639,8 @@ test('Keyboard Settings asks for a keyboard when none is connected', async () =>
   await page.close();
 });
 
-test('a board with no settings has no Step 1 hint, and Keyboard Settings says so', async () => {
-  const page = await demoPage(K2_PRO_ANSI);
+test('a board with no settings and no top row has no Step 1 hint, and Keyboard Settings says so', async () => {
+  const page = await demoPage(K6_PRO_ANSI);
   assert.equal(await page.locator('#settings-hint').isVisible(), false);
   await page.keyboard.press('Alt+5');
   await page.locator('#settings-status-text', { hasText: "This keyboard's firmware has no settings KeyAble can change." }).waitFor();
@@ -647,13 +648,93 @@ test('a board with no settings has no Step 1 hint, and Keyboard Settings says so
   await page.close();
 });
 
+test('a board with a top row and no Keychron settings offers Fn Lock alone', async () => {
+  const page = await demoPage(K2_PRO_ANSI);
+  assert.equal((await page.locator('#settings-hint').textContent()).trim(),
+    "You can change this keyboard's Fn lock in Keyboard Settings (Alt+5).");
+  await page.keyboard.press('Alt+5');
+  await page.locator('#setting-fn-lock:visible').waitFor();
+  assert.deepEqual(await shownSettings(page), ['setting-fn-lock']);
+  assert.equal(await page.locator('#settings-reset-row').isVisible(), false);
+  await page.close();
+});
+
+// F1, F2 and F12 on a layout: [base code, Fn code] for each.
+const topRow = (page, os) => page.evaluate(async os => {
+  const R = activeLayerRoles();
+  const base = os === 'mac' ? R.mac : R.win;
+  const out = {};
+  for (const label of ['F1', 'F2', 'F12']) {
+    const key = activeLayout().keys.find(k => k.label === label);
+    out[label] = [await readKeyCodeOnLayer(base, key), await readKeyCodeOnLayer(fnLayerFor(base), key)];
+  }
+  return out;
+}, os);
+
+test('Fn Lock swaps the top row of one layout, says so, and swaps it back to factory', async () => {
+  const page = await demoPage(V6_MAX_ANSI);
+  await page.keyboard.press('Alt+5');
+  await page.locator('#setting-fn-lock:visible').waitFor();
+  assert.equal(await page.locator('#fn-lock-now-mac').textContent(),
+    'On the Mac layout, the top row types its media keys, and Fn plus a key gives F1 to F12.');
+  assert.equal(await page.locator('#fn-lock-now-windows').textContent(),
+    'On the Windows layout, the top row types F1 to F12, and Fn plus a key gives its media key.');
+  const factoryMac = await topRow(page, 'mac');
+  const factoryWin = await topRow(page, 'windows');
+
+  const macButton = page.locator('#btn-fn-lock-mac');
+  assert.equal(await macButton.textContent(), 'Put F1 to F12 First on the Mac Layout');
+  await macButton.click();
+  await page.locator('#sr-live', { hasText: 'Done. On the Mac layout, the top row now types F1 to F12. ' +
+    "Hold Fn for its media keys. Your keyboard's switch is set to Windows, so this takes effect when you flip it to Mac." }).waitFor();
+  assert.equal(await macButton.textContent(), 'Put Media Keys First on the Mac Layout');
+  const swapped = await topRow(page, 'mac');
+  for (const label of Object.keys(swapped)) {
+    assert.deepEqual(swapped[label], [factoryMac[label][1], factoryMac[label][0]], `${label} swapped`);
+  }
+  assert.deepEqual(await topRow(page, 'windows'), factoryWin, 'the Windows layout is left alone');
+
+  await macButton.click();
+  await page.locator('#sr-live', { hasText: 'Done. On the Mac layout, the top row now types its media keys.' }).waitFor();
+  assert.deepEqual(await topRow(page, 'mac'), factoryMac);
+  await page.close();
+});
+
+test('Fn Lock leaves a key with its F key on neither layer alone, and calls a part-swapped row mixed', async () => {
+  const page = await demoPage(V6_MAX_ANSI);
+  await page.evaluate(async () => {
+    const R = activeLayerRoles();
+    const key = label => activeLayout().keys.find(k => k.label === label);
+    await writeKeyCodeOnLayer(R.win, key('F2'), 0x0006);     // C
+    await writeKeyCodeOnLayer(R.winFn, key('F2'), 0x0007);   // D: F2 is on neither layer
+    await writeKeyCodeOnLayer(R.win, key('F3'), 0x0008);     // E
+    await writeKeyCodeOnLayer(R.winFn, key('F3'), 0x003C);   // F3, now on Fn
+  });
+  await page.keyboard.press('Alt+5');
+  await page.locator('#setting-fn-lock:visible').waitFor();
+  assert.equal(await page.locator('#fn-lock-now-windows').textContent(),
+    'On the Windows layout, some top-row keys type their F key first and some their media key.');
+  assert.equal(await page.locator('#btn-fn-lock-windows').textContent(), 'Put F1 to F12 First on the Windows Layout');
+  await page.locator('#btn-fn-lock-windows').click();
+  await page.locator('#sr-live', { hasText: 'Done. On the Windows layout, the top row now types F1 to F12.' }).waitFor();
+  const codes = await page.evaluate(async () => {
+    const R = activeLayerRoles();
+    const key = label => activeLayout().keys.find(k => k.label === label);
+    const pair = async label => [await readKeyCodeOnLayer(R.win, key(label)), await readKeyCodeOnLayer(R.winFn, key(label))];
+    return { F2: await pair('F2'), F3: await pair('F3') };
+  });
+  assert.deepEqual(codes.F2, [0x0006, 0x0007], 'a key with its F key on neither layer is left alone');
+  assert.deepEqual(codes.F3, [0x003C, 0x0008], 'a key with its F key on Fn is swapped');
+  await page.close();
+});
+
 test('a Max board offers debounce and sleep times, and applies debounce', async () => {
   const page = await demoPage(V6_MAX_ANSI);
   assert.equal((await page.locator('#settings-hint').textContent()).trim(),
-    "You can change this keyboard's debounce and wireless sleep times in Keyboard Settings (Alt+5).");
+    "You can change this keyboard's Fn lock, debounce and wireless sleep times in Keyboard Settings (Alt+5).");
   await page.keyboard.press('Alt+5');
   await page.locator('#setting-debounce:visible').waitFor();
-  assert.deepEqual(await shownSettings(page), ['setting-debounce', 'setting-sleep']);
+  assert.deepEqual(await shownSettings(page), ['setting-fn-lock', 'setting-debounce', 'setting-sleep']);
   assert.equal(await page.locator('#debounce-now').textContent(), "Now 5 milliseconds (Keychron's usual).");
 
   await page.locator('#debounce-ms').fill('12');
@@ -717,10 +798,10 @@ test('sleep times apply, and a refusal says so and keeps the times', async () =>
 test('an Ultra 8K board offers its debounce, polling rate and sleep times, and applies the polling rate', async () => {
   const page = await demoPage(V6_ULTRA_ISO);
   assert.equal((await page.locator('#settings-hint').textContent()).trim(),
-    "You can change this keyboard's debounce, polling rate and wireless sleep times in Keyboard Settings (Alt+5).");
+    "You can change this keyboard's Fn lock, debounce, polling rate and wireless sleep times in Keyboard Settings (Alt+5).");
   await page.keyboard.press('Alt+5');
   await page.locator('#setting-polling:visible').waitFor();
-  assert.deepEqual(await shownSettings(page), ['setting-split-debounce', 'setting-polling', 'setting-sleep']);
+  assert.deepEqual(await shownSettings(page), ['setting-fn-lock', 'setting-split-debounce', 'setting-polling', 'setting-sleep']);
   assert.equal(await page.locator('#polling-now').textContent(),
     'Now 1000 times a second by cable and 1000 times a second on 2.4 GHz. Bluetooth always uses 125.');
   assert.deepEqual(await page.locator('#polling-cable option').allTextContents(), [
@@ -796,14 +877,14 @@ test("Reset All Settings asks first, lists only what changes, and returns each t
 test('an HE board sets one actuation point for every key, replacing keys with their own', async () => {
   const page = await demoPage(K2_HE_ANSI);
   assert.equal((await page.locator('#settings-hint').textContent()).trim(),
-    "You can change this keyboard's actuation point in Keyboard Settings (Alt+5).");
+    "You can change this keyboard's Fn lock and actuation point in Keyboard Settings (Alt+5).");
   await page.evaluate(() => {   // as if Keychron's Launcher had given one key its own point
     const a = hidDevice.analog;
     DemoAnalogMatrix.setTravel(a.profiles[0], a.keyAt(2, 1), { mode: 1, point: 5, sens: 4, releaseSens: 4 });
   });
   await page.keyboard.press('Alt+5');
   await page.locator('#setting-actuation:visible').waitFor();
-  assert.deepEqual(await shownSettings(page), ['setting-actuation']);
+  assert.deepEqual(await shownSettings(page), ['setting-fn-lock', 'setting-actuation']);
   const now = await page.locator('#actuation-now').textContent();
   assert.match(now, /^Now 2\.0 millimetres \(Keychron's usual\)\. This changes profile 1 of 3/);
   assert.match(now, /1 key has its own settings/);
