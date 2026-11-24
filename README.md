@@ -43,6 +43,8 @@ browser; nothing is sent anywhere over the internet.
   a system action (such as Lock Screen or Copilot), a macro, or nothing.
 - Change the knob's press and turn actions, on models that have one.
 - Set a separate action for a key held with Fn, so a key can do two jobs.
+- Fn Lock: swap the top row between F1 to F12 and the media keys, on the Mac
+  or Windows layout, so either works without holding Fn.
 - Edit the Mac or Windows layout, with keys and modifiers named correctly for
   the side you are editing.
 - Choose a key from a list, or by pressing it in Capture Mode.
